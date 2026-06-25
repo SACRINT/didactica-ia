@@ -1,15 +1,24 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is not set');
+// ─── Lazy SQL client ────────────────────────────────────────────────────────
+// Instantiated on first call at runtime, not at build time.
+// Prevents Vercel build failures when DATABASE_URL is missing during static analysis.
+let _client: NeonQueryFunction<false, false> | null = null;
+
+function sql(): NeonQueryFunction<false, false> {
+  if (!_client) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    _client = neon(process.env.DATABASE_URL);
+  }
+  return _client;
 }
 
-export const sql = neon(process.env.DATABASE_URL);
-
-// ─── Teacher queries ───────────────────────────────────────────────────────
+// ─── Teacher queries ────────────────────────────────────────────────────────
 
 export async function getTeacherByEmail(email: string) {
-  const rows = await sql`
+  const rows = await sql()`
     SELECT id, name, email, school_name, municipality, subsystem, created_at
     FROM teachers
     WHERE email = ${email}
@@ -25,7 +34,7 @@ export async function createTeacher(data: {
   municipality?: string;
   subsystem?: string;
 }) {
-  const rows = await sql`
+  const rows = await sql()`
     INSERT INTO teachers (name, email, school_name, municipality, subsystem)
     VALUES (${data.name}, ${data.email}, ${data.schoolName || null}, ${data.municipality || null}, ${data.subsystem || null})
     RETURNING id, name, email, school_name, municipality, subsystem, created_at
@@ -37,7 +46,7 @@ export async function upsertTeacher(data: {
   name: string;
   email: string;
 }) {
-  const rows = await sql`
+  const rows = await sql()`
     INSERT INTO teachers (name, email)
     VALUES (${data.name}, ${data.email})
     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
@@ -51,7 +60,7 @@ export async function updateTeacherProfile(teacherId: string, data: {
   municipality?: string;
   subsystem?: string;
 }) {
-  const rows = await sql`
+  const rows = await sql()`
     UPDATE teachers
     SET
       school_name = COALESCE(${data.schoolName || null}, school_name),
@@ -66,7 +75,7 @@ export async function updateTeacherProfile(teacherId: string, data: {
 // ─── Planning queries ───────────────────────────────────────────────────────
 
 export async function getPlanningsByTeacher(teacherId: string) {
-  return sql`
+  return sql()`
     SELECT id, teacher_id, uac_name, semester, component, curriculum_name,
            status, created_at, updated_at
     FROM plannings
@@ -76,7 +85,7 @@ export async function getPlanningsByTeacher(teacherId: string) {
 }
 
 export async function getPlanningById(id: string, teacherId: string) {
-  const rows = await sql`
+  const rows = await sql()`
     SELECT *
     FROM plannings
     WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
@@ -94,7 +103,7 @@ export async function createPlanning(data: {
   paecContext?: string;
   extractedData?: object;
 }) {
-  const rows = await sql`
+  const rows = await sql()`
     INSERT INTO plannings (
       teacher_id, uac_name, semester, component,
       curriculum_name, paec_context, extracted_data, status
@@ -119,7 +128,7 @@ export async function updatePlanningContent(
   teacherId: string,
   contentJson: object
 ) {
-  const rows = await sql`
+  const rows = await sql()`
     UPDATE plannings
     SET
       content_json = ${JSON.stringify(contentJson)},
@@ -132,7 +141,7 @@ export async function updatePlanningContent(
 }
 
 export async function markPlanningDownloaded(id: string, teacherId: string) {
-  await sql`
+  await sql()`
     UPDATE plannings
     SET status = 'downloaded', updated_at = NOW()
     WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
@@ -140,13 +149,13 @@ export async function markPlanningDownloaded(id: string, teacherId: string) {
 }
 
 export async function deletePlanning(id: string, teacherId: string) {
-  await sql`
+  await sql()`
     DELETE FROM plannings
     WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
   `;
 }
 
-// ─── PDF uploads ────────────────────────────────────────────────────────────
+// ─── PDF uploads ─────────────────────────────────────────────────────────────
 
 export async function savePdfUpload(data: {
   teacherId: string;
@@ -155,11 +164,11 @@ export async function savePdfUpload(data: {
   blobUrl: string;
   parsedOk: boolean;
 }) {
-  const rows = await sql`
+  const rows = await sql()`
     INSERT INTO uploaded_pdfs (teacher_id, planning_id, filename, blob_url, parsed_ok)
     VALUES (
       ${data.teacherId}::uuid,
-      ${data.planningId ? `${data.planningId}::uuid` : null},
+      ${data.planningId ? data.planningId : null},
       ${data.filename},
       ${data.blobUrl},
       ${data.parsedOk}
