@@ -9,7 +9,7 @@ const intlMiddleware = createMiddleware(routing);
 // Routes that require authentication
 const protectedPaths = ['/dashboard', '/nueva-planeacion', '/planeacion'];
 
-export default async function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check if path (without locale prefix) is protected
@@ -28,5 +28,5 @@ export default async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)',],
 };
