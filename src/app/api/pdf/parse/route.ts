@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail } from '@/lib/db';
 import { parsePdfBuffer } from '@/lib/pdf-parser';
-import { put } from '@vercel/blob';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60; // Claude PDF extraction can take up to 40-50s for large files
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,30 +31,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El archivo debe ser un PDF' }, { status: 400 });
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: 'El archivo no puede superar 10 MB' }, { status: 400 });
+    if (file.size > 20 * 1024 * 1024) {
+      return NextResponse.json({ error: 'El archivo no puede superar 20 MB' }, { status: 400 });
     }
 
-    // Convert to buffer and parse
+    // Convert to buffer and parse using Claude AI
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const parseResult = await parsePdfBuffer(buffer);
-
-    // Upload to Vercel Blob (non-blocking, best-effort)
-    try {
-      const blob = await put(
-        `pdfs/${teacher.id}/${Date.now()}-${file.name}`,
-        buffer,
-        {
-          access: 'private',
-          contentType: 'application/pdf',
-        }
-      );
-      // Could save blob.url to DB here if needed
-    } catch (blobErr) {
-      // Blob storage failure is non-critical — continue
-      console.warn('Blob storage upload failed (non-critical):', blobErr);
-    }
 
     return NextResponse.json({
       success: parseResult.success,

@@ -13,6 +13,9 @@ interface Props {
   onNext: (data: UACSelection) => void;
 }
 
+// Formación Laboral is NOT available in semester 1 or 2
+const SEMESTERS_WITHOUT_LABORAL = [1, 2];
+
 export default function StepUAC({ onNext }: Props) {
   const [form, setForm] = useState<UACSelection>({
     uacName: '',
@@ -21,6 +24,17 @@ export default function StepUAC({ onNext }: Props) {
     curriculumName: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const isLaboralDisabled = SEMESTERS_WITHOUT_LABORAL.includes(form.semester);
+
+  // When semester changes, auto-switch to 'fundamental' if laboral is not available
+  const handleSemesterChange = (newSemester: number) => {
+    const nextComponent =
+      SEMESTERS_WITHOUT_LABORAL.includes(newSemester) && form.component === 'laboral'
+        ? 'fundamental'
+        : form.component;
+    setForm({ ...form, semester: newSemester, component: nextComponent });
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -64,7 +78,7 @@ export default function StepUAC({ onNext }: Props) {
               <select
                 className="form-select"
                 value={form.semester}
-                onChange={e => setForm({ ...form, semester: Number(e.target.value) })}
+                onChange={e => handleSemesterChange(Number(e.target.value))}
               >
                 {[1, 2, 3, 4, 5, 6].map(s => (
                   <option key={s} value={s}>{s}° Semestre</option>
@@ -78,10 +92,21 @@ export default function StepUAC({ onNext }: Props) {
                 value={form.component}
                 onChange={e => setForm({ ...form, component: e.target.value })}
               >
-                <option value="laboral">Formación Laboral</option>
-                <option value="fundamental">Currículo Fundamental</option>
-                <option value="ampliado">Currículo Ampliado</option>
+                <option value="fundamental">Currículum Fundamental</option>
+                <option value="ampliado">Currículum Ampliado</option>
+                <option
+                  value="laboral"
+                  disabled={isLaboralDisabled}
+                  style={isLaboralDisabled ? { color: '#aaa' } : {}}
+                >
+                  Formación Laboral{isLaboralDisabled ? ' (3°-6° sem.)' : ''}
+                </option>
               </select>
+              {isLaboralDisabled && (
+                <span className="form-hint" style={{ color: 'var(--c-amber)', fontWeight: 500 }}>
+                  ⚠️ Formación Laboral no aplica para 1° y 2° semestre.
+                </span>
+              )}
             </div>
           </div>
 

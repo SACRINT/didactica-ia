@@ -9,14 +9,17 @@ interface Props {
   onBack: () => void;
 }
 
-const REGIONS = [
-  'Sierra Norte',
-  'Sierra Negra / Nororiente',
-  'Mixteca',
-  'Valle de Tehuacán',
-  'Angelópolis',
-  'Centro (Puebla Capital)',
-  'Otra región',
+const SUBSYSTEMS = [
+  { value: 'bge',     label: 'Bachillerato General Estatal (BGE)' },
+  { value: 'digital', label: 'Bachillerato Digital' },
+  { value: 'emsad',   label: 'EMSAD' },
+  { value: 'cecyte',  label: 'CECyTE' },
+  { value: 'cbtis',   label: 'CBTIS' },
+  { value: 'cbta',    label: 'CBTA' },
+  { value: 'conalep', label: 'CONALEP' },
+  { value: 'dgb',     label: 'Preparatoria Federal / DGB' },
+  { value: 'telebachillerato', label: 'Telebachillerato' },
+  { value: 'otro',    label: 'Otro subsistema' },
 ];
 
 export default function StepContext({ extractedData, onNext, onBack }: Props) {
@@ -24,10 +27,15 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
     teacherName: '',
     schoolName: '',
     municipality: '',
+    state: 'Puebla',
     region: '',
     subsystem: 'bge',
     groupInfo: '',
+    applicationPeriod: '',
+    paecProjectName: '',
+    paecObjective: '',
     paecProblem: '',
+    schoolResources: '',
     studentContext: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -37,8 +45,9 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
     if (!form.teacherName.trim()) e.teacherName = 'Requerido';
     if (!form.schoolName.trim()) e.schoolName = 'Requerido';
     if (!form.municipality.trim()) e.municipality = 'Requerido';
+    if (!form.paecProjectName?.trim()) e.paecProjectName = 'El nombre del proyecto PAEC es requerido';
     if (!form.paecProblem.trim())
-      e.paecProblem = 'La problemática PAEC es requerida para contextualizar las actividades';
+      e.paecProblem = 'La problemática comunitaria es requerida para contextualizar las actividades';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -48,19 +57,21 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
     if (validate()) onNext(form);
   };
 
+  const set = (field: Partial<TeacherContext>) => setForm(f => ({ ...f, ...field }));
+
   return (
     <form onSubmit={handleSubmit}>
-      <div className="card">
-        <h2 className="card-title">Paso 3: Contexto escolar y PAEC</h2>
-        <p className="card-subtitle">
-          Esta información personaliza las actividades al contexto real de tus estudiantes y su
-          comunidad. Es el hilo conductor de toda la planeación.
-        </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* ── SECCIÓN 1: Datos del plantel ─────────────────────────── */}
+        <div className="card">
+          <h2 className="card-title">Paso 3: Contexto escolar y PAEC</h2>
+          <p className="card-subtitle">
+            Esta información personaliza las actividades al contexto real de tus estudiantes y su
+            comunidad. Entre más detallada sea la información, mejor será la planeación generada.
+          </p>
 
-          {/* Plantel data */}
-          <div className="section-card">
+          <div className="section-card" style={{ marginTop: '16px' }}>
             <div className="section-card-header">
               <span style={{ fontSize: '18px' }}>🏫</span>
               <span className="section-card-title">Datos del plantel</span>
@@ -74,7 +85,7 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                     className="form-input"
                     placeholder="Ej: Dra. María López Hernández"
                     value={form.teacherName}
-                    onChange={e => setForm({ ...form, teacherName: e.target.value })}
+                    onChange={e => set({ teacherName: e.target.value })}
                   />
                   {errors.teacherName && <span className="form-error">{errors.teacherName}</span>}
                 </div>
@@ -84,9 +95,9 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                     <label className="form-label form-label-required">Nombre del plantel</label>
                     <input
                       className="form-input"
-                      placeholder="Ej: CBTa No. 5 / EMSAD 03"
+                      placeholder="Ej: EMSAD 03 Héroes de la Patria"
                       value={form.schoolName}
-                      onChange={e => setForm({ ...form, schoolName: e.target.value })}
+                      onChange={e => set({ schoolName: e.target.value })}
                     />
                     {errors.schoolName && <span className="form-error">{errors.schoolName}</span>}
                   </div>
@@ -96,7 +107,7 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                       className="form-input"
                       placeholder="Ej: Izúcar de Matamoros"
                       value={form.municipality}
-                      onChange={e => setForm({ ...form, municipality: e.target.value })}
+                      onChange={e => set({ municipality: e.target.value })}
                     />
                     {errors.municipality && <span className="form-error">{errors.municipality}</span>}
                   </div>
@@ -104,29 +115,48 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Región</label>
-                    <select
-                      className="form-select"
-                      value={form.region}
-                      onChange={e => setForm({ ...form, region: e.target.value })}
-                    >
-                      <option value="">Selecciona una región</option>
-                      {REGIONS.map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
+                    <label className="form-label">Estado</label>
+                    <input
+                      className="form-input"
+                      placeholder="Ej: Puebla"
+                      value={form.state}
+                      onChange={e => set({ state: e.target.value })}
+                    />
+                    <span className="form-hint">Por defecto: Puebla. Modifica si aplica en otro estado.</span>
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Región</label>
+                    <input
+                      className="form-input"
+                      placeholder="Ej: Sierra Norte, Mixteca, Angelópolis..."
+                      value={form.region}
+                      onChange={e => set({ region: e.target.value })}
+                    />
+                    <span className="form-hint">Escribe la región tal como la conocen en tu zona.</span>
+                  </div>
+                </div>
+
+                <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Subsistema / Modalidad</label>
                     <select
                       className="form-select"
                       value={form.subsystem}
-                      onChange={e => setForm({ ...form, subsystem: e.target.value as TeacherContext['subsystem'] })}
+                      onChange={e => set({ subsystem: e.target.value })}
                     >
-                      <option value="bge">Bachillerato General Estatal (BGE)</option>
-                      <option value="digital">Bachillerato Digital</option>
-                      <option value="emsad">EMSAD</option>
+                      {SUBSYSTEMS.map(s => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Período de aplicación</label>
+                    <input
+                      className="form-input"
+                      placeholder="Ej: Agosto – Diciembre 2026"
+                      value={form.applicationPeriod || ''}
+                      onChange={e => set({ applicationPeriod: e.target.value })}
+                    />
                   </div>
                 </div>
 
@@ -136,22 +166,78 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                     className="form-input"
                     placeholder="Ej: 3°A (32 estudiantes), 3°B (30 estudiantes)"
                     value={form.groupInfo}
-                    onChange={e => setForm({ ...form, groupInfo: e.target.value })}
+                    onChange={e => set({ groupInfo: e.target.value })}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Recursos disponibles en el plantel</label>
+                  <input
+                    className="form-input"
+                    placeholder="Ej: Proyector, internet básico, laboratorio de enfermería, sin computadoras para alumnos"
+                    value={form.schoolResources || ''}
+                    onChange={e => set({ schoolResources: e.target.value })}
+                  />
+                  <span className="form-hint">
+                    Indica los recursos tecnológicos, espacios y materiales disponibles.
+                  </span>
                 </div>
 
               </div>
             </div>
           </div>
+        </div>
 
-          {/* PAEC context */}
-          <div className="section-card">
+        {/* ── SECCIÓN 2: Proyecto PAEC/PEC ─────────────────────────── */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="section-card" style={{ margin: 0 }}>
             <div className="section-card-header">
               <span style={{ fontSize: '18px' }}>🌎</span>
-              <span className="section-card-title">Contexto PAEC y comunidad</span>
+              <span className="section-card-title">Proyecto PAEC / PEC y contexto comunitario</span>
             </div>
             <div className="section-card-body">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                <div
+                  style={{
+                    background: 'var(--c-blue-pale)',
+                    border: '1px solid var(--c-blue-mid)',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    fontSize: '13px',
+                    color: 'var(--c-navy)',
+                  }}
+                >
+                  💡 El proyecto PAEC es el hilo conductor que vincula TODAS las actividades didácticas.
+                  La planeación generada integrará este proyecto en cada actividad clave.
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label form-label-required">
+                    Nombre del proyecto PAEC/PEC
+                  </label>
+                  <input
+                    className="form-input"
+                    placeholder='Ej: "Salud Integral: Prevención de Enfermedades Crónicas en nuestra Comunidad"'
+                    value={form.paecProjectName || ''}
+                    onChange={e => set({ paecProjectName: e.target.value })}
+                  />
+                  {errors.paecProjectName && <span className="form-error">{errors.paecProjectName}</span>}
+                  <span className="form-hint">
+                    Copia el título del proyecto tal como aparece en tu documento PAEC o PEC.
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Objetivo general del proyecto</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    placeholder="Ej: Desarrollar en los estudiantes habilidades para identificar, prevenir y orientar sobre enfermedades crónicas comunes en su comunidad."
+                    value={form.paecObjective || ''}
+                    onChange={e => set({ paecObjective: e.target.value })}
+                  />
+                </div>
 
                 <div className="form-group">
                   <label className="form-label form-label-required">
@@ -160,13 +246,13 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                   <textarea
                     className="form-textarea"
                     rows={4}
-                    placeholder="Describe la problemática social, ambiental o de salud que afecta a la comunidad. Ej: 'Alta incidencia de diabetes y obesidad en la población adulta del municipio, relacionada con malos hábitos alimenticios y automedicación sin prescripción médica.'"
+                    placeholder="Describe la problemática social, ambiental o de salud que afecta a la comunidad. Ej: 'Alta incidencia de diabetes tipo 2 y obesidad en adultos mayores del municipio de Izúcar de Matamoros, agravada por el consumo de alimentos ultraprocesados y automedicación.'"
                     value={form.paecProblem}
-                    onChange={e => setForm({ ...form, paecProblem: e.target.value })}
+                    onChange={e => set({ paecProblem: e.target.value })}
                   />
                   {errors.paecProblem && <span className="form-error">{errors.paecProblem}</span>}
-                  <span className="form-hint">
-                    Esta problemática será el hilo conductor de TODAS las actividades didácticas.
+                  <span className="form-hint" style={{ color: 'var(--c-navy-light)', fontWeight: 500 }}>
+                    Esta problemática aparecerá en la Sección II y guiará las actividades de la Sección IV.
                   </span>
                 </div>
 
@@ -175,20 +261,20 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                   <textarea
                     className="form-textarea"
                     rows={3}
-                    placeholder="Ej: 32 estudiantes de comunidades rurales, con acceso limitado a internet. Algunos hablan náhuatl. Tienen celular pero no computadora. Trabajan en negocios familiares del sector salud (farmacias)."
+                    placeholder="Ej: 30 estudiantes de comunidades rurales. Zona de alta marginación. Algunos hablan náhuatl. Tienen celular pero sin internet en casa. Varios trabajan en farmacias o en el campo."
                     value={form.studentContext}
-                    onChange={e => setForm({ ...form, studentContext: e.target.value })}
+                    onChange={e => set({ studentContext: e.target.value })}
                   />
                   <span className="form-hint">
-                    ¿Qué recursos tienen? ¿Zona rural o urbana? ¿Acceso a tecnología? ¿Lengua indígena?
+                    ¿Zona rural o urbana? ¿Hablan lengua indígena? ¿Trabajan? ¿Acceso a internet?
                   </span>
                 </div>
 
               </div>
             </div>
           </div>
-
         </div>
+
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>

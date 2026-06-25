@@ -1,6 +1,7 @@
 export type PlanningStatus = 'draft' | 'generated' | 'downloaded';
 
-export type Subsystem = 'bge' | 'digital' | 'emsad';
+// Open string to support all subsystems (BGE, Digital, EMSAD, CECyTE, CBTIS, CBTA, CONALEP, DGB, etc.)
+export type Subsystem = string;
 
 export type CurriculumComponent = 'laboral' | 'fundamental' | 'ampliado';
 
@@ -24,11 +25,16 @@ export interface TeacherContext {
   teacherName: string;
   schoolName: string;
   municipality: string;
-  region: string;
+  state: string;                 // Estado (default "Puebla")
+  region: string;                // Texto libre
   subsystem: Subsystem;
   groupInfo: string;
-  paecProblem: string;
-  studentContext: string;
+  applicationPeriod?: string;    // Período de aplicación (Ago-Dic 2026)
+  paecProjectName?: string;      // Nombre del proyecto PAEC/PEC
+  paecObjective?: string;        // Objetivo general del proyecto
+  paecProblem: string;           // Problemática comunitaria (requerido)
+  schoolResources?: string;      // Recursos del plantel
+  studentContext: string;        // Caracterización de estudiantes
 }
 
 export interface TransversalityItem {
