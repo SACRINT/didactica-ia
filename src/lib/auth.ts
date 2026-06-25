@@ -3,9 +3,7 @@ import Google from 'next-auth/providers/google';
 import { upsertTeacher } from './db';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // NextAuth v5: uses AUTH_URL and AUTH_SECRET env vars
   trustHost: true,
-  debug: true, // TEMP: remove after OAuth is working
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
