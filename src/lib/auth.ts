@@ -3,10 +3,18 @@ import Google from 'next-auth/providers/google';
 import { upsertTeacher } from './db';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // NextAuth v5: uses AUTH_URL and AUTH_SECRET env vars
+  // AUTH_URL is automatically detected on Vercel, but we set it explicitly
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: 'select_account', // Always show account selector
+        },
+      },
     }),
   ],
   callbacks: {
