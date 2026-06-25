@@ -1,0 +1,143 @@
+{
+  "app": {
+    "name": "DidácticaIA",
+    "tagline": "Tu secuencia didáctica, perfectamente alineada al MCCEMS",
+    "description": "Genera planeaciones didácticas oficiales DBEPA 2026-2027 con IA"
+  },
+  "nav": {
+    "dashboard": "Mis planeaciones",
+    "newPlanning": "Nueva planeación",
+    "logout": "Cerrar sesión",
+    "login": "Iniciar sesión"
+  },
+  "auth": {
+    "title": "Bienvenido a DidácticaIA",
+    "subtitle": "Plataforma oficial para docentes del Bachillerato General Estatal, Digital y EMSAD — Estado de Puebla",
+    "loginWithGoogle": "Iniciar sesión con Google",
+    "loginDescription": "Usa tu correo institucional de la SEP Puebla",
+    "termsNotice": "Al iniciar sesión, aceptas que tus planeaciones se almacenen de forma privada y segura."
+  },
+  "dashboard": {
+    "title": "Mis planeaciones",
+    "subtitle": "Ciclo escolar 2026-2027",
+    "empty": "Aún no has creado ninguna planeación.",
+    "emptyAction": "Crear primera planeación",
+    "newPlanning": "Nueva planeación",
+    "status": {
+      "draft": "Borrador",
+      "generated": "Generada",
+      "downloaded": "Descargada"
+    },
+    "actions": {
+      "download": "Descargar DOCX",
+      "view": "Ver planeación",
+      "clone": "Duplicar",
+      "delete": "Eliminar"
+    }
+  },
+  "planning": {
+    "steps": {
+      "1": "Seleccionar UAC",
+      "2": "Subir programa",
+      "3": "Contexto PAEC",
+      "4": "Generar"
+    },
+    "component": "Componente curricular",
+    "semester": "Semestre",
+    "uacName": "Nombre de la UAC",
+    "hours": "Carga horaria",
+    "subsystem": "Subsistema / Modalidad",
+    "subsystemOptions": {
+      "bge": "Bachillerato General Estatal (BGE)",
+      "digital": "Bachillerato Digital",
+      "emsad": "EMSAD"
+    },
+    "semester_options": {
+      "1": "1er Semestre",
+      "2": "2do Semestre",
+      "3": "3er Semestre",
+      "4": "4to Semestre",
+      "5": "5to Semestre",
+      "6": "6to Semestre"
+    },
+    "component_options": {
+      "laboral": "Formación Laboral",
+      "fundamental": "Currículum Fundamental",
+      "ampliado": "Currículum Ampliado"
+    }
+  },
+  "pdf": {
+    "upload": {
+      "title": "Subir programa de estudios",
+      "subtitle": "Sube el PDF de tu plan y programa de estudios. La plataforma extraerá los datos automáticamente.",
+      "dragDrop": "Arrastra tu PDF aquí o haz clic para seleccionar",
+      "maxSize": "Tamaño máximo: 10 MB",
+      "formats": "Solo archivos PDF",
+      "uploading": "Subiendo...",
+      "parsing": "Extrayendo datos del programa...",
+      "success": "Datos extraídos correctamente",
+      "partial": "Algunos datos requieren revisión",
+      "failed": "No se pudieron extraer los datos automáticamente"
+    },
+    "review": {
+      "title": "Revisar datos del programa",
+      "subtitle": "Verifica que los datos extraídos sean correctos. Puedes editarlos manualmente.",
+      "uacName": "Nombre de la UAC",
+      "learningOutcome": "Resultado de aprendizaje",
+      "totalHours": "Carga horaria total",
+      "activities": "Actividades clave",
+      "addActivity": "Agregar actividad",
+      "evidence": "Evidencias sugeridas",
+      "addEvidence": "Agregar evidencia",
+      "activityName": "Nombre de la actividad",
+      "activityHours": "Horas",
+      "confirm": "Confirmar y continuar"
+    }
+  },
+  "context": {
+    "title": "Contexto escolar y PAEC",
+    "subtitle": "Esta información personaliza las actividades al contexto de tus estudiantes.",
+    "schoolName": "Nombre del plantel",
+    "municipality": "Municipio",
+    "region": "Región",
+    "region_options": {
+      "sierra_norte": "Sierra Norte",
+      "sierra_negra": "Sierra Negra / Nororiente",
+      "mixteca": "Mixteca",
+      "tehuacan": "Valle de Tehuacán",
+      "angelopolis": "Angelópolis",
+      "centro": "Centro (Puebla Capital)",
+      "otra": "Otra región"
+    },
+    "teacherName": "Nombre del(a) docente",
+    "groupInfo": "Grupos y número de estudiantes",
+    "paecProblem": "Problemática comunitaria detectada en el PAEC",
+    "paecProblemHelp": "Describe brevemente el problema social, ambiental o de salud que afecta a tu comunidad y que se abordará con esta UAC.",
+    "studentContext": "Caracterización de los estudiantes",
+    "studentContextHelp": "¿Qué recursos tienen? ¿Hablan lengua indígena? ¿Zona rural o urbana? ¿Acceso a internet?",
+    "generate": "Generar planeación"
+  },
+  "generation": {
+    "title": "Generando tu planeación...",
+    "steps": {
+      "preparing": "Preparando el contexto",
+      "sending": "Enviando a la IA",
+      "generating": "Generando las 7 secciones",
+      "building": "Construyendo el documento",
+      "done": "¡Planeación lista!"
+    },
+    "preview": "Vista previa",
+    "downloadDocx": "Descargar DOCX editable",
+    "downloadPdf": "Descargar PDF",
+    "regenerate": "Regenerar",
+    "note": "El archivo DOCX es completamente editable en Microsoft Word y Google Docs."
+  },
+  "errors": {
+    "generic": "Ocurrió un error inesperado. Por favor intenta de nuevo.",
+    "uploadFailed": "Error al subir el archivo. Verifica que sea un PDF válido.",
+    "parseFailed": "No se pudo extraer información del PDF. Por favor captura los datos manualmente.",
+    "generationFailed": "Error al generar la planeación. Por favor intenta de nuevo.",
+    "unauthorized": "No tienes acceso a este recurso.",
+    "notFound": "Recurso no encontrado."
+  }
+}
