@@ -15,7 +15,7 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
   const activityLabel = isLaboral ? 'Actividades Clave' : 'Propósitos y Contenidos formativos';
   const activityPlaceholder = isLaboral
     ? 'Nombre de la Actividad Clave'
-    : 'Nombre del Propósito o Contenido formativo (ej: Progresión 1, Bloque 1)';
+    : 'Nombre del Propósito o Contenido formativo (ej: Propósito 1, Bloque 1)';
   const addBtnLabel = isLaboral ? '+ Agregar actividad' : '+ Agregar propósito/contenido';
 
   const [file, setFile] = useState<File | null>(null);

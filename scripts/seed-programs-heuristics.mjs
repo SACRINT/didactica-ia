@@ -91,6 +91,35 @@ function cleanUacName(uacName, curriculumName) {
   return clean;
 }
 
+// Clean greedy UAC subject name by matching up to the first Roman numeral
+function cleanUacSubjectName(name) {
+  const match = name.match(/^([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?\b(?:I|II|III|IV|V|VI))\b/);
+  if (match) {
+    return match[1].replace(/\s+/g, ' ').trim();
+  }
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+// Extract total hours from UAC block text
+function extractTotalHours(text) {
+  const patterns = [
+    /(?:Carga Horaria|Horas totales|Total de horas|Carga horaria total)[:\s]*(\d+)\s*(?:horas?)?/i,
+    /(\d+)\s*horas?\s*(?:totales?|en total|por semestre)/i,
+    /Horas\/semana:\s*(\d+)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      const val = parseInt(match[1], 10);
+      if (pattern.source.includes('semana')) {
+        return val * 18; // 18 weeks per semester
+      }
+      if (val >= 10 && val <= 200) return val;
+    }
+  }
+  return 54; // Default fallback
+}
+
 // Heuristic parsing function
 function parseUacsFromText(text, component, curriculumName) {
   const uacs = [];
@@ -175,6 +204,7 @@ function parseUacsFromText(text, component, curriculumName) {
         uacs.push({
           uacName,
           semester,
+          component: 'laboral',
           curriculumName,
           learningOutcome: learningOutcome || `Desarrollar competencias correspondientes a ${uacName}`,
           activities,
@@ -224,26 +254,66 @@ function parseUacsFromText(text, component, curriculumName) {
       const roman = romanMatch ? romanMatch[1].toLowerCase() : 'i';
       const semester = SEMESTER_MAP[roman] || 1;
       
-      const uacName = current.subjectAndRoman;
+      const uacName = cleanUacSubjectName(current.subjectAndRoman);
       
-      // Activities (Bloques o Progresiones en currículum fundamental)
-      // Usually listed as "Propósito formativo 1", "Propósito formativo 2" or "Metas..."
+      // Activities (Propósitos y contenidos formativos)
       const activities = [];
-      const actRegex = /(?:Propósito formativo|Progresión|Metas?|Bloque)\s+(\d+)[:\s]+(.*?)(?=\s*(?:Horas:|Propósito|Progresión|Bloque|$))/gi;
-      const actMatches = [...uacBlock.matchAll(actRegex)];
-      actMatches.forEach((m, idx) => {
+      
+      // Educational verbs to filter out false positives
+      const VERBS = [
+        'Identifica', 'Conoce', 'Analiza', 'Utiliza', 'Reconoce', 'Valora', 'Distingue', 'Aplica', 
+        'Comprende', 'Examina', 'Evalúa', 'Diseña', 'Establece', 'Caracteriza', 'Determina', 
+        'Describe', 'Sistematiza', 'Explica', 'Compara', 'Reflexiona', 'Argumenta', 'Participa', 
+        'Propone', 'Colabora', 'Asume', 'Desarrolla', 'Construye', 'Promueve', 'Estructura',
+        'Interpreta', 'Deduce', 'Indaga', 'Cuestiona', 'Individua', 'Relaciona', 'Diferencia',
+        'Expresa', 'Redacta', 'Lee', 'Comunica', 'Interactúa', 'Produce'
+      ];
+      
+      const purposesRegex = /\b([1-8])\s+([A-ZÁÉÍÓÚÑ][\s\S]+?)(?=\s*(?:\b[1-8]\s+[A-ZÁÉÍÓÚÑ]|\bMeta\b|\bOrientaciones\b|=== PAGE|$))/g;
+      const actMatches = [...uacBlock.matchAll(purposesRegex)];
+      const seen = new Set();
+      
+      actMatches.forEach((m) => {
         const order = parseInt(m[1], 10);
-        const name = m[2].replace(/Horas de Estudio:.*$/i, '').trim();
-        activities.push({ name: name.substring(0, 120), hours: 18, order });
+        const name = m[2].trim().replace(/\s+/g, ' ');
+        
+        // Find the first word
+        const firstWordMatch = name.match(/^([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/);
+        if (!firstWordMatch) return;
+        const firstWord = firstWordMatch[1];
+        
+        // Check if first word is an educational verb
+        const isEducational = VERBS.some(v => firstWord.toLowerCase() === v.toLowerCase());
+        
+        const isFalsePositive = [
+          'MARCO CURRICULAR', 'MODELO EDUCATIVO', 'SECRETARIO', 'COORDINADORA', 
+          'DIRECCIÓN DE', 'SISTEMA NACIONAL', 'PRIMERA EDICIÓN', 'ÍNDICE', 
+          'HORAS/SEMANA', 'HORAS SEMANA', 'CRITERIOS PARA', 'GLOSARIO', 'BIBLIOGRAFÍA',
+          'DIRECTORIO', 'PROGRAMAS DE ESTUDIO', 'CURRÍCULUM', 'SUBSECRETARIA',
+          'Bachillerato', 'Secretaría de'
+        ].some(word => name.toUpperCase().includes(word.toUpperCase()));
+        
+        if (isEducational && name.length > 25 && !isFalsePositive && !seen.has(name)) {
+          seen.add(name);
+          activities.push({ name: name.substring(0, 250), hours: 18, order });
+        }
       });
 
-      // Default activities if none found (e.g. Progresiones 1, 2, 3)
-      if (activities.length === 0) {
-        activities.push(
-          { name: `Progresiones de aprendizaje bloque 1`, hours: 18, order: 1 },
-          { name: `Progresiones de aprendizaje bloque 2`, hours: 18, order: 2 },
-          { name: `Progresiones de aprendizaje bloque 3`, hours: 18, order: 3 }
-        );
+      // Sort by order
+      activities.sort((a, b) => a.order - b.order);
+
+      // Fallback activities are not added here to allow correct deduplication.
+      // They are added at the end before database insertion if still empty.
+
+      // Distribute total UAC hours among purposes
+      const totalHours = extractTotalHours(uacBlock);
+      const count = activities.length;
+      if (count > 0) {
+        const baseHours = Math.floor(totalHours / count);
+        const remainder = totalHours % count;
+        activities.forEach((act, idx) => {
+          act.hours = baseHours + (idx < remainder ? 1 : 0);
+        });
       }
 
       // Outcome
@@ -256,11 +326,12 @@ function parseUacsFromText(text, component, curriculumName) {
       uacs.push({
         uacName,
         semester,
+        component,
         curriculumName,
-        learningOutcome: learningOutcome || `Desarrollar progresiones y metas de aprendizaje para ${uacName}`,
+        learningOutcome: learningOutcome || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
         activities,
         evidences: ['Portafolio de evidencias', 'Evaluación formativa', 'Proyecto integrador'],
-        totalHours: activities.reduce((acc, a) => acc + a.hours, 0)
+        totalHours
       });
     }
   }
@@ -294,7 +365,9 @@ async function seed() {
 
   console.log(`Found ${pdfFiles.length} PDFs. Starting text extraction...`);
 
-  let count = 0;
+  // Accumulate parsed UACs in a dictionary to prevent duplicates and keep best match
+  const uacDict = {};
+  
   for (const pdf of pdfFiles) {
     const curriculumName = pdf.filename
       .replace(/_2024\.pdf$/i, '')
@@ -316,40 +389,73 @@ async function seed() {
     if (!text) continue;
 
     const uacs = parseUacsFromText(text, pdf.component, curriculumName);
-    console.log(`  ✓ Extracted ${uacs.length} UACs.`);
+    console.log(`  ✓ Extracted ${uacs.length} UAC blocks.`);
 
     for (const uac of uacs) {
-      try {
-        await sql`
-          INSERT INTO programs_catalog (
-            uac_name, semester, component, curriculum_name, year,
-            total_hours, learning_outcome, activities, evidences
-          )
-          VALUES (
-            ${uac.uacName},
-            ${uac.semester},
-            ${pdf.component},
-            ${uac.curriculumName},
-            ${year},
-            ${uac.totalHours},
-            ${uac.learningOutcome},
-            ${JSON.stringify(uac.activities)},
-            ${JSON.stringify(uac.evidences)}
-          )
-          ON CONFLICT (uac_name) DO UPDATE SET
-            semester = EXCLUDED.semester,
-            component = EXCLUDED.component,
-            curriculum_name = EXCLUDED.curriculum_name,
-            year = EXCLUDED.year,
-            total_hours = EXCLUDED.total_hours,
-            learning_outcome = EXCLUDED.learning_outcome,
-            activities = EXCLUDED.activities,
-            evidences = EXCLUDED.evidences
-        `;
-        count++;
-      } catch (err) {
-        console.error(`  ❌ Failed to save UAC ${uac.uacName}:`, err.message);
+      const key = uac.uacName;
+      const existing = uacDict[key];
+      // Keep if not exists, or if new has more activities/purposes
+      if (!existing || uac.activities.length > existing.activities.length) {
+        uacDict[key] = { ...uac, year };
       }
+    }
+  }
+
+  console.log(`🧹 Clearing old catalog entries from Neon Database...`);
+  await sql`DELETE FROM programs_catalog`;
+
+  let count = 0;
+  for (const key of Object.keys(uacDict)) {
+    const uac = uacDict[key];
+    
+    // Add fallback activities if none were parsed
+    if (uac.activities.length === 0) {
+      const actCount = 3;
+      const baseHours = Math.floor(uac.totalHours / actCount);
+      const remainder = uac.totalHours % actCount;
+      const defaultName = uac.component === 'laboral' 
+        ? 'Actividad Clave' 
+        : 'Propósito y Contenido formativo';
+      
+      for (let idx = 0; idx < actCount; idx++) {
+        uac.activities.push({
+          name: `${defaultName} bloque ${idx + 1}`,
+          hours: baseHours + (idx < remainder ? 1 : 0),
+          order: idx + 1
+        });
+      }
+    }
+
+    try {
+      await sql`
+        INSERT INTO programs_catalog (
+          uac_name, semester, component, curriculum_name, year,
+          total_hours, learning_outcome, activities, evidences
+        )
+        VALUES (
+          ${uac.uacName},
+          ${uac.semester},
+          ${uac.component},
+          ${uac.curriculumName},
+          ${uac.year},
+          ${uac.totalHours},
+          ${uac.learningOutcome},
+          ${JSON.stringify(uac.activities)},
+          ${JSON.stringify(uac.evidences)}
+        )
+        ON CONFLICT (uac_name) DO UPDATE SET
+          semester = EXCLUDED.semester,
+          component = EXCLUDED.component,
+          curriculum_name = EXCLUDED.curriculum_name,
+          year = EXCLUDED.year,
+          total_hours = EXCLUDED.total_hours,
+          learning_outcome = EXCLUDED.learning_outcome,
+          activities = EXCLUDED.activities,
+          evidences = EXCLUDED.evidences
+      `;
+      count++;
+    } catch (err) {
+      console.error(`  ❌ Failed to save UAC ${uac.uacName}:`, err.message);
     }
   }
 

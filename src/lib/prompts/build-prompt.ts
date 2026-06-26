@@ -45,7 +45,7 @@ Componente: ${componentLabels[component] || component}
 Carga horaria total: ${extractedData.totalHours} horas
 Resultado de aprendizaje: ${extractedData.learningOutcome || '(Inferir del nombre de la UAC y el contexto)'}
 
-${component === 'laboral' ? 'Actividades Clave' : 'Propósitos y Contenidos formativos (Progresiones)'} del programa:
+${component === 'laboral' ? 'Actividades Clave' : 'Propósitos y Contenidos formativos'} del programa:
 ${activitiesText}
 
 Evidencias sugeridas por el programa:
