@@ -30,8 +30,19 @@ export default function StepUAC({ onNext }: Props) {
   const [isManualInput, setIsManualInput] = useState(false);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
 
   const isLaboralDisabled = SEMESTERS_WITHOUT_LABORAL.includes(form.semester);
+
+  // Extract unique specialties from catalog programs when in Formación Laboral mode
+  const specialties = form.component === 'laboral'
+    ? Array.from(new Set(catalogPrograms.map(p => p.curriculum_name).filter(Boolean))).sort() as string[]
+    : [];
+
+  // Filter UACs by the selected specialty
+  const filteredUacs = form.component === 'laboral'
+    ? catalogPrograms.filter(p => p.curriculum_name === selectedSpecialty)
+    : catalogPrograms;
 
   // Fetch programs from catalog when semester or component changes
   useEffect(() => {
@@ -45,17 +56,47 @@ export default function StepUAC({ onNext }: Props) {
           setCatalogPrograms(data.programs);
           
           if (data.programs.length > 0) {
-            // Auto-select the first program from catalog
-            const first = data.programs[0];
-            setSelectedCatalogUac(first);
-            setForm(prev => ({
-              ...prev,
-              uacName: first.uac_name,
-              curriculumName: first.curriculum_name || '',
-            }));
-            setIsManualInput(false);
+            if (form.component === 'laboral') {
+              // Extract unique specialties
+              const specs = Array.from(
+                new Set(data.programs.map((p: any) => p.curriculum_name).filter(Boolean))
+              ).sort() as string[];
+              
+              if (specs.length > 0) {
+                const initialSpec = specs[0];
+                setSelectedSpecialty(initialSpec);
+                
+                // Filter UACs by that specialty
+                const filtered = data.programs.filter((p: any) => p.curriculum_name === initialSpec);
+                if (filtered.length > 0) {
+                  const first = filtered[0];
+                  setSelectedCatalogUac(first);
+                  setForm(prev => ({
+                    ...prev,
+                    uacName: first.uac_name,
+                    curriculumName: first.curriculum_name || '',
+                  }));
+                  setIsManualInput(false);
+                }
+              } else {
+                setSelectedSpecialty('');
+                setSelectedCatalogUac(null);
+                setForm(prev => ({ ...prev, uacName: '', curriculumName: '' }));
+                setIsManualInput(true);
+              }
+            } else {
+              // For other components, select first UAC directly
+              const first = data.programs[0];
+              setSelectedCatalogUac(first);
+              setForm(prev => ({
+                ...prev,
+                uacName: first.uac_name,
+                curriculumName: first.curriculum_name || '',
+              }));
+              setIsManualInput(false);
+              setSelectedSpecialty('');
+            }
           } else {
-            // If no catalog programs, default to manual input
             setSelectedCatalogUac(null);
             setForm(prev => ({
               ...prev,
@@ -63,6 +104,7 @@ export default function StepUAC({ onNext }: Props) {
               curriculumName: '',
             }));
             setIsManualInput(true);
+            setSelectedSpecialty('');
           }
         }
       } catch (err) {
@@ -84,12 +126,40 @@ export default function StepUAC({ onNext }: Props) {
     setForm({ ...form, semester: newSemester, component: nextComponent });
   };
 
+  const handleSpecialtyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === 'manual_specialty') {
+      setIsManualInput(true);
+      setSelectedSpecialty('');
+      setSelectedCatalogUac(null);
+      setForm(prev => ({ ...prev, uacName: '', curriculumName: '' }));
+    } else {
+      setIsManualInput(false);
+      setSelectedSpecialty(val);
+      // Find UACs for this specialty
+      const uacsForSpec = catalogPrograms.filter(p => p.curriculum_name === val);
+      if (uacsForSpec.length > 0) {
+        const first = uacsForSpec[0];
+        setSelectedCatalogUac(first);
+        setForm(prev => ({
+          ...prev,
+          uacName: first.uac_name,
+          curriculumName: first.curriculum_name || '',
+        }));
+      }
+    }
+  };
+
   const handleUacSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     if (val === 'manual') {
       setIsManualInput(true);
       setSelectedCatalogUac(null);
-      setForm(prev => ({ ...prev, uacName: '', curriculumName: '' }));
+      setForm(prev => ({
+        ...prev,
+        uacName: '',
+        curriculumName: form.component === 'laboral' ? selectedSpecialty : '',
+      }));
     } else {
       setIsManualInput(false);
       const selected = catalogPrograms.find(p => p.id === val);
@@ -181,13 +251,29 @@ export default function StepUAC({ onNext }: Props) {
             </div>
           </div>
 
+          {form.component === 'laboral' && !loadingPrograms && catalogPrograms.length > 0 && (
+            <div className="form-group animate-fade-in">
+              <label className="form-label form-label-required">Especialidad / Capacitación</label>
+              <select
+                className="form-select"
+                value={isManualInput && selectedSpecialty === '' ? 'manual_specialty' : selectedSpecialty}
+                onChange={handleSpecialtyChange}
+              >
+                {specialties.map(spec => (
+                  <option key={spec} value={spec}>{spec}</option>
+                ))}
+                <option value="manual_specialty">➕ Otra especialidad (capturar manualmente)</option>
+              </select>
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label form-label-required">Nombre de la UAC</label>
             
             {loadingPrograms ? (
               <div className="form-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#666' }}>
                 <div className="spinner spinner-dark" style={{ width: '16px', height: '16px' }} />
-                <span>Cargando programas del catálogo...</span>
+                <span>Cargando UACs del catálogo...</span>
               </div>
             ) : catalogPrograms.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -196,9 +282,9 @@ export default function StepUAC({ onNext }: Props) {
                   value={isManualInput ? 'manual' : (selectedCatalogUac?.id || '')}
                   onChange={handleUacSelectChange}
                 >
-                  {catalogPrograms.map((p) => (
+                  {(form.component === 'laboral' ? filteredUacs : catalogPrograms).map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.uac_name} {p.curriculum_name ? `(${p.curriculum_name})` : ''} ({p.year})
+                      {p.uac_name} {form.component !== 'laboral' && p.curriculum_name ? `(${p.curriculum_name})` : ''} ({p.year})
                     </option>
                   ))}
                   <option value="manual">➕ Agregar otra UAC (capturar manualmente / subir PDF)</option>

@@ -294,14 +294,18 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
                   onChange={e => updateActivity(idx, 'name', e.target.value)}
                   required
                 />
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="Horas"
-                  value={a.hours}
-                  min={1}
-                  onChange={e => updateActivity(idx, 'hours', Number(e.target.value))}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="Horas"
+                    value={a.hours}
+                    min={1}
+                    onChange={e => updateActivity(idx, 'hours', Number(e.target.value))}
+                    style={{ flex: 1, minWidth: '0' }}
+                  />
+                  <span style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>hrs</span>
+                </div>
                 <button
                   type="button"
                   className="btn btn-danger btn-sm"

@@ -157,7 +157,7 @@ ${excerpt}`;
     ? parsed.activities
         .filter((a: { name?: string }) => a?.name)
         .map((a: { name: string; hours?: number; order?: number }, i: number) => ({
-          name: String(a.name).trim(),
+          name: removeHyphens(String(a.name).trim()),
           hours: Number(a.hours) || Math.round((parsed.totalHours || 54) / 3),
           order: Number(a.order) || i + 1,
         }))
@@ -177,11 +177,11 @@ ${excerpt}`;
     : [];
 
   const data = {
-    uacName: parsed.uacName ? String(parsed.uacName).trim() : '',
-    learningOutcome: parsed.learningOutcome ? String(parsed.learningOutcome).trim() : '',
+    uacName: parsed.uacName ? removeHyphens(String(parsed.uacName).trim()) : '',
+    learningOutcome: parsed.learningOutcome ? removeHyphens(String(parsed.learningOutcome).trim()) : '',
     totalHours: Number(parsed.totalHours) || 54,
     activities: finalActivities,
-    evidences,
+    evidences: evidences.map((e: string) => removeHyphens(e)),
     parseConfidence: 'high' as const,
   };
 
@@ -213,4 +213,15 @@ function buildEmptyData() {
     evidences: [] as string[],
     parseConfidence: 'failed' as const,
   };
+}
+
+function removeHyphens(text: string): string {
+  if (!text) return '';
+  return text
+    // Replace soft hyphens
+    .replace(/\u00ad/g, '')
+    // Replace standard hyphen followed by newline and optional spaces
+    .replace(/([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)-\s*[\r\n]\s*([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/g, '$1$2')
+    // Replace standard hyphen followed by spaces
+    .replace(/([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)-\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/g, '$1$2');
 }

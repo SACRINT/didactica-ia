@@ -71,23 +71,72 @@ async function extractFullText(pdfPath) {
   }
 }
 
+// Remove hyphens used for syllable splitting at line ends or within words
+function removeHyphens(text) {
+  if (!text) return '';
+  return text
+    // Replace soft hyphens
+    .replace(/\u00ad/g, '')
+    // Replace standard hyphen followed by newline and optional spaces
+    .replace(/([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)-\s*[\r\n]\s*([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/g, '$1$2')
+    // Replace standard hyphen followed by spaces
+    .replace(/([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)-\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/g, '$1$2');
+}
+
+// Extract only the purpose statement (which typically ends with a period before contents list)
+function extractPurposeOnly(text) {
+  if (!text) return '';
+  // Find a period followed by space and an uppercase letter, or end of string
+  // Ensure we don't split on decimal numbers like "1.5" or common abbreviations
+  const match = text.match(/^([\s\S]+?\.)(?=\s+[A-ZÁÉÍÓÚÑ]|$)/);
+  if (match) {
+    return match[1].trim();
+  }
+  return text;
+}
+
+// Convert accented characters to unaccented counterparts while preserving indices
+function cleanAccentsPreserveLength(str) {
+  if (!str) return '';
+  const map = {
+    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+    'ñ': 'n', 'Ñ': 'N', 'ü': 'u', 'Ü': 'U'
+  };
+  return str.split('').map(c => map[c] || c).join('');
+}
+
 // Clean UAC Name
 function cleanUacName(uacName, curriculumName) {
   if (!uacName) return '';
   let clean = uacName
-    .replace(/^de la Salud\s+/i, '')
-    .replace(/^Información general del Área de la Salud\s+/i, '')
-    .replace(/^Información general del programa de\s+/i, '')
     .replace(/^UAC\s+/i, '')
-    .replace(/UAC\s*$/i, '')
-    .replace(/^[-\s]+/, '')
-    .trim();
+    .replace(/Información general del programa (de\s+)?/i, '')
+    .replace(/Información general del Área (de\s+)?/i, '');
   
   if (curriculumName) {
-    const escaped = curriculumName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const regex = new RegExp(`^${escaped}\\s+`, 'i');
-    clean = clean.replace(regex, '').trim();
+    const cleanNorm = cleanAccentsPreserveLength(clean.toLowerCase());
+    const currNorm = cleanAccentsPreserveLength(curriculumName.toLowerCase());
+    if (cleanNorm.startsWith(currNorm)) {
+      clean = clean.slice(currNorm.length).trim();
+    }
+    
+    // Also clean repeated suffix of curriculum name (e.g. "la Salud" or "Sostenible de Traspatio")
+    const currWords = curriculumName.split(/\s+/);
+    for (let i = 0; i < currWords.length; i++) {
+      const suffix = currWords.slice(i).join(' ');
+      const suffixNorm = cleanAccentsPreserveLength(suffix.toLowerCase());
+      const currentCleanNorm = cleanAccentsPreserveLength(clean.toLowerCase());
+      if (suffixNorm.length > 3 && currentCleanNorm.startsWith(suffixNorm)) {
+        clean = clean.slice(suffix.length).trim();
+        break;
+      }
+    }
   }
+  
+  clean = clean.replace(/^(?:de|y|e)\s+/i, '').trim();
+  clean = removeHyphens(clean);
+  clean = clean.replace(/\s+/g, ' ').trim();
   return clean;
 }
 
@@ -144,26 +193,33 @@ function parseUacsFromText(text, component, curriculumName) {
       
       const semester = SEMESTER_MAP[current.semesterWord] || 3;
       
-      const escapedCurriculum = curriculumName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const normText = cleanAccentsPreserveLength(text);
+      const normCurriculumName = cleanAccentsPreserveLength(curriculumName);
+      const escapedCurriculum = normCurriculumName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const infoRegex = new RegExp(`(?:Información general del programa de|UAC\\s+Información general del programa de)\\s+${escapedCurriculum}\\s+(.*?)\\s+Actividad Clave 1`, 'i');
       
-      let uacName = '';
-      const infoMatch = uacBlock.match(infoRegex);
+      const normUacBlock = normText.substring(current.index, nextIndex);
+      
+      let uacNameRaw = '';
+      const infoMatch = normUacBlock.match(infoRegex);
       if (infoMatch) {
-        uacName = infoMatch[1].trim();
+        const offset = infoMatch[0].indexOf(infoMatch[1]);
+        const matchStart = infoMatch.index + offset;
+        const matchEnd = matchStart + infoMatch[1].length;
+        uacNameRaw = uacBlock.substring(matchStart, matchEnd).trim();
       } else {
         const simpleFallback = uacBlock.match(/Información general del programa de\s+.*?\s+(.*?)\s+Actividad Clave 1/i);
         if (simpleFallback) {
-          uacName = simpleFallback[1].trim();
+          uacNameRaw = simpleFallback[1].trim();
         } else {
           const finalMatch = uacBlock.match(/Unidad de Aprendizaje Curricular\s+\d+\s+[a-zA-Záéíóúñ]+\s+Semestre\s+UAC\s+(.*?)\s+Actividad Clave 1/i);
           if (finalMatch) {
-            uacName = finalMatch[1].trim();
+            uacNameRaw = finalMatch[1].trim();
           }
         }
       }
       
-      uacName = cleanUacName(uacName, curriculumName);
+      const uacName = cleanUacName(uacNameRaw, curriculumName);
       
       // Parse activities
       const activities = [];
@@ -180,14 +236,14 @@ function parseUacsFromText(text, component, curriculumName) {
           hours = parseInt(hoursMatch[1], 10);
         }
         
-        activities.push({ name, hours, order });
+        activities.push({ name: removeHyphens(name), hours, order });
       });
 
       // Parse outcome
       let learningOutcome = '';
       const outcomeMatch = uacBlock.match(/Resultado de aprendizaje\s+Al finalizar la UAC el estudiante será capaz de:\s+(.*?)(?=\s*(?:\d+\.\s+|Actividad clave|Estrategia|$))/i);
       if (outcomeMatch) {
-        learningOutcome = outcomeMatch[1].trim();
+        learningOutcome = removeHyphens(outcomeMatch[1].trim());
       }
 
       // Parse evidences
@@ -196,13 +252,13 @@ function parseUacsFromText(text, component, curriculumName) {
       const evMatch = uacBlock.match(evRegex);
       if (evMatch) {
         const evText = evMatch[0].replace(/^(?:Evidencia[s]?|Producto[s]? esperado[s]?)[:\s]+/i, '');
-        const items = evText.split(/[,;]|\\b(?:y|e)\\b/).map(s => s.trim()).filter(s => s.length > 5);
+        const items = evText.split(/[,;]|\\b(?:y|e)\\b/).map(s => removeHyphens(s.trim())).filter(s => s.length > 5);
         evidences.push(...items);
       }
       
       if (uacName && activities.length > 0) {
         uacs.push({
-          uacName,
+          uacName: removeHyphens(uacName),
           semester,
           component: 'laboral',
           curriculumName,
@@ -293,9 +349,10 @@ function parseUacsFromText(text, component, curriculumName) {
           'Bachillerato', 'Secretaría de'
         ].some(word => name.toUpperCase().includes(word.toUpperCase()));
         
-        if (isEducational && name.length > 25 && !isFalsePositive && !seen.has(name)) {
-          seen.add(name);
-          activities.push({ name: name.substring(0, 250), hours: 18, order });
+        const cleanName = removeHyphens(extractPurposeOnly(name));
+        if (isEducational && cleanName.length > 25 && !isFalsePositive && !seen.has(cleanName)) {
+          seen.add(cleanName);
+          activities.push({ name: cleanName.substring(0, 250), hours: 18, order });
         }
       });
 
@@ -320,15 +377,15 @@ function parseUacsFromText(text, component, curriculumName) {
       let learningOutcome = '';
       const outcomeMatch = uacBlock.match(/(?:Propósito formativo|Resultado de aprendizaje|Propósito de la asignatura)[:\s]+(.*?)(?=\s*(?:\d+\.\s+|=== PAGE|$))/i);
       if (outcomeMatch) {
-        learningOutcome = outcomeMatch[1].trim();
+        learningOutcome = removeHyphens(outcomeMatch[1].trim());
       }
 
       uacs.push({
-        uacName,
+        uacName: removeHyphens(uacName),
         semester,
         component,
         curriculumName,
-        learningOutcome: learningOutcome || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
+        learningOutcome: removeHyphens(learningOutcome) || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
         activities,
         evidences: ['Portafolio de evidencias', 'Evaluación formativa', 'Proyecto integrador'],
         totalHours
