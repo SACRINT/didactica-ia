@@ -200,6 +200,10 @@ function buildSectionII(content: GeneratedPlanningContent): (Paragraph | Table)[
   const cL = Math.floor(CONTENT * 0.27), cR = CONTENT - cL;
   const cA0 = Math.floor(CONTENT * 0.56), cA1 = Math.floor(CONTENT * 0.23), cA2 = CONTENT - cA0 - cA1;
 
+  const isLaboral = content.sectionI.component?.toLowerCase().includes('laboral') || false;
+  const activityLabel = isLaboral ? 'Actividades Clave' : 'Propósitos y Contenidos formativos';
+  const tableHeader = isLaboral ? 'Actividad Clave / Contenido' : 'Propósito o Contenido formativo';
+
   return [
     secHeading('II. PROPÓSITO FORMATIVO DE LA CLASE'),
     tbl([
@@ -215,9 +219,9 @@ function buildSectionII(content: GeneratedPlanningContent): (Paragraph | Table)[
       ] }),
     ], [cL, cR]),
     sp(),
-    subH('Actividades Clave y Distribución Horaria'),
+    subH(`${activityLabel} y Distribución Horaria`),
     tbl([
-      new TableRow({ children: [tcM('Actividad Clave / Contenido', { w: cA0 }), tcM('Horas Asignadas', { w: cA1, align: AlignmentType.CENTER }), tcM('% de la UAC', { w: cA2, align: AlignmentType.CENTER })] }),
+      new TableRow({ children: [tcM(tableHeader, { w: cA0 }), tcM('Horas Asignadas', { w: cA1, align: AlignmentType.CENTER }), tcM('% de la UAC', { w: cA2, align: AlignmentType.CENTER })] }),
       ...s.activities.map((a, i) => new TableRow({ children: [
         tc(a.name, { w: cA0, fill: i % 2 === 0 ? C.white : C.alt }),
         tc(`${a.hours} hrs.`, { w: cA1, align: AlignmentType.CENTER, fill: i % 2 === 0 ? C.white : C.alt }),
@@ -253,7 +257,7 @@ function buildSectionIII(content: GeneratedPlanningContent): (Paragraph | Table)
   return [secHeading('III. TRANSVERSALIDAD'), tbl(rows, c), sp()];
 }
 
-function buildActivityTable(activity: GeneratedPlanningContent['sectionIV']['activities'][0]): Table {
+function buildActivityTable(activity: GeneratedPlanningContent['sectionIV']['activities'][0], isLaboral: boolean): Table {
   const cols = [Math.floor(CONTENT * 0.09), Math.floor(CONTENT * 0.38), Math.floor(CONTENT * 0.28), CONTENT - Math.floor(CONTENT * 0.09) - Math.floor(CONTENT * 0.38) - Math.floor(CONTENT * 0.28)];
 
   function phaseRow(name: string, color: string, phase: { activities: string; processes: string; materials: string }) {
@@ -271,7 +275,7 @@ function buildActivityTable(activity: GeneratedPlanningContent['sectionIV']['act
     width: { size: CONTENT, type: WidthType.DXA },
     columnWidths: cols,
     rows: [
-      new TableRow({ children: [tcH(`ACTIVIDAD CLAVE: ${activity.name} (${activity.hours} horas)`, { w: CONTENT, span: 4, align: AlignmentType.CENTER, size: 19 })] }),
+      new TableRow({ children: [tcH(`${isLaboral ? 'ACTIVIDAD CLAVE' : 'PROPÓSITO o CONTENIDO FORMATIVO'}: ${activity.name} (${activity.hours} horas)`, { w: CONTENT, span: 4, align: AlignmentType.CENTER, size: 19 })] }),
       new TableRow({ children: [new TableCell({ columnSpan: 1, shading: { fill: C.mid, type: ShadingType.CLEAR }, borders: bdr(), margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Metodología:', bold: true, size: 17, color: C.white, font: 'Arial' })] })] }), new TableCell({ columnSpan: 3, shading: { fill: C.alt, type: ShadingType.CLEAR }, borders: bdr(), margins: CELLMRG, children: [new Paragraph({ children: [new TextRun({ text: activity.methodology, bold: true, size: 18, font: 'Arial', color: C.dark })] })] })] }),
       new TableRow({ children: [tcM('Fase /\nMomento', { w: cols[0], align: AlignmentType.CENTER }), tcM('Actividades del Estudiante\n(Metodologías Activas)', { w: cols[1] }), tcM('Procesos de Pensamiento /\nConstrucción o Resignificación', { w: cols[2] }), tcM('Materiales /\nRecursos Didácticos', { w: cols[3] })] }),
       phaseRow('APER-\nTURA', C.apertura, activity.apertura),
@@ -282,14 +286,17 @@ function buildActivityTable(activity: GeneratedPlanningContent['sectionIV']['act
 }
 
 function buildSectionIV(content: GeneratedPlanningContent): (Paragraph | Table)[] {
+  const isLaboral = content.sectionI.component?.toLowerCase().includes('laboral') || false;
+  const label = isLaboral ? 'ACTIVIDAD CLAVE' : 'PROPÓSITO o CONTENIDO FORMATIVO';
+
   const elements: (Paragraph | Table)[] = [
     secHeading('IV. DISEÑO DE ESCENARIOS DE APRENDIZAJE (SECUENCIA DE ACTIVIDADES DIDÁCTICAS)'),
     noteP(content.sectionIV.note || 'El diseño de actividades emplea exclusivamente metodologías activas (ABP, Simulación, Método de Casos, Visita de campo).'),
     sp(),
   ];
   content.sectionIV.activities.forEach((activity, i) => {
-    elements.push(subH(`▶ ACTIVIDAD CLAVE ${i + 1}: ${activity.name} (${activity.hours} horas)`));
-    elements.push(buildActivityTable(activity));
+    elements.push(subH(`▶ ${label} ${i + 1}: ${activity.name} (${activity.hours} horas)`));
+    elements.push(buildActivityTable(activity, isLaboral));
     elements.push(sp());
     if (i < content.sectionIV.activities.length - 1) elements.push(pb());
   });

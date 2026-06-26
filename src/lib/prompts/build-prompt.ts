@@ -45,7 +45,7 @@ Componente: ${componentLabels[component] || component}
 Carga horaria total: ${extractedData.totalHours} horas
 Resultado de aprendizaje: ${extractedData.learningOutcome || '(Inferir del nombre de la UAC y el contexto)'}
 
-Actividades Clave del programa:
+${component === 'laboral' ? 'Actividades Clave' : 'Propósitos y Contenidos formativos (Progresiones)'} del programa:
 ${activitiesText}
 
 Evidencias sugeridas por el programa:
@@ -77,7 +77,7 @@ ${context.studentContext || '(No especificada — adapta al contexto general del
 3. ESTUDIANTES: Adapta la metodología y materiales a: ${context.studentContext || 'el contexto comunitario local'}
 4. RECURSOS: Solo propón actividades realizables con: ${context.schoolResources || 'recursos básicos de aula'}
 5. SUBSISTEMA: La planeación debe cumplir los lineamientos del ${subsystemLabel}
-6. Genera exactamente ${extractedData.activities.length} Actividades Clave en la Sección IV
+6. Genera exactamente ${extractedData.activities.length} secuencias didácticas correspondientes a cada ${component === 'laboral' ? 'Actividad Clave' : 'Propósito/Contenido formativo'} en la Sección IV
 7. Las ponderaciones en la Sección V deben sumar exactamente 100%
 8. El período de aplicación en Sección I debe ser: ${context.applicationPeriod || 'Agosto – Diciembre 2026'}
 

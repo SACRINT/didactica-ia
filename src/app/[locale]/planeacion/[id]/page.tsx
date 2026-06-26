@@ -93,32 +93,39 @@ export default async function PlanningDetailPage({
           </div>
 
           {/* Section IV summary */}
-          <div className="section-card">
-            <div className="section-card-header">
-              <span className="section-card-title">
-                IV. Actividades Clave ({content.sectionIV?.activities?.length || 0} actividades)
-              </span>
-            </div>
-            <div className="section-card-body">
-              {content.sectionIV?.activities?.map((a, i) => (
-                <div
-                  key={i}
-                  style={{
-                    padding: '12px 16px',
-                    background: i % 2 === 0 ? 'var(--c-blue-pale)' : 'var(--c-surface)',
-                    borderRadius: '8px',
-                    marginBottom: '8px',
-                    borderLeft: '3px solid var(--c-blue-mid)',
-                  }}
-                >
-                  <strong>AC{i + 1}:</strong> {a.name}{' '}
-                  <span style={{ color: 'var(--c-text-muted)' }}>({a.hours} hrs.)</span>
-                  {' — '}
-                  <em style={{ color: 'var(--c-navy-light)' }}>{a.methodology}</em>
+          {(() => {
+            const isLaboral = s1?.component?.toLowerCase().includes('laboral') || false;
+            const activityLabel = isLaboral ? 'Actividades Clave' : 'Propósitos y Contenidos formativos';
+            const prefix = isLaboral ? 'AC' : 'PC';
+            return (
+              <div className="section-card">
+                <div className="section-card-header">
+                  <span className="section-card-title">
+                    IV. {activityLabel} ({content.sectionIV?.activities?.length || 0} elementos)
+                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="section-card-body">
+                  {content.sectionIV?.activities?.map((a, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: '12px 16px',
+                        background: i % 2 === 0 ? 'var(--c-blue-pale)' : 'var(--c-surface)',
+                        borderRadius: '8px',
+                        marginBottom: '8px',
+                        borderLeft: '3px solid var(--c-blue-mid)',
+                      }}
+                    >
+                      <strong>{prefix}{i + 1}:</strong> {a.name}{' '}
+                      <span style={{ color: 'var(--c-text-muted)' }}>({a.hours} hrs.)</span>
+                      {' — '}
+                      <em style={{ color: 'var(--c-navy-light)' }}>{a.methodology}</em>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Section V summary */}
           {content.sectionV?.evaluations && (

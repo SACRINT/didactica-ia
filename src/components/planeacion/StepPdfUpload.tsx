@@ -11,6 +11,13 @@ interface Props {
 }
 
 export default function StepPdfUpload({ uacSelection, initialData, onNext, onBack }: Props) {
+  const isLaboral = uacSelection.component === 'laboral';
+  const activityLabel = isLaboral ? 'Actividades Clave' : 'Propósitos y Contenidos formativos';
+  const activityPlaceholder = isLaboral
+    ? 'Nombre de la Actividad Clave'
+    : 'Nombre del Propósito o Contenido formativo (ej: Progresión 1, Bloque 1)';
+  const addBtnLabel = isLaboral ? '+ Agregar actividad' : '+ Agregar propósito/contenido';
+
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -277,12 +284,12 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
           </div>
 
           <div className="form-group">
-            <label className="form-label form-label-required">Actividades Clave</label>
+            <label className="form-label form-label-required">{activityLabel}</label>
             {formData.activities.map((a, idx) => (
               <div key={idx} className="activity-row" style={{ marginBottom: '8px' }}>
                 <input
                   className="form-input"
-                  placeholder={`Nombre de la Actividad Clave ${idx + 1}`}
+                  placeholder={`${activityPlaceholder} ${idx + 1}`}
                   value={a.name}
                   onChange={e => updateActivity(idx, 'name', e.target.value)}
                   required
@@ -311,7 +318,7 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
               onClick={addActivity}
               style={{ marginTop: '8px' }}
             >
-              + Agregar actividad
+              {addBtnLabel}
             </button>
           </div>
 
