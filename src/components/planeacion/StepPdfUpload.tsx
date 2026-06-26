@@ -34,8 +34,24 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
     };
   });
 
+  const [isProgramCorrect, setIsProgramCorrect] = useState(() => !!initialData);
   const [showUploadZone, setShowUploadZone] = useState(() => !initialData);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setIsProgramCorrect(checked);
+    if (checked) {
+      setShowUploadZone(false);
+      if (initialData) {
+        setFormData({ ...initialData });
+      }
+      setFile(null);
+      setParseResult(null);
+    } else {
+      setShowUploadZone(true);
+    }
+  };
 
   const handleFile = async (f: File) => {
     if (!f.name.toLowerCase().endsWith('.pdf')) {
@@ -129,6 +145,23 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
           automáticamente. Siempre podrás editar cualquier campo antes de continuar.
         </p>
 
+        {initialData && (
+          <div style={{ marginBottom: '20px', padding: '16px', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 500, color: 'var(--c-navy)' }}>
+              <input
+                type="checkbox"
+                checked={isProgramCorrect}
+                onChange={handleCheckboxChange}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span>Confirmo que el programa oficial ({initialData.year || 2025}) es el correcto para esta UAC</span>
+            </label>
+            <p style={{ margin: '6px 0 0 28px', fontSize: '13px', color: '#64748b' }}>
+              Si el programa seleccionado ya no es el actual o si sabes que hay uno más nuevo, desmarca esta casilla para subir el archivo PDF del programa más reciente.
+            </p>
+          </div>
+        )}
+
         {showUploadZone ? (
           !file ? (
             <div
@@ -170,19 +203,11 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
           <div className="alert alert-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '18px' }}>📚</span>
-              <strong>UAC precargada desde el catálogo oficial</strong>
+              <strong>UAC precargada desde el catálogo oficial ({initialData?.year || 2025})</strong>
             </div>
             <p style={{ margin: 0, fontSize: '14px' }}>
               Hemos completado los campos con los datos oficiales del plan de estudios (MCCEMS). Puedes revisarlos abajo.
             </p>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ marginTop: '4px' }}
-              onClick={() => setShowUploadZone(true)}
-            >
-              Subir un archivo PDF diferente para esta UAC
-            </button>
           </div>
         )}
 

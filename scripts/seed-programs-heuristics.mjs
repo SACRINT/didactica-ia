@@ -305,7 +305,13 @@ async function seed() {
       .replace(/_/g, ' ')
       .trim();
 
-    console.log(`📄 Parsing: ${pdf.filename} (${curriculumName})...`);
+    let year = 2025;
+    if (pdf.filename.includes('2023')) year = 2023;
+    else if (pdf.filename.includes('2024')) year = 2024;
+    else if (pdf.filename.includes('2025')) year = 2025;
+    else if (pdf.filename.includes('2026')) year = 2026;
+
+    console.log(`📄 Parsing: ${pdf.filename} (${curriculumName}, Year: ${year})...`);
     const text = await extractFullText(pdf.fullPath);
     if (!text) continue;
 
@@ -316,7 +322,7 @@ async function seed() {
       try {
         await sql`
           INSERT INTO programs_catalog (
-            uac_name, semester, component, curriculum_name,
+            uac_name, semester, component, curriculum_name, year,
             total_hours, learning_outcome, activities, evidences
           )
           VALUES (
@@ -324,6 +330,7 @@ async function seed() {
             ${uac.semester},
             ${pdf.component},
             ${uac.curriculumName},
+            ${year},
             ${uac.totalHours},
             ${uac.learningOutcome},
             ${JSON.stringify(uac.activities)},
@@ -333,6 +340,7 @@ async function seed() {
             semester = EXCLUDED.semester,
             component = EXCLUDED.component,
             curriculum_name = EXCLUDED.curriculum_name,
+            year = EXCLUDED.year,
             total_hours = EXCLUDED.total_hours,
             learning_outcome = EXCLUDED.learning_outcome,
             activities = EXCLUDED.activities,

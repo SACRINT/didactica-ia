@@ -19,6 +19,7 @@ export interface ExtractedPdfData {
   evidences: string[];
   rawText?: string;
   parseConfidence: 'high' | 'medium' | 'low' | 'failed';
+  year?: number;
 }
 
 export interface TeacherContext {

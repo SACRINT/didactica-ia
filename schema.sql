@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS programs_catalog (
   semester         INTEGER NOT NULL CHECK (semester BETWEEN 1 AND 6),
   component        TEXT NOT NULL,     -- 'laboral' | 'fundamental' | 'ampliado'
   curriculum_name  TEXT,              -- e.g. 'Área de la Salud', 'Turismo'
+  year             INTEGER NOT NULL DEFAULT 2025,
   total_hours      INTEGER NOT NULL,
   learning_outcome TEXT NOT NULL,
   activities       JSONB NOT NULL,    -- Array of KeyActivity

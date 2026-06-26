@@ -126,6 +126,7 @@ export default function StepUAC({ onNext }: Props) {
         activities: selectedCatalogUac.activities,
         evidences: selectedCatalogUac.evidences,
         parseConfidence: 'high',
+        year: selectedCatalogUac.year,
       };
       onNext(form, initialData);
     }
@@ -197,7 +198,7 @@ export default function StepUAC({ onNext }: Props) {
                 >
                   {catalogPrograms.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.uac_name} {p.curriculum_name ? `(${p.curriculum_name})` : ''}
+                      {p.uac_name} {p.curriculum_name ? `(${p.curriculum_name})` : ''} ({p.year})
                     </option>
                   ))}
                   <option value="manual">➕ Agregar otra UAC (capturar manualmente / subir PDF)</option>

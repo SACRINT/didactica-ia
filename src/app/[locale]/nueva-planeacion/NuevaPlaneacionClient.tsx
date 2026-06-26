@@ -113,6 +113,7 @@ export default function NuevaPlaneacionClient({ locale }: Props) {
         {step === 2 && uacSelection && (
           <StepPdfUpload
             uacSelection={uacSelection}
+            initialData={extractedData}
             onNext={handlePdfNext}
             onBack={() => setStep(1)}
           />

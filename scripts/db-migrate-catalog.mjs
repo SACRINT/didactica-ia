@@ -40,6 +40,7 @@ async function run() {
         semester         INTEGER NOT NULL CHECK (semester BETWEEN 1 AND 6),
         component        TEXT NOT NULL,
         curriculum_name  TEXT,
+        year             INTEGER NOT NULL DEFAULT 2025,
         total_hours      INTEGER NOT NULL,
         learning_outcome TEXT NOT NULL,
         activities       JSONB NOT NULL,
@@ -47,7 +48,10 @@ async function run() {
         created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
-    console.log('✅ Tabla programs_catalog creada o ya existente.');
+    await sql`
+      ALTER TABLE programs_catalog ADD COLUMN IF NOT EXISTS year INTEGER NOT NULL DEFAULT 2025
+    `;
+    console.log('✅ Tabla programs_catalog y columna year verificadas.');
   } catch (e) {
     console.error('❌ Error creando tabla programs_catalog:', e.message || e);
     process.exit(1);
