@@ -17,8 +17,8 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Server external packages for PDF parsing
-  serverExternalPackages: ['pdf-parse'],
+  // Server external packages for PDF parsing (must not be bundled by Turbopack)
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
 };
 
 export default withNextIntl(nextConfig);

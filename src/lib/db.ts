@@ -177,3 +177,37 @@ export async function savePdfUpload(data: {
   `;
   return rows[0];
 }
+
+// ─── Programs Catalog queries ────────────────────────────────────────────────
+
+export async function getProgramsCatalog(semester?: number, component?: string) {
+  if (semester !== undefined && component !== undefined) {
+    return sql()`
+      SELECT id, uac_name, semester, component, curriculum_name, total_hours, learning_outcome, activities, evidences
+      FROM programs_catalog
+      WHERE semester = ${semester} AND component = ${component}
+      ORDER BY uac_name ASC
+    `;
+  } else if (semester !== undefined) {
+    return sql()`
+      SELECT id, uac_name, semester, component, curriculum_name, total_hours, learning_outcome, activities, evidences
+      FROM programs_catalog
+      WHERE semester = ${semester}
+      ORDER BY uac_name ASC
+    `;
+  } else if (component !== undefined) {
+    return sql()`
+      SELECT id, uac_name, semester, component, curriculum_name, total_hours, learning_outcome, activities, evidences
+      FROM programs_catalog
+      WHERE component = ${component}
+      ORDER BY uac_name ASC
+    `;
+  } else {
+    return sql()`
+      SELECT id, uac_name, semester, component, curriculum_name, total_hours, learning_outcome, activities, evidences
+      FROM programs_catalog
+      ORDER BY uac_name ASC
+    `;
+  }
+}
+

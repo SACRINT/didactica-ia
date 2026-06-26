@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
 interface Props {
@@ -38,7 +38,54 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
     schoolResources: '',
     studentContext: '',
   });
+
+  const [paecLoading, setPaecLoading] = useState(false);
+  const [paecSuccess, setPaecSuccess] = useState(false);
+  const [paecError, setPaecError] = useState<string | null>(null);
+  const paecInputRef = useRef<HTMLInputElement>(null);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handlePaecUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith('.pdf')) {
+      setPaecError('Solo se aceptan archivos PDF.');
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      setPaecError('El archivo no puede superar 10 MB.');
+      return;
+    }
+
+    setPaecLoading(true);
+    setPaecSuccess(false);
+    setPaecError(null);
+
+    try {
+      const fd = new FormData();
+      fd.append('pdf', f);
+      const res = await fetch('/api/pdf/parse-paec', { method: 'POST', body: fd });
+      const result = await res.json();
+
+      if (res.ok && result.data) {
+        setForm(prev => ({
+          ...prev,
+          paecProjectName: result.data.projectName || prev.paecProjectName,
+          paecObjective: result.data.objective || prev.paecObjective,
+          paecProblem: result.data.problem || prev.paecProblem,
+          studentContext: result.data.studentContext || prev.studentContext,
+        }));
+        setPaecSuccess(true);
+      } else {
+        setPaecError(result.error || 'No se pudieron extraer los datos automáticamente.');
+      }
+    } catch {
+      setPaecError('Error de red al procesar el PDF del PAEC.');
+    } finally {
+      setPaecLoading(false);
+    }
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -132,7 +179,7 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
                       value={form.region}
                       onChange={e => set({ region: e.target.value })}
                     />
-                    <span className="form-hint">Escribe la región tal como la conocen en tu zona.</span>
+                    <span className="form-hint">Escribe la region tal como la conocen en tu zona.</span>
                   </div>
                 </div>
 
@@ -197,6 +244,43 @@ export default function StepContext({ extractedData, onNext, onBack }: Props) {
             </div>
             <div className="section-card-body">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                {/* PAEC Upload Helper */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #eee', paddingBottom: '16px' }}>
+                  <label className="form-label" style={{ fontWeight: 600 }}>¿Tienes el documento del PAEC-PEC en PDF?</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => paecInputRef.current?.click()}
+                      disabled={paecLoading}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      {paecLoading && <div className="spinner spinner-dark" style={{ width: '12px', height: '12px', borderWidth: '2px' }} />}
+                      <span>{paecLoading ? 'Extrayendo problemática...' : '📁 Cargar PAEC-PEC en PDF'}</span>
+                    </button>
+                    <input
+                      ref={paecInputRef}
+                      type="file"
+                      accept=".pdf"
+                      style={{ display: 'none' }}
+                      onChange={handlePaecUpload}
+                    />
+                    <span className="form-hint" style={{ margin: 0 }}>
+                      {paecLoading ? 'Procesando el documento...' : 'Extrae el nombre, objetivo y problemática de forma automática.'}
+                    </span>
+                  </div>
+                  {paecSuccess && (
+                    <div className="alert alert-success" style={{ margin: '8px 0 0 0', padding: '8px 12px', fontSize: '13px' }}>
+                      ✓ Datos del PAEC extraídos correctamente e integrados en el formulario. Por favor, revísalos.
+                    </div>
+                  )}
+                  {paecError && (
+                    <div className="alert alert-warning" style={{ margin: '8px 0 0 0', padding: '8px 12px', fontSize: '13px' }}>
+                      ⚠️ {paecError}
+                    </div>
+                  )}
+                </div>
 
                 <div
                   style={{

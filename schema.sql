@@ -41,6 +41,20 @@ CREATE TABLE IF NOT EXISTS plannings (
 CREATE INDEX IF NOT EXISTS idx_plannings_teacher_id
   ON plannings (teacher_id, created_at DESC);
 
+-- ─── Programs Catalog ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS programs_catalog (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  uac_name         TEXT NOT NULL UNIQUE,
+  semester         INTEGER NOT NULL CHECK (semester BETWEEN 1 AND 6),
+  component        TEXT NOT NULL,     -- 'laboral' | 'fundamental' | 'ampliado'
+  curriculum_name  TEXT,              -- e.g. 'Área de la Salud', 'Turismo'
+  total_hours      INTEGER NOT NULL,
+  learning_outcome TEXT NOT NULL,
+  activities       JSONB NOT NULL,    -- Array of KeyActivity
+  evidences        JSONB NOT NULL,    -- Array of strings
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ─── Uploaded PDFs ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS uploaded_pdfs (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),

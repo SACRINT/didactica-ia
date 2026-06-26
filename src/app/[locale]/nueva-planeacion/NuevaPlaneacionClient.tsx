@@ -35,8 +35,13 @@ export default function NuevaPlaneacionClient({ locale }: Props) {
   const [context, setContext] = useState<TeacherContext | null>(null);
   const [planningId, setPlanningId] = useState<string | null>(null);
 
-  const handleUACNext = (data: UACSelection) => {
+  const handleUACNext = (data: UACSelection, initialData?: ExtractedPdfData) => {
     setUacSelection(data);
+    if (initialData) {
+      setExtractedData(initialData);
+    } else {
+      setExtractedData(null);
+    }
     setStep(2);
   };
 

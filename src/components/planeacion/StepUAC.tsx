@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { ExtractedPdfData } from '@/types/planning';
 
 interface UACSelection {
   uacName: string;
@@ -10,7 +11,7 @@ interface UACSelection {
 }
 
 interface Props {
-  onNext: (data: UACSelection) => void;
+  onNext: (data: UACSelection, initialData?: ExtractedPdfData) => void;
 }
 
 // Formación Laboral is NOT available in semester 1 or 2
@@ -23,9 +24,56 @@ export default function StepUAC({ onNext }: Props) {
     component: 'laboral',
     curriculumName: '',
   });
+
+  const [catalogPrograms, setCatalogPrograms] = useState<any[]>([]);
+  const [selectedCatalogUac, setSelectedCatalogUac] = useState<any>(null);
+  const [isManualInput, setIsManualInput] = useState(false);
+  const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const isLaboralDisabled = SEMESTERS_WITHOUT_LABORAL.includes(form.semester);
+
+  // Fetch programs from catalog when semester or component changes
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      setLoadingPrograms(true);
+      try {
+        const res = await fetch(`/api/programs?semester=${form.semester}&component=${form.component}`);
+        const data = await res.json();
+        
+        if (data.programs) {
+          setCatalogPrograms(data.programs);
+          
+          if (data.programs.length > 0) {
+            // Auto-select the first program from catalog
+            const first = data.programs[0];
+            setSelectedCatalogUac(first);
+            setForm(prev => ({
+              ...prev,
+              uacName: first.uac_name,
+              curriculumName: first.curriculum_name || '',
+            }));
+            setIsManualInput(false);
+          } else {
+            // If no catalog programs, default to manual input
+            setSelectedCatalogUac(null);
+            setForm(prev => ({
+              ...prev,
+              uacName: '',
+              curriculumName: '',
+            }));
+            setIsManualInput(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching catalog programs:', err);
+      } finally {
+        setLoadingPrograms(false);
+      }
+    };
+
+    fetchPrograms();
+  }, [form.semester, form.component]);
 
   // When semester changes, auto-switch to 'fundamental' if laboral is not available
   const handleSemesterChange = (newSemester: number) => {
@@ -34,6 +82,26 @@ export default function StepUAC({ onNext }: Props) {
         ? 'fundamental'
         : form.component;
     setForm({ ...form, semester: newSemester, component: nextComponent });
+  };
+
+  const handleUacSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === 'manual') {
+      setIsManualInput(true);
+      setSelectedCatalogUac(null);
+      setForm(prev => ({ ...prev, uacName: '', curriculumName: '' }));
+    } else {
+      setIsManualInput(false);
+      const selected = catalogPrograms.find(p => p.id === val);
+      if (selected) {
+        setSelectedCatalogUac(selected);
+        setForm(prev => ({
+          ...prev,
+          uacName: selected.uac_name,
+          curriculumName: selected.curriculum_name || '',
+        }));
+      }
+    }
   };
 
   const validate = () => {
@@ -45,7 +113,22 @@ export default function StepUAC({ onNext }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) onNext(form);
+    if (!validate()) return;
+
+    if (isManualInput || !selectedCatalogUac) {
+      onNext(form);
+    } else {
+      // Pass catalog details as pre-filled extractedData
+      const initialData: ExtractedPdfData = {
+        uacName: selectedCatalogUac.uac_name,
+        learningOutcome: selectedCatalogUac.learning_outcome,
+        totalHours: selectedCatalogUac.total_hours,
+        activities: selectedCatalogUac.activities,
+        evidences: selectedCatalogUac.evidences,
+        parseConfidence: 'high',
+      };
+      onNext(form, initialData);
+    }
   };
 
   return (
@@ -57,20 +140,6 @@ export default function StepUAC({ onNext }: Props) {
 
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          <div className="form-group">
-            <label className="form-label form-label-required">Nombre de la UAC</label>
-            <input
-              className="form-input"
-              placeholder="Ej: Despacha medicamentos y material de curación de acuerdo con prescripciones médicas"
-              value={form.uacName}
-              onChange={e => setForm({ ...form, uacName: e.target.value })}
-            />
-            {errors.uacName && <span className="form-error">{errors.uacName}</span>}
-            <span className="form-hint">
-              Copia exactamente el nombre de la UAC como aparece en tu programa de estudios.
-            </span>
-          </div>
 
           <div className="form-row">
             <div className="form-group">
@@ -85,6 +154,7 @@ export default function StepUAC({ onNext }: Props) {
                 ))}
               </select>
             </div>
+            
             <div className="form-group">
               <label className="form-label form-label-required">Componente curricular</label>
               <select
@@ -111,15 +181,66 @@ export default function StepUAC({ onNext }: Props) {
           </div>
 
           <div className="form-group">
+            <label className="form-label form-label-required">Nombre de la UAC</label>
+            
+            {loadingPrograms ? (
+              <div className="form-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#666' }}>
+                <div className="spinner spinner-dark" style={{ width: '16px', height: '16px' }} />
+                <span>Cargando programas del catálogo...</span>
+              </div>
+            ) : catalogPrograms.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <select
+                  className="form-select"
+                  value={isManualInput ? 'manual' : (selectedCatalogUac?.id || '')}
+                  onChange={handleUacSelectChange}
+                >
+                  {catalogPrograms.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.uac_name} {p.curriculum_name ? `(${p.curriculum_name})` : ''}
+                    </option>
+                  ))}
+                  <option value="manual">➕ Agregar otra UAC (capturar manualmente / subir PDF)</option>
+                </select>
+
+                {isManualInput && (
+                  <input
+                    className="form-input animate-fade-in"
+                    placeholder="Escribe el nombre de la UAC..."
+                    value={form.uacName}
+                    onChange={e => setForm({ ...form, uacName: e.target.value })}
+                    required
+                  />
+                )}
+              </div>
+            ) : (
+              <input
+                className="form-input"
+                placeholder="Escribe el nombre de la UAC..."
+                value={form.uacName}
+                onChange={e => setForm({ ...form, uacName: e.target.value })}
+                required
+              />
+            )}
+            
+            {errors.uacName && <span className="form-error">{errors.uacName}</span>}
+            <span className="form-hint">
+              Selecciona una UAC del catálogo oficial o escribe el nombre exacto como aparece en tu programa de estudios.
+            </span>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Nombre del currículo / especialidad</label>
             <input
               className="form-input"
-              placeholder="Ej: Área de la Salud, Turismo, Administración..."
+              placeholder={isManualInput ? "Ej: Área de la Salud, Turismo, Administración..." : ""}
               value={form.curriculumName || ''}
               onChange={e => setForm({ ...form, curriculumName: e.target.value })}
+              disabled={!isManualInput}
+              style={!isManualInput ? { backgroundColor: '#f5f5f5', color: '#666', cursor: 'not-allowed' } : {}}
             />
             <span className="form-hint">
-              Opcional. El nombre de la especialidad o currículo al que pertenece esta UAC.
+              El nombre de la especialidad o currículo al que pertenece esta UAC (se autocompleta con el catálogo).
             </span>
           </div>
 

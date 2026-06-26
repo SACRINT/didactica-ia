@@ -5,27 +5,36 @@ import type { ExtractedPdfData, KeyActivity } from '@/types/planning';
 
 interface Props {
   uacSelection: { uacName: string; semester: number; component: string };
+  initialData?: ExtractedPdfData | null;
   onNext: (data: ExtractedPdfData) => void;
   onBack: () => void;
 }
 
-export default function StepPdfUpload({ uacSelection, onNext, onBack }: Props) {
+export default function StepPdfUpload({ uacSelection, initialData, onNext, onBack }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [parseResult, setParseResult] = useState<{ confidence: string; errors: string[] } | null>(null);
-  const [formData, setFormData] = useState<ExtractedPdfData>({
-    uacName: uacSelection.uacName,
-    learningOutcome: '',
-    totalHours: 54,
-    activities: [
-      { name: '', hours: 18, order: 1 },
-      { name: '', hours: 18, order: 2 },
-      { name: '', hours: 18, order: 3 },
-    ],
-    evidences: [''],
-    parseConfidence: 'failed',
+  
+  const [formData, setFormData] = useState<ExtractedPdfData>(() => {
+    if (initialData) {
+      return { ...initialData };
+    }
+    return {
+      uacName: uacSelection.uacName,
+      learningOutcome: '',
+      totalHours: 54,
+      activities: [
+        { name: '', hours: 18, order: 1 },
+        { name: '', hours: 18, order: 2 },
+        { name: '', hours: 18, order: 3 },
+      ],
+      evidences: [''],
+      parseConfidence: 'failed',
+    };
   });
+
+  const [showUploadZone, setShowUploadZone] = useState(() => !initialData);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (f: File) => {
@@ -120,39 +129,59 @@ export default function StepPdfUpload({ uacSelection, onNext, onBack }: Props) {
           automáticamente. Siempre podrás editar cualquier campo antes de continuar.
         </p>
 
-        {!file ? (
-          <div
-            className={`pdf-upload-zone ${dragging ? 'dragover' : ''}`}
-            onClick={() => inputRef.current?.click()}
-            onDragOver={e => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
-          >
-            <div className="pdf-upload-icon">📄</div>
-            <p className="pdf-upload-title">Arrastra tu PDF aquí o haz clic para seleccionar</p>
-            <p className="pdf-upload-sub">Solo archivos PDF · Máximo 10 MB</p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf"
-              style={{ display: 'none' }}
-              onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-          </div>
+        {showUploadZone ? (
+          !file ? (
+            <div
+              className={`pdf-upload-zone ${dragging ? 'dragover' : ''}`}
+              onClick={() => inputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+            >
+              <div className="pdf-upload-icon">📄</div>
+              <p className="pdf-upload-title">Arrastra tu PDF aquí o haz clic para seleccionar</p>
+              <p className="pdf-upload-sub">Solo archivos PDF · Máximo 10 MB</p>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".pdf"
+                style={{ display: 'none' }}
+                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+            </div>
+          ) : (
+            <div className="pdf-file-info">
+              <span className="pdf-file-icon">📄</span>
+              <span className="pdf-file-name">{file.name}</span>
+              <span className="pdf-file-size">{(file.size / 1024).toFixed(0)} KB</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setFile(null); setParseResult(null); }}
+              >
+                Cambiar
+              </button>
+            </div>
+          )
         ) : (
-          <div className="pdf-file-info">
-            <span className="pdf-file-icon">📄</span>
-            <span className="pdf-file-name">{file.name}</span>
-            <span className="pdf-file-size">{(file.size / 1024).toFixed(0)} KB</span>
+          <div className="alert alert-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>📚</span>
+              <strong>UAC precargada desde el catálogo oficial</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '14px' }}>
+              Hemos completado los campos con los datos oficiales del plan de estudios (MCCEMS). Puedes revisarlos abajo.
+            </p>
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => { setFile(null); setParseResult(null); }}
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: '4px' }}
+              onClick={() => setShowUploadZone(true)}
             >
-              Cambiar
+              Subir un archivo PDF diferente para esta UAC
             </button>
           </div>
         )}
@@ -182,7 +211,7 @@ export default function StepPdfUpload({ uacSelection, onNext, onBack }: Props) {
         </h3>
         <p className="card-subtitle">
           Verifica que la información extraída sea correcta. Puedes editar todos los campos.
-          {!file && ' (Puedes completar los datos manualmente sin subir un PDF.)'}
+          {!file && !initialData && ' (Puedes completar los datos manualmente sin subir un PDF.)'}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
