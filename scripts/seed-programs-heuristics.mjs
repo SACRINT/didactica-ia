@@ -173,6 +173,21 @@ function extractTotalHours(text) {
 function parseUacsFromText(text, component, curriculumName) {
   const uacs = [];
   
+  // Educational verbs to filter out false positives
+  const VERBS = [
+    'Identifica', 'Conoce', 'Analiza', 'Utiliza', 'Reconoce', 'Valora', 'Distingue', 'Aplica', 
+    'Comprende', 'Examina', 'Evalúa', 'Diseña', 'Establece', 'Caracteriza', 'Determina', 
+    'Describe', 'Sistematiza', 'Explica', 'Compara', 'Reflexiona', 'Argumenta', 'Participa', 
+    'Propone', 'Colabora', 'Asume', 'Desarrolla', 'Construye', 'Promueve', 'Estructura',
+    'Interpreta', 'Deduce', 'Indaga', 'Cuestiona', 'Individua', 'Relaciona', 'Diferencia',
+    'Expresa', 'Redacta', 'Lee', 'Comunica', 'Interactúa', 'Produce',
+    'Problematiza', 'Plantea', 'Elabora', 'Procesa', 'Discute', 'Formula', 'Integra',
+    'Fortalece', 'Representa', 'Revisa', 'Gráfica', 'Observa', 'Estudia', 'Entiende',
+    'Investiga', 'Practica', 'Selecciona', 'Extrae', 'Sigue', 'Solicita', 'Hace',
+    'Habla', 'Pregunta', 'Consolida', 'Comparte', 'Pide', 'Relata', 'Cuenta', 'Explora',
+    'Narra', 'Escribe', 'Reescribe', 'Impulsa', 'Ejerce', 'Genera', 'Recrea', 'Experimenta'
+  ];
+  
   if (component === 'laboral') {
     // Laboral has UAC 1, UAC 2 headers
     const uacHeaderRegex = /Unidad de Aprendizaje Curricular\s+(\d+)\s+([a-zA-Záéíóúñ]+)\s+Semestre/gi;
@@ -269,8 +284,92 @@ function parseUacsFromText(text, component, curriculumName) {
         });
       }
     }
+  } else if (component === 'ampliado') {
+    // Typical headings: "3.1. Ámbito: Práctica y Colaboración Ciudadana", etc.
+    const uacHeaderRegex = /3\.(\d+)\.\s+Ámbito:\s*(.*?)(?=\s*(?:Meta educativa|Tabla \d+|=== PAGE|$))/gi;
+    const matches = [];
+    let match;
+    while ((match = uacHeaderRegex.exec(text)) !== null) {
+      const subjectAndRoman = match[2].trim();
+      if (subjectAndRoman.length <= 60 && !/\d/.test(subjectAndRoman)) {
+        matches.push({
+          index: match.index,
+          num: parseInt(match[1], 10),
+          subjectAndRoman,
+        });
+      }
+    }
+
+    for (let i = 0; i < matches.length; i++) {
+      const current = matches[i];
+      let nextIndex = matches[i + 1] ? matches[i + 1].index : text.length;
+      if (!matches[i + 1]) {
+        // Truncate last block at section 4
+        const lowerText = text.substring(current.index).toLowerCase();
+        const idx = lowerText.indexOf('4.1.');
+        if (idx !== -1) {
+          nextIndex = current.index + idx;
+        } else {
+          nextIndex = Math.min(current.index + 8000, text.length);
+        }
+      }
+      
+      const uacBlock = text.substring(current.index, nextIndex);
+      const uacName = `Ámbito de la Formación Socioemocional: ${current.subjectAndRoman}`;
+      
+      // Ampliado UACs can be chosen in any semester, we register it as 1 by default
+      const semester = 1;
+
+      const activities = [];
+      const purposesRegex = /\b([1-8])\s+([A-ZÁÉÍÓÚÑ][\s\S]+?)(?=\s*(?:\b[1-8]\s+[A-ZÁÉÍÓÚÑ]|\bMeta\b|\bOrientaciones\b|=== PAGE|$))/g;
+      const actMatches = [...uacBlock.matchAll(purposesRegex)];
+      const seen = new Set();
+      
+      actMatches.forEach((m) => {
+        const order = parseInt(m[1], 10);
+        const name = m[2].trim().replace(/\s+/g, ' ');
+        const firstWordMatch = name.match(/^([a-zA-ZáéíóúñÁÉÍÓÚÑ]+)/);
+        if (!firstWordMatch) return;
+        const firstWord = firstWordMatch[1];
+        const isEducational = VERBS.some(v => firstWord.toLowerCase() === v.toLowerCase());
+        const isFalsePositive = [
+          'MARCO CURRICULAR', 'MODELO EDUCATIVO', 'SECRETARIO', 'COORDINADORA', 
+          'DIRECCIÓN DE', 'SISTEMA NACIONAL', 'PRIMERA EDICIÓN', 'ÍNDICE', 
+          'HORAS/SEMANA', 'HORAS SEMANA', 'CRITERIOS PARA', 'GLOSARIO', 'BIBLIOGRAFÍA',
+          'DIRECTORIO', 'PROGRAMAS DE ESTUDIO', 'CURRÍCULUM', 'SUBSECRETARIA',
+          'Bachillerato', 'Secretaría de'
+        ].some(word => name.toUpperCase().includes(word.toUpperCase()));
+        
+        const cleanName = removeHyphens(extractPurposeOnly(name));
+        if (isEducational && cleanName.length > 25 && !isFalsePositive && !seen.has(cleanName)) {
+          seen.add(cleanName);
+          activities.push({ name: cleanName.substring(0, 250), order });
+        }
+      });
+
+      const totalHours = 36;
+      const count = activities.length;
+      if (count > 0) {
+        const baseHours = Math.floor(totalHours / count);
+        const remainder = totalHours % count;
+        activities.forEach((act, idx) => {
+          act.hours = baseHours + (idx < remainder ? 1 : 0);
+        });
+      }
+
+      uacs.push({
+        uacName: removeHyphens(uacName),
+        semester,
+        component,
+        curriculumName,
+        learningOutcome: `Desarrollar capacidades socioemocionales en el ámbito de ${current.subjectAndRoman}`,
+        activities,
+        evidences: ['Bitácora de registro', 'Autoevaluación formativa', 'Proyecto comunitario'],
+        totalHours
+      });
+    }
   } else {
-    // Fundamental/Ampliado
+    // Fundamental
     // Typical headings: "2.1. Pensamiento Matemático I", "2.2. Pensamiento Matemático II", etc.
     const uacHeaderRegex = /2\.(\d+)\.\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+(?:I|II|III|IV|V|VI))\b/g;
     const matches = [];
@@ -347,21 +446,6 @@ function parseUacsFromText(text, component, curriculumName) {
       
       // Activities (Propósitos y contenidos formativos)
       const activities = [];
-      
-      // Educational verbs to filter out false positives
-      const VERBS = [
-        'Identifica', 'Conoce', 'Analiza', 'Utiliza', 'Reconoce', 'Valora', 'Distingue', 'Aplica', 
-        'Comprende', 'Examina', 'Evalúa', 'Diseña', 'Establece', 'Caracteriza', 'Determina', 
-        'Describe', 'Sistematiza', 'Explica', 'Compara', 'Reflexiona', 'Argumenta', 'Participa', 
-        'Propone', 'Colabora', 'Asume', 'Desarrolla', 'Construye', 'Promueve', 'Estructura',
-        'Interpreta', 'Deduce', 'Indaga', 'Cuestiona', 'Individua', 'Relaciona', 'Diferencia',
-        'Expresa', 'Redacta', 'Lee', 'Comunica', 'Interactúa', 'Produce',
-        'Problematiza', 'Plantea', 'Elabora', 'Procesa', 'Discute', 'Formula', 'Integra',
-        'Fortalece', 'Representa', 'Revisa', 'Gráfica', 'Observa', 'Estudia', 'Entiende',
-        'Investiga', 'Practica', 'Selecciona', 'Extrae', 'Sigue', 'Solicita', 'Hace',
-        'Habla', 'Pregunta', 'Consolida', 'Comparte', 'Pide', 'Relata', 'Cuenta', 'Explora',
-        'Narra', 'Escribe', 'Reescribe', 'Impulsa', 'Ejerce', 'Genera', 'Recrea', 'Experimenta'
-      ];
       
       const purposesRegex = /\b([1-8])\s+([A-ZÁÉÍÓÚÑ][\s\S]+?)(?=\s*(?:\b[1-8]\s+[A-ZÁÉÍÓÚÑ]|\bMeta\b|\bOrientaciones\b|=== PAGE|$))/g;
       const actMatches = [...uacBlock.matchAll(purposesRegex)];

@@ -182,6 +182,14 @@ export async function savePdfUpload(data: {
 
 export async function getProgramsCatalog(semester?: number, component?: string) {
   if (semester !== undefined && component !== undefined) {
+    if (component === 'ampliado') {
+      return sql()`
+        SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences
+        FROM programs_catalog
+        WHERE component = ${component}
+        ORDER BY uac_name ASC
+      `;
+    }
     return sql()`
       SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences
       FROM programs_catalog
