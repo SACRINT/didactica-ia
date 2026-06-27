@@ -302,13 +302,46 @@ function parseUacsFromText(text, component, curriculumName) {
 
     for (let i = 0; i < matches.length; i++) {
       const current = matches[i];
-      const nextIndex = matches[i + 1] ? matches[i + 1].index : text.length;
+      let nextIndex = matches[i + 1] ? matches[i + 1].index : text.length;
+      if (!matches[i + 1]) {
+        const lowerText = text.substring(current.index).toLowerCase();
+        const truncateKeywords = [
+          '3. orientaciones',
+          '3.1. planeacion',
+          'ejemplo de planeacion',
+          'para abordar los propositos',
+          'sugerencias didacticas'
+        ];
+        let truncateOffset = -1;
+        for (const kw of truncateKeywords) {
+          const idx = lowerText.indexOf(kw);
+          if (idx !== -1 && (truncateOffset === -1 || idx < truncateOffset)) {
+            truncateOffset = idx;
+          }
+        }
+        if (truncateOffset !== -1) {
+          nextIndex = current.index + truncateOffset;
+        } else {
+          nextIndex = Math.min(current.index + 8000, text.length);
+        }
+      }
       const uacBlock = text.substring(current.index, nextIndex);
       
-      // Determine semester from Roman numeral
-      const romanMatch = current.subjectAndRoman.match(/\b(I|II|III|IV|V|VI)\b/i);
-      const roman = romanMatch ? romanMatch[1].toLowerCase() : 'i';
-      const semester = SEMESTER_MAP[roman] || 1;
+      // Extract semester from text
+      let semester = 1;
+      const textNorm = cleanAccentsPreserveLength(uacBlock.toLowerCase());
+      if (textNorm.includes('primer semestre') || textNorm.includes('1er semestre')) semester = 1;
+      else if (textNorm.includes('segundo semestre') || textNorm.includes('2do semestre')) semester = 2;
+      else if (textNorm.includes('tercer semestre') || textNorm.includes('3er semestre')) semester = 3;
+      else if (textNorm.includes('cuarto semestre') || textNorm.includes('4to semestre')) semester = 4;
+      else if (textNorm.includes('quinto semestre') || textNorm.includes('5to semestre')) semester = 5;
+      else if (textNorm.includes('sexto semestre') || textNorm.includes('6to semestre')) semester = 6;
+      else {
+        // Fallback to Roman numeral if not found in text
+        const romanMatch = current.subjectAndRoman.match(/\b(I|II|III|IV|V|VI)\b/i);
+        const roman = romanMatch ? romanMatch[1].toLowerCase() : 'i';
+        semester = SEMESTER_MAP[roman] || 1;
+      }
       
       const uacName = cleanUacSubjectName(current.subjectAndRoman);
       
@@ -322,7 +355,12 @@ function parseUacsFromText(text, component, curriculumName) {
         'Describe', 'Sistematiza', 'Explica', 'Compara', 'Reflexiona', 'Argumenta', 'Participa', 
         'Propone', 'Colabora', 'Asume', 'Desarrolla', 'Construye', 'Promueve', 'Estructura',
         'Interpreta', 'Deduce', 'Indaga', 'Cuestiona', 'Individua', 'Relaciona', 'Diferencia',
-        'Expresa', 'Redacta', 'Lee', 'Comunica', 'Interactúa', 'Produce'
+        'Expresa', 'Redacta', 'Lee', 'Comunica', 'Interactúa', 'Produce',
+        'Problematiza', 'Plantea', 'Elabora', 'Procesa', 'Discute', 'Formula', 'Integra',
+        'Fortalece', 'Representa', 'Revisa', 'Gráfica', 'Observa', 'Estudia', 'Entiende',
+        'Investiga', 'Practica', 'Selecciona', 'Extrae', 'Sigue', 'Solicita', 'Hace',
+        'Habla', 'Pregunta', 'Consolida', 'Comparte', 'Pide', 'Relata', 'Cuenta', 'Explora',
+        'Narra', 'Escribe', 'Reescribe', 'Impulsa', 'Ejerce', 'Genera', 'Recrea', 'Experimenta'
       ];
       
       const purposesRegex = /\b([1-8])\s+([A-ZÁÉÍÓÚÑ][\s\S]+?)(?=\s*(?:\b[1-8]\s+[A-ZÁÉÍÓÚÑ]|\bMeta\b|\bOrientaciones\b|=== PAGE|$))/g;
