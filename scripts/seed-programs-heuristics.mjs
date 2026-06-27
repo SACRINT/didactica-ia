@@ -142,7 +142,7 @@ function cleanUacName(uacName, curriculumName) {
 
 // Clean greedy UAC subject name by matching up to the first Roman numeral
 function cleanUacSubjectName(name) {
-  const match = name.match(/^([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?\b(?:I|II|III|IV|V|VI))\b/);
+  const match = name.match(/^([a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s,]+?\b(?:I|II|III|IV|V|VI))\b/);
   if (match) {
     return match[1].replace(/\s+/g, ' ').trim();
   }
@@ -371,7 +371,7 @@ function parseUacsFromText(text, component, curriculumName) {
   } else {
     // Fundamental
     // Typical headings: "2.1. Pensamiento Matemático I", "2.2. Pensamiento Matemático II", etc.
-    const uacHeaderRegex = /2\.(\d+)\.\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+(?:I|II|III|IV|V|VI))\b/g;
+    const uacHeaderRegex = /2\.(\d+)\.\s+([a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s,]+(?:I|II|III|IV|V|VI))\b/g;
     const matches = [];
     let match;
     while ((match = uacHeaderRegex.exec(text)) !== null) {
@@ -502,16 +502,18 @@ function parseUacsFromText(text, component, curriculumName) {
         learningOutcome = removeHyphens(outcomeMatch[1].trim());
       }
 
-      uacs.push({
-        uacName: removeHyphens(uacName),
-        semester,
-        component,
-        curriculumName,
-        learningOutcome: removeHyphens(learningOutcome) || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
-        activities,
-        evidences: ['Portafolio de evidencias', 'Evaluación formativa', 'Proyecto integrador'],
-        totalHours
-      });
+      if (activities.length > 0) {
+        uacs.push({
+          uacName: removeHyphens(uacName),
+          semester,
+          component,
+          curriculumName,
+          learningOutcome: removeHyphens(learningOutcome) || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
+          activities,
+          evidences: ['Portafolio de evidencias', 'Evaluación formativa', 'Proyecto integrador'],
+          totalHours
+        });
+      }
     }
   }
   return uacs;
