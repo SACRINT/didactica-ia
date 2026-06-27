@@ -43,6 +43,7 @@ export default function StepUAC({ onNext }: Props) {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
 
   const isLaboralDisabled = SEMESTERS_WITHOUT_LABORAL.includes(form.semester);
+  const isFfeDisabled = form.semester < 5;
 
   // Extract unique specialties from catalog programs when in Formación Laboral mode
   const specialties = form.component === 'laboral'
@@ -146,10 +147,12 @@ export default function StepUAC({ onNext }: Props) {
 
   // When semester changes, auto-switch to 'fundamental' if laboral is not available
   const handleSemesterChange = (newSemester: number) => {
-    const nextComponent =
-      SEMESTERS_WITHOUT_LABORAL.includes(newSemester) && form.component === 'laboral'
-        ? 'fundamental'
-        : form.component;
+    let nextComponent = form.component;
+    if (SEMESTERS_WITHOUT_LABORAL.includes(newSemester) && form.component === 'laboral') {
+      nextComponent = 'fundamental';
+    } else if (newSemester < 5 && form.component === 'ext_optativo') {
+      nextComponent = 'fundamental';
+    }
     
     setForm(prev => {
       let updatedUacName = prev.uacName;
@@ -273,6 +276,14 @@ export default function StepUAC({ onNext }: Props) {
                 onChange={e => setForm({ ...form, component: e.target.value })}
               >
                 <option value="fundamental">Currículum Fundamental</option>
+                <option value="ext_obligatorio">F. Fundamental Extendida Obligatoria (FFEO)</option>
+                <option
+                  value="ext_optativo"
+                  disabled={isFfeDisabled}
+                  style={isFfeDisabled ? { color: '#aaa' } : {}}
+                >
+                  F. Fundamental Extendida (FFE){isFfeDisabled ? ' (5°-6° sem.)' : ''}
+                </option>
                 <option value="ampliado">Currículum Ampliado</option>
                 <option
                   value="laboral"
@@ -282,9 +293,14 @@ export default function StepUAC({ onNext }: Props) {
                   Formación Laboral{isLaboralDisabled ? ' (3°-6° sem.)' : ''}
                 </option>
               </select>
-              {isLaboralDisabled && (
+              {isLaboralDisabled && form.component === 'laboral' && (
                 <span className="form-hint" style={{ color: 'var(--c-amber)', fontWeight: 500 }}>
                   ⚠️ Formación Laboral no aplica para 1° y 2° semestre.
+                </span>
+              )}
+              {isFfeDisabled && form.component === 'ext_optativo' && (
+                <span className="form-hint" style={{ color: 'var(--c-amber)', fontWeight: 500 }}>
+                  ⚠️ F. Fundamental Extendida (FFE) no aplica para semestres anteriores a 5º.
                 </span>
               )}
             </div>

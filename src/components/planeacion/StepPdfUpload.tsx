@@ -41,8 +41,10 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
     };
   });
 
-  const [isProgramCorrect, setIsProgramCorrect] = useState(() => !!initialData);
-  const [showUploadZone, setShowUploadZone] = useState(() => !initialData);
+  const hasPreloadedData = !!(initialData && initialData.activities && initialData.activities.length > 0);
+
+  const [isProgramCorrect, setIsProgramCorrect] = useState(() => hasPreloadedData);
+  const [showUploadZone, setShowUploadZone] = useState(() => !hasPreloadedData);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,7 +154,7 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
           automáticamente. Siempre podrás editar cualquier campo antes de continuar.
         </p>
 
-        {initialData && (
+        {hasPreloadedData && initialData && (
           <div style={{ marginBottom: '20px', padding: '16px', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 500, color: 'var(--c-navy)' }}>
               <input
@@ -170,42 +172,55 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
         )}
 
         {showUploadZone ? (
-          !file ? (
-            <div
-              className={`pdf-upload-zone ${dragging ? 'dragover' : ''}`}
-              onClick={() => inputRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={handleDrop}
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
-            >
-              <div className="pdf-upload-icon">📄</div>
-              <p className="pdf-upload-title">Arrastra tu PDF aquí o haz clic para seleccionar</p>
-              <p className="pdf-upload-sub">Solo archivos PDF · Máximo 10 MB</p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".pdf"
-                style={{ display: 'none' }}
-                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-              />
-            </div>
-          ) : (
-            <div className="pdf-file-info">
-              <span className="pdf-file-icon">📄</span>
-              <span className="pdf-file-name">{file.name}</span>
-              <span className="pdf-file-size">{(file.size / 1024).toFixed(0)} KB</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => { setFile(null); setParseResult(null); }}
+          <div>
+            {!hasPreloadedData && (
+              <div className="alert alert-warning" style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>⚠️</span>
+                  <strong>Programa de estudios no precargado</strong>
+                </div>
+                <p style={{ margin: 0, fontSize: '14px' }}>
+                  Esta asignatura aún no tiene sus propósitos formativos precargados en la base de datos de la escuela. Por favor sube el programa de estudios oficial (PDF) para extraer los datos de forma automática, o captúralos manualmente abajo.
+                </p>
+              </div>
+            )}
+            {!file ? (
+              <div
+                className={`pdf-upload-zone ${dragging ? 'dragover' : ''}`}
+                onClick={() => inputRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
               >
-                Cambiar
-              </button>
-            </div>
-          )
+                <div className="pdf-upload-icon">📄</div>
+                <p className="pdf-upload-title">Arrastra tu PDF aquí o haz clic para seleccionar</p>
+                <p className="pdf-upload-sub">Solo archivos PDF · Máximo 10 MB</p>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".pdf"
+                  style={{ display: 'none' }}
+                  onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </div>
+            ) : (
+              <div className="pdf-file-info">
+                <span className="pdf-file-icon">📄</span>
+                <span className="pdf-file-name">{file.name}</span>
+                <span className="pdf-file-size">{(file.size / 1024).toFixed(0)} KB</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { setFile(null); setParseResult(null); }}
+                >
+                  Cambiar
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="alert alert-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

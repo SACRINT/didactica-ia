@@ -170,6 +170,60 @@ function extractTotalHours(text) {
 }
 
 // Heuristic parsing function
+const FUNDAMENTAL_THEMES = {
+  // Pensamiento Matemático
+  'Pensamiento Matemático I': 'Pensamiento aritmético',
+  'Pensamiento Matemático II': 'Introducción al álgebra',
+  'Pensamiento Matemático III': 'Pensamiento algebraico e introducción a geometría plana',
+  'Pensamiento Matemático IV': 'Trigonometría y geometría analítica',
+  'Pensamiento Matemático V': 'Cálculo diferencial',
+  'Pensamiento Matemático VI': 'Pensamiento estadístico y probabilístico',
+
+  // Ciencias Naturales, Experimentales y Tecnología
+  'Ciencias Naturales, Experimentales y Tecnología I': 'Invitación a la ciencia. Naturaleza de la materia',
+  'Ciencias Naturales, Experimentales y Tecnología II': 'El poder de la energía',
+  'Ciencias Naturales, Experimentales y Tecnología III': 'Nuestro hogar. El sistema terrestre',
+  'Ciencias Naturales, Experimentales y Tecnología IV': 'El poder de la química',
+  'Ciencias Naturales, Experimentales y Tecnología V': 'Del átomo al universo. Fuerza y energía',
+  'Ciencias Naturales, Experimentales y Tecnología VI': '¿Qué es la vida? Evolución y diversidad biológica',
+  'Ciencias Naturales Experimentales y Tecnología VI': '¿Qué es la vida? Evolución y diversidad biológica',
+
+  // Ciencias Sociales
+  'Ciencias Sociales I': 'Estado, ciudadanía y relaciones de poder',
+  'Ciencias Sociales II': 'Organización, relaciones sociales y económicas',
+  'Ciencias Sociales III': 'La realidad social y sus transformaciones',
+
+  // Cultura Digital
+  'Cultura Digital I': 'Ciudadanía digital',
+  'Cultura Digital II': 'Aprendizaje individual y colaborativo',
+  'Cultura Digital III': 'Uso y difusión del conocimiento',
+
+  // Conciencia Histórica
+  'Conciencia Histórica I': 'Coordenadas de la Historia',
+  'Conciencia Histórica II': 'La experiencia histórica',
+  'Conciencia Histórica III': 'Navegar en el tiempo: investigaciones históricas',
+
+  // Pensamiento Filosófico y Humanidades / Humanidades
+  'Pensamiento Filosófico y Humanidades I': 'El ejercicio de filosofar y la perspectiva humanista',
+  'Pensamiento Filosófico y Humanidades II': 'Las reflexiones filosóficas sobre el Conocer',
+  'Pensamiento Filosófico y Humanidades III': 'Las reflexiones filosóficas sobre el Actuar',
+  'Humanidades I': 'El ejercicio de filosofar y la perspectiva humanista',
+  'Humanidades II': 'Las reflexiones filosóficas sobre el Conocer',
+  'Humanidades III': 'Las reflexiones filosóficas sobre el Actuar',
+
+  // Inglés
+  'Inglés I': '(A1) To be, or not to be, that is the question',
+  'Inglés II': '(A1+) These are a few of my favorite things',
+  'Inglés III': '(A2) What we were, we share',
+  'Inglés IV': '(A2+) Should I stay or should I go?',
+  'Inglés V': '(B1) We are the champions',
+
+  // Lengua y Comunicación
+  'Lengua y Comunicación I': 'Leer y escribir para pensarnos juntos',
+  'Lengua y Comunicación II': 'Libertad para imaginar, poder para comunicar',
+  'Lengua y Comunicación III': 'Describir culturas, apropiarse de las palabras'
+};
+
 function parseUacsFromText(text, component, curriculumName) {
   const uacs = [];
   
@@ -503,11 +557,12 @@ function parseUacsFromText(text, component, curriculumName) {
       }
 
       if (activities.length > 0) {
+        const cleanName = removeHyphens(uacName);
         uacs.push({
-          uacName: removeHyphens(uacName),
+          uacName: cleanName,
           semester,
           component,
-          curriculumName,
+          curriculumName: FUNDAMENTAL_THEMES[cleanName] || curriculumName,
           learningOutcome: removeHyphens(learningOutcome) || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
           activities,
           evidences: ['Portafolio de evidencias', 'Evaluación formativa', 'Proyecto integrador'],
@@ -582,6 +637,69 @@ async function seed() {
     }
   }
 
+  // Load FFE and FFEO placeholders
+  const placeholders = [
+    // FFEO (Formación Fundamental Extendida Obligatoria)
+    { uacName: 'Laboratorio de Investigación', semester: 1, component: 'ext_obligatorio', curriculumName: 'FFEO', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Taller de Ciencias I', semester: 2, component: 'ext_obligatorio', curriculumName: 'FFEO', totalHours: 72, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Taller de Ciencias II', semester: 3, component: 'ext_obligatorio', curriculumName: 'FFEO', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Espacio y Sociedad', semester: 4, component: 'ext_obligatorio', curriculumName: 'FFEO', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Taller de Pensamiento Variacional I', semester: 5, component: 'ext_obligatorio', curriculumName: 'FFEO', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Temas Selectos de Matemáticas II', semester: 6, component: 'ext_obligatorio', curriculumName: 'FFEO', totalHours: 72, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+
+    // FFE - Quinto Semestre (Área de Conocimiento)
+    { uacName: 'Análisis de Fenómenos Físicos I (CNET)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Análisis de Fenómenos Biológicos (CNET)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Salud Integral I (CNET)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Organización del Flujo de Materia I (CNET)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Derecho y Sociedad I (CS)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Fundamentos de Administración I (CS)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Economía I (CS)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Procesos Contables I (CS)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Psicología I (HUM)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Pensamiento Filosófico I (HUM)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Arte y Cultura I', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Lógica y Pensamiento Crítico', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+
+    // FFE - Quinto Semestre (Recurso Sociocognitivo)
+    { uacName: 'Pensamiento Matemático Finanzas I (CS)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Temas Selectos CS I (CS)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Comunicación y Sociedad I (Lengua)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Inglés V (Lengua)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Raíces etimológicas I (Lengua)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Taller Pensamiento Variacional I (PM)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Dibujo Técnico I (PM)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Probabilidad y Estadística I (PM)', semester: 5, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+
+    // FFE - Sexto Semestre (Área de Conocimiento)
+    { uacName: 'Análisis de Fenómenos Físicos II (CNET)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Temas Selectos de Biología (CNET)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Salud Integral II (CNET)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Organización del Flujo de Materia II (CNET)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Derecho y Sociedad II (CS)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Fundamentos de Administración II (CS)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Economía II (CS)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Procesos Contables II (CS)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Psicología II (HUM)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Pensamiento Filosófico II (HUM)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Arte y Cultura II', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Experiencia Estética', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Área Conocimiento)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+
+    // FFE - Sexto Semestre (Recurso Sociocognitivo)
+    { uacName: 'Pensamiento Matemático Finanzas II (CS)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Temas Selectos CS II (CS)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Comunicación y Sociedad II (Lengua)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Inglés VI (Lengua)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Raíces etimológicas II (Lengua)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Taller Pensamiento Variacional II (PM)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Dibujo Técnico II (PM)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true },
+    { uacName: 'Probabilidad y Estadística II (PM)', semester: 6, component: 'ext_optativo', curriculumName: 'FFE (Recurso Sociocognitivo)', totalHours: 54, learningOutcome: '', activities: [], evidences: [], year: 2025, isPlaceholder: true }
+  ];
+
+  for (const ph of placeholders) {
+    uacDict[ph.uacName] = ph;
+  }
+
   console.log(`🧹 Clearing old catalog entries from Neon Database...`);
   await sql`DELETE FROM programs_catalog`;
 
@@ -589,8 +707,8 @@ async function seed() {
   for (const key of Object.keys(uacDict)) {
     const uac = uacDict[key];
     
-    // Add fallback activities if none were parsed
-    if (uac.activities.length === 0) {
+    // Add fallback activities if none were parsed (ignore placeholders)
+    if (uac.activities.length === 0 && !uac.isPlaceholder) {
       const actCount = 3;
       const baseHours = Math.floor(uac.totalHours / actCount);
       const remainder = uac.totalHours % actCount;

@@ -63,6 +63,8 @@
     "component_options": {
       "laboral": "Formación Laboral",
       "fundamental": "Currículum Fundamental",
+      "ext_obligatorio": "F. Fundamental Extendida Obligatoria (FFEO)",
+      "ext_optativo": "F. Fundamental Extendida (FFE)",
       "ampliado": "Currículum Ampliado"
     }
   },
