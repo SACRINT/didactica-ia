@@ -17,6 +17,16 @@ interface Props {
 // Formación Laboral is NOT available in semester 1 or 2
 const SEMESTERS_WITHOUT_LABORAL = [1, 2];
 
+function cleanSocioemotionalName(name: string, semester: number): string {
+  let clean = name.replace(/^Ámbito de la Formación Socioemocional:\s*/i, '');
+  const romans = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
+  const roman = romans[semester] || '';
+  if (roman && !clean.endsWith(` ${roman}`)) {
+    clean = `${clean} ${roman}`;
+  }
+  return clean;
+}
+
 export default function StepUAC({ onNext }: Props) {
   const [form, setForm] = useState<UACSelection>({
     uacName: '',
@@ -90,7 +100,7 @@ export default function StepUAC({ onNext }: Props) {
               setSelectedCatalogUac(first);
               setForm(prev => ({
                 ...prev,
-                uacName: first.uac_name,
+                uacName: form.component === 'ampliado' ? cleanSocioemotionalName(first.uac_name, form.semester) : first.uac_name,
                 curriculumName: first.curriculum_name || '',
               }));
               setIsManualInput(false);
@@ -123,7 +133,19 @@ export default function StepUAC({ onNext }: Props) {
       SEMESTERS_WITHOUT_LABORAL.includes(newSemester) && form.component === 'laboral'
         ? 'fundamental'
         : form.component;
-    setForm({ ...form, semester: newSemester, component: nextComponent });
+    
+    setForm(prev => {
+      let updatedUacName = prev.uacName;
+      if (prev.component === 'ampliado' && selectedCatalogUac) {
+        updatedUacName = cleanSocioemotionalName(selectedCatalogUac.uac_name, newSemester);
+      }
+      return {
+        ...prev,
+        semester: newSemester,
+        component: nextComponent,
+        uacName: updatedUacName
+      };
+    });
   };
 
   const handleSpecialtyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -167,7 +189,7 @@ export default function StepUAC({ onNext }: Props) {
         setSelectedCatalogUac(selected);
         setForm(prev => ({
           ...prev,
-          uacName: selected.uac_name,
+          uacName: form.component === 'ampliado' ? cleanSocioemotionalName(selected.uac_name, form.semester) : selected.uac_name,
           curriculumName: selected.curriculum_name || '',
         }));
       }
@@ -282,11 +304,21 @@ export default function StepUAC({ onNext }: Props) {
                   value={isManualInput ? 'manual' : (selectedCatalogUac?.id || '')}
                   onChange={handleUacSelectChange}
                 >
-                  {(form.component === 'laboral' ? filteredUacs : catalogPrograms).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.uac_name} {form.component !== 'laboral' && p.curriculum_name ? `(${p.curriculum_name})` : ''} ({p.year})
-                    </option>
-                  ))}
+                  {(form.component === 'laboral' ? filteredUacs : catalogPrograms).map((p) => {
+                    const displayName = form.component === 'ampliado'
+                      ? cleanSocioemotionalName(p.uac_name, form.semester)
+                      : p.uac_name;
+                    const suffix = form.component === 'laboral'
+                      ? ''
+                      : form.component === 'ampliado'
+                        ? '' // Hide (MCC FORMACION SOCIOEMOCIONAL)
+                        : p.curriculum_name ? ` (${p.curriculum_name})` : '';
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {displayName}{suffix} ({p.year})
+                      </option>
+                    );
+                  })}
                   <option value="manual">➕ Agregar otra UAC (capturar manualmente / subir PDF)</option>
                 </select>
 
