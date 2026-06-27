@@ -63,13 +63,30 @@ export default function StepUAC({ onNext }: Props) {
         const data = await res.json();
         
         if (data.programs) {
-          setCatalogPrograms(data.programs);
+          let filteredPrograms = data.programs;
+          if (form.component === 'ampliado') {
+            if (form.semester === 1 || form.semester === 2) {
+              // Only allow Artísticas/Culturales and Físicas/Deportivas in 1st & 2nd semesters
+              filteredPrograms = data.programs.filter((p: any) => 
+                p.uac_name.includes('Artísticas y Culturales') || 
+                p.uac_name.includes('Físicas y Deportivas')
+              );
+            } else {
+              // Semesters 3-6: Only allow the other 3
+              filteredPrograms = data.programs.filter((p: any) => 
+                !p.uac_name.includes('Artísticas y Culturales') && 
+                !p.uac_name.includes('Físicas y Deportivas')
+              );
+            }
+          }
+
+          setCatalogPrograms(filteredPrograms);
           
-          if (data.programs.length > 0) {
+          if (filteredPrograms.length > 0) {
             if (form.component === 'laboral') {
               // Extract unique specialties
               const specs = Array.from(
-                new Set(data.programs.map((p: any) => p.curriculum_name).filter(Boolean))
+                new Set(filteredPrograms.map((p: any) => p.curriculum_name).filter(Boolean))
               ).sort() as string[];
               
               if (specs.length > 0) {
@@ -77,7 +94,7 @@ export default function StepUAC({ onNext }: Props) {
                 setSelectedSpecialty(initialSpec);
                 
                 // Filter UACs by that specialty
-                const filtered = data.programs.filter((p: any) => p.curriculum_name === initialSpec);
+                const filtered = filteredPrograms.filter((p: any) => p.curriculum_name === initialSpec);
                 if (filtered.length > 0) {
                   const first = filtered[0];
                   setSelectedCatalogUac(first);
@@ -96,7 +113,7 @@ export default function StepUAC({ onNext }: Props) {
               }
             } else {
               // For other components, select first UAC directly
-              const first = data.programs[0];
+              const first = filteredPrograms[0];
               setSelectedCatalogUac(first);
               setForm(prev => ({
                 ...prev,
