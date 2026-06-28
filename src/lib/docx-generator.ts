@@ -198,7 +198,7 @@ function buildSectionI(content: GeneratedPlanningContent): (Paragraph | Table)[]
 function buildSectionII(content: GeneratedPlanningContent): (Paragraph | Table)[] {
   const s = content.sectionII;
   const cL = Math.floor(CONTENT * 0.27), cR = CONTENT - cL;
-  const cA0 = Math.floor(CONTENT * 0.56), cA1 = Math.floor(CONTENT * 0.23), cA2 = CONTENT - cA0 - cA1;
+  const cA0 = Math.floor(CONTENT * 0.45), cA1 = Math.floor(CONTENT * 0.15), cA2 = Math.floor(CONTENT * 0.15), cA3 = CONTENT - cA0 - cA1 - cA2;
 
   const isLaboral = content.sectionI.component?.toLowerCase().includes('laboral') || false;
   const activityLabel = isLaboral ? 'Actividades Clave' : 'Propósitos y Contenidos formativos';
@@ -221,14 +221,25 @@ function buildSectionII(content: GeneratedPlanningContent): (Paragraph | Table)[
     sp(),
     subH(`${activityLabel} y Distribución Horaria`),
     tbl([
-      new TableRow({ children: [tcM(tableHeader, { w: cA0 }), tcM('Horas Asignadas', { w: cA1, align: AlignmentType.CENTER }), tcM('% de la UAC', { w: cA2, align: AlignmentType.CENTER })] }),
+      new TableRow({ children: [
+        tcM(tableHeader, { w: cA0 }),
+        tcM('Corte Semestral', { w: cA1, align: AlignmentType.CENTER }),
+        tcM('Horas Asignadas', { w: cA2, align: AlignmentType.CENTER }),
+        tcM('% de la UAC', { w: cA3, align: AlignmentType.CENTER })
+      ] }),
       ...s.activities.map((a, i) => new TableRow({ children: [
         tc(a.name, { w: cA0, fill: i % 2 === 0 ? C.white : C.alt }),
-        tc(`${a.hours} hrs.`, { w: cA1, align: AlignmentType.CENTER, fill: i % 2 === 0 ? C.white : C.alt }),
-        tc(`${Math.round((a.hours / s.activities.reduce((sum, ac) => sum + ac.hours, 0)) * 100)}%`, { w: cA2, align: AlignmentType.CENTER, fill: i % 2 === 0 ? C.white : C.alt }),
+        tc(a.corte || 'N/A', { w: cA1, align: AlignmentType.CENTER, fill: i % 2 === 0 ? C.white : C.alt }),
+        tc(`${a.hours} hrs.`, { w: cA2, align: AlignmentType.CENTER, fill: i % 2 === 0 ? C.white : C.alt }),
+        tc(`${Math.round((a.hours / s.activities.reduce((sum, ac) => sum + ac.hours, 0)) * 100)}%`, { w: cA3, align: AlignmentType.CENTER, fill: i % 2 === 0 ? C.white : C.alt }),
       ]})),
-      new TableRow({ children: [tcL('TOTAL', { w: cA0, align: AlignmentType.RIGHT }), tcL(`${s.activities.reduce((sum, a) => sum + a.hours, 0)} hrs.`, { w: cA1, align: AlignmentType.CENTER }), tcL('100%', { w: cA2, align: AlignmentType.CENTER })] }),
-    ], [cA0, cA1, cA2]),
+      new TableRow({ children: [
+        tcL('TOTAL', { w: cA0, align: AlignmentType.RIGHT }),
+        tcL('-', { w: cA1, align: AlignmentType.CENTER }),
+        tcL(`${s.activities.reduce((sum, a) => sum + a.hours, 0)} hrs.`, { w: cA2, align: AlignmentType.CENTER }),
+        tcL('100%', { w: cA3, align: AlignmentType.CENTER })
+      ] }),
+    ], [cA0, cA1, cA2, cA3]),
     sp(),
   ];
 }
@@ -304,7 +315,8 @@ function buildSectionIV(content: GeneratedPlanningContent): (Paragraph | Table)[
 }
 
 function buildSectionV(content: GeneratedPlanningContent): (Paragraph | Table)[] {
-  const evals = content.sectionV.evaluations;
+  const s = content.sectionV;
+  const evals = s.evaluations;
   const c = [Math.floor(CONTENT*0.13), Math.floor(CONTENT*0.13), Math.floor(CONTENT*0.13), Math.floor(CONTENT*0.28), Math.floor(CONTENT*0.19), CONTENT - Math.floor(CONTENT*0.13)*3 - Math.floor(CONTENT*0.28) - Math.floor(CONTENT*0.19)];
 
   const rows: TableRow[] = [
@@ -321,7 +333,23 @@ function buildSectionV(content: GeneratedPlanningContent): (Paragraph | Table)[]
     new TableRow({ children: [tcL('PONDERACIÓN TOTAL', { w: CONTENT-c[5], span: 5 }), tcL('100%', { w: c[5], align: AlignmentType.CENTER })] }),
   ];
 
-  return [secHeading('V. ESTRATEGIA DE EVALUACIÓN FORMATIVA'), tbl(rows, c), sp()];
+  const elements: (Paragraph | Table)[] = [
+    secHeading('V. ESTRATEGIA DE EVALUACIÓN FORMATIVA'),
+  ];
+
+  if (s.evaluationAgreement) {
+    elements.push(subH('Acuerdo de Acreditación / Evaluación'));
+    elements.push(new Paragraph({
+      spacing: { before: 60, after: 120 },
+      children: [new TextRun({ text: s.evaluationAgreement, size: 18, font: 'Arial', italics: true })],
+    }));
+    elements.push(sp());
+  }
+
+  elements.push(tbl(rows, c));
+  elements.push(sp());
+
+  return elements;
 }
 
 function buildSectionVI(content: GeneratedPlanningContent): (Paragraph | Table)[] {

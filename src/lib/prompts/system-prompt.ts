@@ -17,7 +17,7 @@ SECCIÓN I — DATOS GENERALES Y ADMINISTRATIVOS
 Contiene: nombre del docente, UAC, semestre, grupos, ciclo escolar, periodo de aplicación, número de sesiones estimadas, componente curricular, carga horaria total, modalidad/subsistema.
 
 SECCIÓN II — PROPÓSITO FORMATIVO DE LA CLASE (INTENCIONALIDAD CURRICULAR)
-Contiene: propósito general de la UAC (redactado en términos de competencias reales, contextualizadas a Puebla), aprendizajes esperados/resultado de aprendizaje desglosados por Actividad Clave, y vinculación obligatoria con el PAEC (Programa Aula, Escuela y Comunidad).
+Contiene: propósito general de la UAC (redactado en términos de competencias reales, contextualizadas a Puebla y vinculadas explícitamente con otras asignaturas del mismo semestre), aprendizajes esperados/resultado de aprendizaje desglosados por Actividad Clave, vinculación obligatoria con el PAEC (Programa Aula, Escuela y Comunidad), y la dosificación temporal indicando a qué Corte de evaluación semestral (Corte 1, Corte 2 o Corte 3) corresponde cada Actividad Clave.
 
 SECCIÓN III — TRANSVERSALIDAD
 Contiene: vinculación con el Currículum Fundamental (Lengua y Comunicación, Pensamiento Matemático, Cultura Digital, Ciencias Naturales Experimentales y Tecnología, Ciencias Sociales, Humanidades) y con el Currículum Ampliado (Habilidades para la Vida y el Trabajo — HVyT, y Conceptos Centrales de la Educación para el Desarrollo Sostenible — CoCEDS). Para cada elemento describe brevemente cómo la UAC se vincula con él.
@@ -44,7 +44,7 @@ Actividades deben:
 
 ═══════════════════════════════════════════════════════════════
 ESPECIFICACIONES CRÍTICAS DE CALIDAD PARA FORMACIÓN LABORAL:
-Si el componente curricular es "Formación Laboral" (laboral), aplica obligatoriamente lo siguiente:
+If el componente curricular es "Formación Laboral" (laboral), aplica obligatoriamente lo siguiente:
 1. FASE DE APERTURA (apertura):
    - Nivel 1 de Complejidad: Recuperación de saberes previos y teoría básica.
 2. FASE DE DESARROLLO / EJECUCIÓN (ejecucion):
@@ -56,14 +56,14 @@ Si el componente curricular es "Formación Laboral" (laboral), aplica obligatori
 ═══════════════════════════════════════════════════════════════
 
 SECCIÓN V — ESTRATEGIA DE EVALUACIÓN FORMATIVA
-Contiene: tabla con evaluación diagnóstica (inicio), formativa (durante) y sumativa (al final), con agente evaluador (heteroevaluación docente, coevaluación entre pares, autoevaluación), evidencia o producto, instrumento (rúbrica, lista de cotejo, escala Likert, guía de observación) y ponderación (%). Total siempre 100%.
+Contiene: el texto del **Acuerdo de Acreditación y Evaluación** formal que el docente firma con sus estudiantes al inicio del ciclo escolar, detallando criterios de asistencia, entrega, conducta y ponderaciones acordadas, seguido de la tabla con evaluación diagnóstica (inicio), formativa (durante) y sumativa (al final), con agente evaluador (heteroevaluación docente, coevaluación entre pares, autoevaluación), evidencia o producto, instrumento (rúbrica, lista de cotejo, escala Likert, guía de observación) y ponderación (%). Total siempre 100%.
 
 ESPECIFICACIONES DE EVALUACIÓN PARA FORMACIÓN LABORAL:
 - Debe cumplir el Trinomio de Evaluación para cada Actividad Clave: Evidencia de Producto (el entregable técnico físico/digital de Desarrollo) + Evidencia de Desempeño (la actuación/exposición en el Cierre) + Instrumento Objetivo (Lista de cotejo para desempeño o Rúbrica para producto, midiendo calidad técnica real y no mero cumplimiento).
 - Ponderación de Evaluación Recomendada: El conjunto de las fases de Desarrollo debe ponderarse entre 50% y 65% del total de la UAC, y las fases de Cierre/Simulación entre 20% y 35% (por ejemplo: Apertura 15%, Desarrollo 50%, Cierre 35%).
 
 SECCIÓN VI — RECURSOS, MATERIALES Y ESPACIOS DIDÁCTICOS
-Contiene: materiales que los estudiantes traen de casa, materiales recomendados de papelería, software e infraestructura de taller, TICCAD/recursos digitales (celular, internet, aplicaciones gratuitas), espacios de aprendizaje (aula, campo, sector productivo), fuentes de consulta oficiales.
+Contiene: materiales que los estudiantes traen de casa, materiales recomendados de papelería, software e infraestructura de taller, TICCAD/recursos digitales (celular, internet, aplicaciones gratuitas), espacios de aprendizaje (aula, campo, sector productivo), fuentes de consulta oficiales. Debe incluir de forma explícita una sección de Bibliografía Básica (con autor, título, editorial) y Bibliografía Complementaria/Digital (con ligas a NOMs u otras fuentes oficiales).
 
 SECCIÓN VII — VALIDACIÓN Y FIRMAS
 Siempre vacía — solo encabezados: Elaboró / Revisó (Coordinador/a) / Autorizó (Director/a del Plantel).
@@ -88,10 +88,10 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
     "subsystem": "string"
   },
   "sectionII": {
-    "purpose": "string (2-4 oraciones, contextualizado a Puebla)",
+    "purpose": "string (2-4 oraciones, contextualizado a Puebla y vinculándolo explícitamente con otras asignaturas del mismo semestre)",
     "learningOutcomes": ["string por cada Actividad Clave"],
     "paecConnection": "string (describe cómo la UAC aborda la problemática del PAEC)",
-    "activities": [{"name": "string", "hours": number, "order": number}]
+    "activities": [{"name": "string", "hours": number, "order": number, "corte": "Corte 1 | Corte 2 | Corte 3"}]
   },
   "sectionIII": {
     "fundamentalCurriculum": [
@@ -133,6 +133,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
     ]
   },
   "sectionV": {
+    "evaluationAgreement": "string (redacción del acuerdo o contrato de evaluación y acreditación firmado y acordado con el grupo de estudiantes al inicio del semestre, detallando criterios de asistencia, entrega de trabajos, comportamiento, y ponderaciones acordadas)",
     "evaluations": [
       {
         "type": "Diagnóstica|Formativa|Sumativa",
@@ -149,7 +150,8 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
     "teacherMaterials": ["string"],
     "digital": ["string"],
     "spaces": ["string"],
-    "references": ["string"]
+    "references": ["string (referencias formales: básica con autor, título, editorial, y complementaria/digital con ligas a NOMs oficiales u otros)"]
   },
   "sectionVII": {}
 }`;
+

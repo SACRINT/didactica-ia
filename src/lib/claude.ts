@@ -95,3 +95,38 @@ export async function* generatePlanningStream(
     }
   }
 }
+
+/**
+ * Generates an extra resource (rubric, material, lesson plan) text using Claude Haiku 4.5.
+ * Uses Prompt Caching to optimize costs.
+ */
+export async function generateExtraText(
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 8192,
+    system: [
+      {
+        type: 'text',
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    messages: [
+      {
+        role: 'user',
+        content: userPrompt,
+      },
+    ],
+  });
+
+  const content = response.content[0];
+  if (content.type !== 'text') {
+    throw new Error('Unexpected response type from Claude API');
+  }
+
+  return content.text;
+}
+

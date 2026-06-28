@@ -1,0 +1,192 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import {
+  getTeacherByEmail,
+  getPlanningById,
+  getPlanningExtras,
+  createPlanningExtra,
+  deletePlanningExtra,
+} from '@/lib/db';
+import { generateExtraText } from '@/lib/claude';
+import {
+  SYSTEM_PROMPT_EXTRAS,
+  RUBRIC_PROMPT_TEMPLATE,
+  MATERIAL_PROMPT_TEMPLATE,
+  LESSON_PLAN_PROMPT_TEMPLATE,
+} from '@/lib/prompts/extras-prompts';
+import type { GeneratedPlanningContent } from '@/types/planning';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60; // Claude call could take up to 60s
+
+// ── GET: List all extras for a planning ──────────────────────────────
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: 'Docente no encontrado' }, { status: 404 });
+    }
+
+    const { id } = await params;
+    const extras = await getPlanningExtras(id, teacher.id);
+    return NextResponse.json(extras);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Error desconocido';
+    console.error('GET extras error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// ── POST: Generate and save a new extra ──────────────────────────────
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: 'Docente no encontrado' }, { status: 404 });
+    }
+
+    const { id: planningId } = await params;
+    const planning = await getPlanningById(planningId, teacher.id);
+    if (!planning) {
+      return NextResponse.json({ error: 'Planeación no encontrada' }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const {
+      type,
+      title,
+      keyIndex = null,
+      activityName = '',
+      evidence = '',
+      sessionNum = 1,
+      totalSessions = 18,
+    } = body as {
+      type: 'rubric' | 'checklist' | 'material' | 'lesson_plan';
+      title: string;
+      keyIndex?: number | null;
+      activityName?: string;
+      evidence?: string;
+      sessionNum?: number;
+      totalSessions?: number;
+    };
+
+    if (!type || !title) {
+      return NextResponse.json({ error: 'Faltan campos requeridos: type y title' }, { status: 400 });
+    }
+
+    const contentJson = planning.content_json as GeneratedPlanningContent | null;
+    const paecProblem = planning.paec_context || 'Problemática comunitaria no especificada';
+
+    let userPrompt = '';
+
+    if (type === 'rubric' || type === 'checklist') {
+      const instrumentType = type === 'rubric' ? 'Rúbrica analítica' : 'Lista de cotejo';
+      userPrompt = RUBRIC_PROMPT_TEMPLATE(
+        planning.uac_name,
+        activityName || `Actividad Clave ${keyIndex !== null ? keyIndex + 1 : ''}`,
+        evidence || 'Evidencia de desempeño/producto',
+        instrumentType
+      );
+    } else if (type === 'material') {
+      const uacContext = `
+UAC: ${planning.uac_name}
+Propósito Formativo: ${contentJson?.sectionII?.purpose || ''}
+Resultados de Aprendizaje: ${(contentJson?.sectionII?.learningOutcomes || []).join(' | ')}
+      `.trim();
+      userPrompt = MATERIAL_PROMPT_TEMPLATE(
+        planning.uac_name,
+        title,
+        paecProblem,
+        uacContext
+      );
+    } else if (type === 'lesson_plan') {
+      const studentContext = planning.extracted_data?.studentContext || 'Estudiantes de bachillerato general estatal';
+      const learningOutcome =
+        keyIndex !== null && contentJson?.sectionII?.learningOutcomes?.[keyIndex]
+          ? contentJson.sectionII.learningOutcomes[keyIndex]
+          : 'Resultado de aprendizaje general';
+
+      userPrompt = LESSON_PLAN_PROMPT_TEMPLATE(
+        planning.uac_name,
+        activityName || `Actividad Clave ${keyIndex !== null ? keyIndex + 1 : ''}`,
+        sessionNum,
+        totalSessions,
+        paecProblem,
+        studentContext,
+        learningOutcome
+      );
+    } else {
+      return NextResponse.json({ error: 'Tipo de recurso no válido' }, { status: 400 });
+    }
+
+    // Call Claude
+    console.log(`Generating extra of type ${type} using Claude...`);
+    const generatedMarkdown = await generateExtraText(SYSTEM_PROMPT_EXTRAS, userPrompt);
+
+    // Save to Database
+    const newExtra = await createPlanningExtra(
+      {
+        planningId,
+        type,
+        title,
+        keyIndex,
+        contentText: generatedMarkdown,
+      },
+      teacher.id
+    );
+
+    return NextResponse.json({ success: true, extra: newExtra });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Error al generar recurso extra';
+    console.error('POST extras error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// ── DELETE: Delete an extra ──────────────────────────────────────────
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: 'Docente no encontrado' }, { status: 404 });
+    }
+
+    const url = new URL(request.url);
+    const extraId = url.searchParams.get('extraId');
+
+    if (!extraId) {
+      return NextResponse.json({ error: 'Falta extraId en los parámetros' }, { status: 400 });
+    }
+
+    await deletePlanningExtra(extraId, teacher.id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Error al eliminar recurso extra';
+    console.error('DELETE extras error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

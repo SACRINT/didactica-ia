@@ -219,3 +219,70 @@ export async function getProgramsCatalog(semester?: number, component?: string) 
   }
 }
 
+// ─── Planning Extras queries ──────────────────────────────────────────────────
+
+export async function getPlanningExtras(planningId: string, teacherId: string) {
+  return sql()`
+    SELECT pe.id, pe.planning_id, pe.type, pe.title, pe.key_index, pe.content_text, pe.created_at
+    FROM planning_extras pe
+    JOIN plannings p ON pe.planning_id = p.id
+    WHERE pe.planning_id = ${planningId}::uuid AND p.teacher_id = ${teacherId}::uuid
+    ORDER BY pe.created_at ASC
+  `;
+}
+
+export async function getPlanningExtraById(id: string, teacherId: string) {
+  const rows = await sql()`
+    SELECT pe.id, pe.planning_id, pe.type, pe.title, pe.key_index, pe.content_text, pe.created_at
+    FROM planning_extras pe
+    JOIN plannings p ON pe.planning_id = p.id
+    WHERE pe.id = ${id}::uuid AND p.teacher_id = ${teacherId}::uuid
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function createPlanningExtra(
+  data: {
+    planningId: string;
+    type: 'rubric' | 'checklist' | 'material' | 'lesson_plan';
+    title: string;
+    keyIndex: number | null;
+    contentText: string;
+  },
+  teacherId: string
+) {
+  // First verify planning ownership
+  const pRows = await sql()`
+    SELECT id FROM plannings
+    WHERE id = ${data.planningId}::uuid AND teacher_id = ${teacherId}::uuid
+    LIMIT 1
+  `;
+  if (pRows.length === 0) {
+    throw new Error('Planeación no encontrada o no autorizada');
+  }
+
+  const rows = await sql()`
+    INSERT INTO planning_extras (planning_id, type, title, key_index, content_text)
+    VALUES (
+      ${data.planningId}::uuid,
+      ${data.type},
+      ${data.title},
+      ${data.keyIndex},
+      ${data.contentText}
+    )
+    RETURNING id, planning_id, type, title, key_index, content_text, created_at
+  `;
+  return rows[0];
+}
+
+export async function deletePlanningExtra(id: string, teacherId: string) {
+  await sql()`
+    DELETE FROM planning_extras
+    WHERE id = ${id}::uuid AND planning_id IN (
+      SELECT id FROM plannings WHERE teacher_id = ${teacherId}::uuid
+    )
+  `;
+}
+
+

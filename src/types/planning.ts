@@ -9,6 +9,7 @@ export interface KeyActivity {
   name: string;
   hours: number;
   order: number;
+  corte?: string; // e.g. "Corte 1" | "Corte 2" | "Corte 3" (dosificación semestral)
 }
 
 export interface ExtractedPdfData {
@@ -100,6 +101,7 @@ export interface GeneratedPlanningContent {
   };
   // Section V - Formative Evaluation
   sectionV: {
+    evaluationAgreement?: string; // Acuerdo de acreditación firmado con el grupo (Anexo 12)
     evaluations: EvaluationRow[];
   };
   // Section VI - Resources
@@ -137,3 +139,14 @@ export interface CreatePlanningInput {
   extractedData: ExtractedPdfData;
   context: TeacherContext;
 }
+
+export interface PlanningExtra {
+  id: string;
+  planningId: string;
+  type: 'rubric' | 'checklist' | 'material' | 'lesson_plan';
+  title: string;
+  keyIndex: number | null;
+  contentText: string;
+  createdAt: Date;
+}
+
