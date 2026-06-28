@@ -279,8 +279,8 @@ function buildActivityTable(activity: GeneratedPlanningContent['sectionIV']['act
       new TableRow({ children: [new TableCell({ columnSpan: 1, shading: { fill: C.mid, type: ShadingType.CLEAR }, borders: bdr(), margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Metodología:', bold: true, size: 17, color: C.white, font: 'Arial' })] })] }), new TableCell({ columnSpan: 3, shading: { fill: C.alt, type: ShadingType.CLEAR }, borders: bdr(), margins: CELLMRG, children: [new Paragraph({ children: [new TextRun({ text: activity.methodology, bold: true, size: 18, font: 'Arial', color: C.dark })] })] })] }),
       new TableRow({ children: [tcM('Fase /\nMomento', { w: cols[0], align: AlignmentType.CENTER }), tcM('Actividades del Estudiante\n(Metodologías Activas)', { w: cols[1] }), tcM('Procesos de Pensamiento /\nConstrucción o Resignificación', { w: cols[2] }), tcM('Materiales /\nRecursos Didácticos', { w: cols[3] })] }),
       phaseRow('APER-\nTURA', C.apertura, activity.apertura),
-      phaseRow('EJE-\nCUCIÓN', C.ejecucion, activity.ejecucion),
-      phaseRow('CON-\nCLUSIÓN', C.conclusion, activity.conclusion),
+      phaseRow('DESA-\nRROLLO', C.ejecucion, activity.ejecucion),
+      phaseRow('CIERRE', C.conclusion, activity.conclusion),
     ],
   });
 }

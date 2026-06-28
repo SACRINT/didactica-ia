@@ -42,11 +42,28 @@ Actividades deben:
   - Incluir al menos una visita o entrevista al sector productivo por UAC
   - Generar evidencias concretas (productos, desempeños)
 
+═══════════════════════════════════════════════════════════════
+ESPECIFICACIONES CRÍTICAS DE CALIDAD PARA FORMACIÓN LABORAL:
+Si el componente curricular es "Formación Laboral" (laboral), aplica obligatoriamente lo siguiente:
+1. FASE DE APERTURA (apertura):
+   - Nivel 1 de Complejidad: Recuperación de saberes previos y teoría básica.
+2. FASE DE DESARROLLO / EJECUCIÓN (ejecucion):
+   - Nivel 2 de Complejidad Obligatorio: Los estudiantes deben aplicar y procesar de forma práctica la competencia técnica.
+   - Qué SÍ debe generar: Diseñar formatos de control originales (ej: inventario en hoja de cálculo con fórmulas automáticas), estructurar bases de datos lógicas, diagramar flujos de procesos organizacionales, diseñar planos o simulaciones técnicas, o resolver problemas técnicos reales o simulados.
+   - Qué NO debe generar (PROHIBIDO): No aceptes actividades pasivas como resumir teorías, copiar formatos vacíos, transcribir conceptos o escuchar exposiciones pasivas.
+3. FASE DE CIERRE / CONCLUSIÓN (conclusion):
+   - Consolidación y Simulación Práctica: La actividad final debe ser una simulación interactiva, juego de roles (ej: actuar como Jefe de Almacén y defender técnicamente el reporte) o exposición activa del modelo diseñado ante el grupo, defendiendo decisiones.
+═══════════════════════════════════════════════════════════════
+
 SECCIÓN V — ESTRATEGIA DE EVALUACIÓN FORMATIVA
 Contiene: tabla con evaluación diagnóstica (inicio), formativa (durante) y sumativa (al final), con agente evaluador (heteroevaluación docente, coevaluación entre pares, autoevaluación), evidencia o producto, instrumento (rúbrica, lista de cotejo, escala Likert, guía de observación) y ponderación (%). Total siempre 100%.
 
+ESPECIFICACIONES DE EVALUACIÓN PARA FORMACIÓN LABORAL:
+- Debe cumplir el Trinomio de Evaluación para cada Actividad Clave: Evidencia de Producto (el entregable técnico físico/digital de Desarrollo) + Evidencia de Desempeño (la actuación/exposición en el Cierre) + Instrumento Objetivo (Lista de cotejo para desempeño o Rúbrica para producto, midiendo calidad técnica real y no mero cumplimiento).
+- Ponderación de Evaluación Recomendada: El conjunto de las fases de Desarrollo debe ponderarse entre 50% y 65% del total de la UAC, y las fases de Cierre/Simulación entre 20% y 35% (por ejemplo: Apertura 15%, Desarrollo 50%, Cierre 35%).
+
 SECCIÓN VI — RECURSOS, MATERIALES Y ESPACIOS DIDÁCTICOS
-Contiene: materiales que los estudiantes traen de casa, materiales elaborados por el docente, TICCAD/recursos digitales (celular, internet, aplicaciones gratuitas), espacios de aprendizaje (aula, campo, sector productivo), fuentes de consulta oficiales.
+Contiene: materiales que los estudiantes traen de casa, materiales recomendados de papelería, software e infraestructura de taller, TICCAD/recursos digitales (celular, internet, aplicaciones gratuitas), espacios de aprendizaje (aula, campo, sector productivo), fuentes de consulta oficiales.
 
 SECCIÓN VII — VALIDACIÓN Y FIRMAS
 Siempre vacía — solo encabezados: Elaboró / Revisó (Coordinador/a) / Autorizó (Director/a del Plantel).
