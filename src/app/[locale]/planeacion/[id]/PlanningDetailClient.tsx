@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { GeneratedPlanningContent, Planning, PlanningExtra } from '@/types/planning';
 import { ExtraPreviewModal } from '@/components/planeacion/ExtraPreviewModal';
+import DeletePlanningButton from '@/components/planeacion/DeletePlanningButton';
 
 interface PlanningDetailClientProps {
   locale: string;
@@ -149,6 +150,49 @@ export default function PlanningDetailClient({
     });
   }
 
+  if (!content) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Header */}
+        <div className="page-header" style={{ borderBottom: '1px solid var(--c-border)', paddingBottom: '16px' }}>
+          <Link href={`/${locale}/dashboard`} className="btn btn-ghost" style={{ marginBottom: '12px', display: 'inline-flex' }}>
+            ← Mis planeaciones
+          </Link>
+          <h1 className="page-title" style={{ fontSize: '28px', color: 'var(--c-navy)' }}>{planning.uacName}</h1>
+          <p className="page-subtitle" style={{ color: 'var(--c-text-muted)', fontSize: '15px' }}>
+            {planning.semester}° Semestre · Componente {planning.component === 'laboral' ? 'Formación Laboral' : 'Fundamental/Ampliado'}
+          </p>
+          <div className="page-actions" style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <DeletePlanningButton id={planning.id} locale={locale} redirectAfterDelete={true} />
+          </div>
+        </div>
+
+        {/* Warning Banner */}
+        <div className="card" style={{ border: '1px solid #f5c2c7', backgroundColor: '#f8d7da', color: '#842029', padding: '24px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '20px', fontWeight: 'bold' }}>
+            <span>⚠️</span> Borrador - Generación Incompleta
+          </div>
+          <p style={{ lineHeight: 1.6, margin: 0, fontSize: '15px' }}>
+            Esta planeación didáctica se encuentra en estado de <strong>Borrador</strong>. Las 7 secciones oficiales de la planeación y los instrumentos de evaluación no han sido generados por la Inteligencia Artificial.
+          </p>
+          <p style={{ lineHeight: 1.6, margin: 0, fontSize: '14px', opacity: 0.9 }}>
+            Esto ocurre típicamente debido a una de las siguientes razones:
+            <ul style={{ listStyleType: 'disc', paddingLeft: '20px', marginTop: '6px' }}>
+              <li>La cuenta asociada a tu API Key de Anthropic (Claude) se quedó sin saldo o créditos.</li>
+              <li>El proceso de generación fue cancelado o se interrumpió la conexión antes de finalizar.</li>
+            </ul>
+          </p>
+          <div style={{ marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <Link href={`/${locale}/nueva-planeacion`} className="btn btn-primary" style={{ backgroundColor: 'var(--c-navy)', borderColor: 'var(--c-navy)' }}>
+              Crear nueva planeación
+            </Link>
+            <DeletePlanningButton id={planning.id} locale={locale} redirectAfterDelete={true} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Header */}
@@ -160,12 +204,13 @@ export default function PlanningDetailClient({
         <p className="page-subtitle" style={{ color: 'var(--c-text-muted)', fontSize: '15px' }}>
           {planning.semester}° Semestre · Componente {planning.component === 'laboral' ? 'Formación Laboral' : 'Fundamental/Ampliado'}
         </p>
-        <div className="page-actions" style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+        <div className="page-actions" style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
           {content && (
             <a href={`/api/docx/${planning.id}`} className="btn btn-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <span>↓</span> Descargar Planeación Completa (DOCX)
             </a>
           )}
+          <DeletePlanningButton id={planning.id} locale={locale} redirectAfterDelete={true} />
         </div>
       </div>
 

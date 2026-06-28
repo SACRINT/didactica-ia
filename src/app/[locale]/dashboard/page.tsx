@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getTeacherByEmail, getPlanningsByTeacher } from '@/lib/db';
 import AppLayout from '@/components/layout/AppLayout';
 import Link from 'next/link';
+import DeletePlanningButton from '@/components/planeacion/DeletePlanningButton';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -77,7 +78,7 @@ export default async function DashboardPage({
                   year: 'numeric', month: 'short', day: 'numeric'
                 })}
               </p>
-              <div className="planning-card-actions">
+              <div className="planning-card-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <Link href={`/${locale}/planeacion/${p.id as string}`} className="btn btn-secondary btn-sm">
                   Ver
                 </Link>
@@ -86,6 +87,7 @@ export default async function DashboardPage({
                     ↓ DOCX
                   </a>
                 )}
+                <DeletePlanningButton id={p.id as string} locale={locale} size="sm" />
               </div>
             </div>
           ))}
