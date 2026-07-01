@@ -16,6 +16,10 @@ export interface SchoolContext {
   indicators?: string;
   previousPrograms?: string;
   facilities?: string;
+  activeLaboralUacs?: string[];
+  activeFfeUacs?: string[];
+  groupsConfig?: string;
+  groupsCount?: string;
 }
 
 export interface TableRow2Cols {

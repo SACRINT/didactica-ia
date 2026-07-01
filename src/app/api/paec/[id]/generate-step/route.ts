@@ -83,17 +83,36 @@ export async function POST(
         }
         const justStr = JSON.stringify(project.fase2_justificacion);
         
-        // Filter UAC catalog by cycle type
+        // Filter UAC catalog by cycle type: Semesters 5 and 6 are excluded for this school year (old programs)
         let semesters: number[] = [];
         if (project.cycle_type === 'A') {
-          semesters = [3, 5];
+          semesters = [1, 3];
         } else if (project.cycle_type === 'B') {
-          semesters = [4, 6];
+          semesters = [2, 4];
         } else {
-          semesters = [3, 4, 5, 6];
+          semesters = [1, 2, 3, 4];
         }
 
-        const uacs = await getProgramsCatalogForPaec(semesters) as { uac_name: string; semester: number }[];
+        const allUacs = await getProgramsCatalogForPaec(semesters) as { uac_name: string; semester: number; component: string }[];
+        
+        // Filter laboral/ffe UACs based on school selection
+        const schoolCtx = (project.school_context || {}) as { activeLaboralUacs?: string[]; activeFfeUacs?: string[] };
+        const activeLaboral = schoolCtx.activeLaboralUacs || [];
+        const activeFfe = schoolCtx.activeFfeUacs || [];
+
+        const uacs = allUacs.filter(u => {
+          if (u.component === 'fundamental' || u.component === 'ampliado') {
+            return true;
+          }
+          if (u.component === 'laboral') {
+            return activeLaboral.includes(u.uac_name);
+          }
+          if (u.component === 'ext_obligatorio' || u.component === 'ext_optativo') {
+            return activeFfe.includes(u.uac_name);
+          }
+          return false;
+        });
+
         userPrompt = buildPrompt3Mapeo(justStr, uacs);
         break;
       }

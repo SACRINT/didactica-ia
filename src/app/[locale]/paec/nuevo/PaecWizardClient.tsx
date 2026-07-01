@@ -20,9 +20,9 @@ const STEPS = [
 ];
 
 const CYCLE_LABELS: Record<string, string> = {
-  A: 'Semestre A (3° y 5°)',
-  B: 'Semestre B (4° y 6°)',
-  annual: 'Ciclo Anual (3° a 6°)',
+  A: 'Semestre A (1° y 3°)',
+  B: 'Semestre B (2° y 4°)',
+  annual: 'Proyecto Completo (1° al 6°)',
 };
 
 export default function PaecWizardClient({ locale, initialId }: Props) {
@@ -58,6 +58,40 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
     facilities: '',
   });
 
+  // Catalogs and Selections
+  const [laboralCatalog, setLaboralCatalog] = useState<string[]>([]);
+  const [ffeCatalog, setFfeCatalog] = useState<string[]>([]);
+  const [selectedLaboral, setSelectedLaboral] = useState<string[]>([]);
+  const [selectedFfe, setSelectedFfe] = useState<string[]>([]);
+  const [groupsCount, setGroupsCount] = useState('1');
+  const [groupsConfig, setGroupsConfig] = useState('');
+
+  // Load UAC lists for select checklists
+  useEffect(() => {
+    async function fetchCatalog() {
+      try {
+        const resLab = await fetch(`/api/programs?component=laboral`);
+        const dataLab = await resLab.json();
+        if (dataLab.programs) {
+          const names = Array.from(new Set(dataLab.programs.map((p: any) => p.uac_name))) as string[];
+          setLaboralCatalog(names.sort());
+        }
+
+        const resFfe1 = await fetch(`/api/programs?component=ext_optativo`);
+        const dataFfe1 = await resFfe1.json();
+        const resFfe2 = await fetch(`/api/programs?component=ext_obligatorio`);
+        const dataFfe2 = await resFfe2.json();
+        
+        const allFfe = [...(dataFfe1.programs || []), ...(dataFfe2.programs || [])];
+        const ffeNames = Array.from(new Set(allFfe.map((p: any) => p.uac_name))) as string[];
+        setFfeCatalog(ffeNames.sort());
+      } catch (err) {
+        console.error('Error fetching catalogs:', err);
+      }
+    }
+    fetchCatalog();
+  }, []);
+
   // Load project details if ID is present
   useEffect(() => {
     if (projectId) {
@@ -79,7 +113,13 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
       setProblemStatement(p.problemStatement);
       setCycleType(p.cycleType);
       if (p.communityContext) setCommunity(p.communityContext);
-      if (p.schoolContext) setSchool(p.schoolContext);
+      if (p.schoolContext) {
+        setSchool(p.schoolContext);
+        setSelectedLaboral(p.schoolContext.activeLaboralUacs || []);
+        setSelectedFfe(p.schoolContext.activeFfeUacs || []);
+        setGroupsCount(p.schoolContext.groupsCount || '1');
+        setGroupsConfig(p.schoolContext.groupsConfig || '');
+      }
 
       // Set active step to the furthest generated step, or current step
       setActiveStep(p.currentStep);
@@ -109,7 +149,13 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
           problemStatement,
           cycleType,
           communityContext: community,
-          schoolContext: school,
+          schoolContext: {
+            ...school,
+            activeLaboralUacs: selectedLaboral,
+            activeFfeUacs: selectedFfe,
+            groupsConfig,
+            groupsCount,
+          },
         }),
       });
 
@@ -211,9 +257,9 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                   onChange={(e) => setCycleType(e.target.value as any)}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)', background: '#fff' }}
                 >
-                  <option value="A">Semestre A (3° y 5° Semestre - Septiembre-Enero)</option>
-                  <option value="B">Semestre B (4° y 6° Semestre - Febrero-Junio)</option>
-                  <option value="annual">Proyecto Anual Completo (3° a 6° Semestre)</option>
+                  <option value="A">Semestre A (1° y 3° Semestre - Septiembre-Enero)</option>
+                  <option value="B">Semestre B (2° y 4° Semestre - Febrero-Junio)</option>
+                  <option value="annual">Proyecto Completo (1° al 6° Semestre)</option>
                 </select>
               </div>
             </div>
@@ -222,6 +268,12 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
           {/* Contexto Comunitario */}
           <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
             <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>2. Ficha de Datos de la Comunidad (INEGI/Entorno)</h2>
+            <p style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'var(--c-text-muted)' }}>
+              Puedes consultar y obtener los datos demográficos y socioeconómicos de tu localidad en el buscador oficial de INEGI:{' '}
+              <a href="https://www.inegi.org.mx/app/areasgeograficas/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-blue-mid)', fontWeight: 600, textDecoration: 'underline' }}>
+                Sistema de Áreas Geográficas de INEGI 🔗
+              </a>
+            </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Ubicación Geográfica y Nombre de la Localidad</label>
@@ -340,6 +392,111 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Estructura de Grupos, Capacitaciones y FFE */}
+          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>4. Estructura de Grupos y Materias Específicas</h2>
+            <p style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'var(--c-text-muted)' }}>
+              Configura los grupos y selecciona las capacitaciones o asignaturas del componente laboral y FFE activas en tu plantel.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Número de Grupos por Semestre</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 3 grupos (A, B, C)"
+                    value={groupsCount}
+                    onChange={(e) => setGroupsCount(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Grupos específicos asignados a este proyecto</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 1°A, 2°A, 3°A, 4°A (o Dejar vacío para todos)"
+                    value={groupsConfig}
+                    onChange={(e) => setGroupsConfig(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--c-text-muted)', margin: '4px 0 0' }}>
+                  El proyecto transversal cruzará únicamente las asignaturas seleccionadas a continuación para evitar sobrecargar los planes de los docentes.
+                </p>
+              </div>
+
+              {/* Laboral Checklist */}
+              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: '16px', marginTop: '8px' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '10px', fontSize: '14px', color: 'var(--c-navy)' }}>
+                  Capacitaciones para el Trabajo (Formación Laboral) activas *
+                </label>
+                {laboralCatalog.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>Cargando catálogo laboral...</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px', border: '1px solid var(--c-border)', borderRadius: '6px', background: '#fafafa' }}>
+                    {laboralCatalog.map((name) => {
+                      const isChecked = selectedLaboral.includes(name);
+                      return (
+                        <label key={name} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setSelectedLaboral(selectedLaboral.filter(n => n !== name));
+                              } else {
+                                setSelectedLaboral([...selectedLaboral, name]);
+                              }
+                            }}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <span>{name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* FFE Checklist */}
+              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: '16px', marginTop: '8px' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '10px', fontSize: '14px', color: 'var(--c-navy)' }}>
+                  Formación Fundamental Extendida (FFE/FFEO) activas
+                </label>
+                {ffeCatalog.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>Cargando catálogo FFE...</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px', border: '1px solid var(--c-border)', borderRadius: '6px', background: '#fafafa' }}>
+                    {ffeCatalog.map((name) => {
+                      const isChecked = selectedFfe.includes(name);
+                      return (
+                        <label key={name} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setSelectedFfe(selectedFfe.filter(n => n !== name));
+                              } else {
+                                setSelectedFfe([...selectedFfe, name]);
+                              }
+                            }}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <span>{name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
 

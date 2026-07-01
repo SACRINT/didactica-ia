@@ -173,12 +173,12 @@ export default function PlanningDetailClient({
             <span>⚠️</span> Borrador - Generación Incompleta
           </div>
           <p style={{ lineHeight: 1.6, margin: 0, fontSize: '15px' }}>
-            Esta planeación didáctica se encuentra en estado de <strong>Borrador</strong>. Las 7 secciones oficiales de la planeación y los instrumentos de evaluación no han sido generados por la Inteligencia Artificial.
+            Esta planeación didáctica se encuentra en estado de <strong>Borrador</strong>. Las 7 secciones oficiales de la planeación y los instrumentos de evaluación no han sido generados.
           </p>
           <p style={{ lineHeight: 1.6, margin: 0, fontSize: '14px', opacity: 0.9 }}>
             Esto ocurre típicamente debido a una de las siguientes razones:
             <ul style={{ listStyleType: 'disc', paddingLeft: '20px', marginTop: '6px' }}>
-              <li>La cuenta asociada a tu API Key de Anthropic (Claude) se quedó sin saldo o créditos.</li>
+              <li>La cuenta asociada a tu API Key se quedó sin saldo o créditos.</li>
               <li>El proceso de generación fue cancelado o se interrumpió la conexión antes de finalizar.</li>
             </ul>
           </p>

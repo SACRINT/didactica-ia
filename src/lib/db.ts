@@ -221,7 +221,7 @@ export async function getProgramsCatalog(semester?: number, component?: string) 
 
 export async function getProgramsCatalogForPaec(semesters: number[]) {
   return sql()`
-    SELECT uac_name, semester
+    SELECT uac_name, semester, component
     FROM programs_catalog
     WHERE semester = ANY(${semesters})
     ORDER BY semester, uac_name ASC
