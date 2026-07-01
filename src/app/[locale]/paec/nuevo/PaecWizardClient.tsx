@@ -107,6 +107,10 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
   const [groupsCount, setGroupsCount] = useState('1');
   const [groupsConfig, setGroupsConfig] = useState('');
 
+  // Manual Edit States
+  const [isEditingContent, setIsEditingContent] = useState(false);
+  const [editPayload, setEditPayload] = useState<any>(null);
+
   // Load UAC lists for select checklists
   useEffect(() => {
     async function fetchCatalog() {
@@ -235,6 +239,62 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
       setError(err instanceof Error ? err.message : 'Error en la comunicación con la IA.');
     } finally {
       setGenerating(false);
+    }
+  }
+
+  // Get current step's generated JSON data
+  function getCurrentStepData() {
+    if (!project) return null;
+    switch (activeStep) {
+      case 1: return JSON.parse(JSON.stringify(project.fase1Diagnostico));
+      case 2: return JSON.parse(JSON.stringify(project.fase2Justificacion));
+      case 3: return JSON.parse(JSON.stringify(project.fase2Mapeo));
+      case 4: return JSON.parse(JSON.stringify(project.fase2Cronograma));
+      case 5: return JSON.parse(JSON.stringify(project.fase2PlanOperativo));
+      case 6: return JSON.parse(JSON.stringify(project.fase2Anexos));
+      default: return null;
+    }
+  }
+
+  // Save manual modifications back to database
+  async function saveStepEdits() {
+    if (!projectId || !project || !editPayload) return;
+    setLoading(true);
+    setError(null);
+    try {
+      let fieldName = '';
+      switch (activeStep) {
+        case 1: fieldName = 'fase1_diagnostico'; break;
+        case 2: fieldName = 'fase2_justificacion'; break;
+        case 3: fieldName = 'fase2_mapeo'; break;
+        case 4: fieldName = 'fase2_cronograma'; break;
+        case 5: fieldName = 'fase2_plan_operativo'; break;
+        case 6: fieldName = 'fase2_anexos'; break;
+      }
+
+      const res = await fetch(`/api/paec/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldName,
+          stepData: editPayload,
+          step: project.currentStep,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al guardar los cambios.');
+      }
+
+      const data = await res.json();
+      setProject(data.project);
+      setIsEditingContent(false);
+      setEditPayload(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar la edición.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -753,18 +813,54 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
         {/* STATE B: SUCCESSFULLY GENERATED CONTENT VIEW */}
         {generated && project && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--c-border)', paddingBottom: '14px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--c-border)', paddingBottom: '14px', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: '20px', color: 'var(--c-navy)', margin: 0, fontWeight: 700 }}>
-                {STEPS[activeStep - 1].label} (Contenido Generado)
+                {STEPS[activeStep - 1].label} {isEditingContent ? '(Modo Edición)' : '(Contenido Generado)'}
               </h2>
-              <button
-                onClick={generateCurrentStep}
-                disabled={generating}
-                className="btn btn-ghost"
-                style={{ fontSize: '13px', color: 'var(--c-navy-light)', textDecoration: 'underline' }}
-              >
-                {generating ? 'Regenerando...' : 'Regenerar esta fase 🔄'}
-              </button>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {isEditingContent ? (
+                  <>
+                    <button
+                      onClick={saveStepEdits}
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '13px', backgroundColor: '#28a745', border: 'none', color: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px' }}
+                    >
+                      <span>💾</span> Guardar Cambios
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingContent(false);
+                        setEditPayload(null);
+                      }}
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: '13px', color: '#dc3545', cursor: 'pointer', padding: '6px 12px', borderRadius: '4px' }}
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditPayload(getCurrentStepData());
+                        setIsEditingContent(true);
+                      }}
+                      className="btn btn-amber btn-sm"
+                      style={{ fontSize: '13px', backgroundColor: 'var(--c-blue-mid)', border: 'none', color: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px' }}
+                    >
+                      <span>✏️</span> Editar Contenido
+                    </button>
+                    <button
+                      onClick={generateCurrentStep}
+                      disabled={generating}
+                      className="btn btn-ghost"
+                      style={{ fontSize: '13px', color: 'var(--c-navy-light)', textDecoration: 'underline' }}
+                    >
+                      {generating ? 'Regenerando...' : 'Regenerar esta fase 🔄'}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Step 1 Visual Render */}
@@ -780,10 +876,24 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {project.fase1Diagnostico.tabla1.map((r, i) => (
+                      {(isEditingContent && editPayload?.tabla1 ? editPayload.tabla1 : project.fase1Diagnostico.tabla1).map((r: any, i: number) => (
                         <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                           <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.col1}</td>
-                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.col2}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>
+                            {isEditingContent ? (
+                              <textarea
+                                value={r.col2}
+                                onChange={(e) => {
+                                  const copy = { ...editPayload };
+                                  copy.tabla1[i].col2 = e.target.value;
+                                  setEditPayload(copy);
+                                }}
+                                style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                              />
+                            ) : (
+                              r.col2
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -800,10 +910,24 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {project.fase1Diagnostico.tabla2.map((r, i) => (
+                      {(isEditingContent && editPayload?.tabla2 ? editPayload.tabla2 : project.fase1Diagnostico.tabla2).map((r: any, i: number) => (
                         <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                           <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.col1}</td>
-                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.col2}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>
+                            {isEditingContent ? (
+                              <textarea
+                                value={r.col2}
+                                onChange={(e) => {
+                                  const copy = { ...editPayload };
+                                  copy.tabla2[i].col2 = e.target.value;
+                                  setEditPayload(copy);
+                                }}
+                                style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                              />
+                            ) : (
+                              r.col2
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -820,10 +944,24 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {project.fase1Diagnostico.tabla3.map((r, i) => (
+                      {(isEditingContent && editPayload?.tabla3 ? editPayload.tabla3 : project.fase1Diagnostico.tabla3).map((r: any, i: number) => (
                         <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                           <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.aspect}</td>
-                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.analysis}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>
+                            {isEditingContent ? (
+                              <textarea
+                                value={r.analysis}
+                                onChange={(e) => {
+                                  const copy = { ...editPayload };
+                                  copy.tabla3[i].analysis = e.target.value;
+                                  setEditPayload(copy);
+                                }}
+                                style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                              />
+                            ) : (
+                              r.analysis
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -840,10 +978,24 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {project.fase1Diagnostico.tabla4.map((r, i) => (
+                      {(isEditingContent && editPayload?.tabla4 ? editPayload.tabla4 : project.fase1Diagnostico.tabla4).map((r: any, i: number) => (
                         <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                           <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.col1}</td>
-                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.col2}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>
+                            {isEditingContent ? (
+                              <textarea
+                                value={r.col2}
+                                onChange={(e) => {
+                                  const copy = { ...editPayload };
+                                  copy.tabla4[i].col2 = e.target.value;
+                                  setEditPayload(copy);
+                                }}
+                                style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                              />
+                            ) : (
+                              r.col2
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -857,42 +1009,139 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', lineHeight: 1.6 }}>
                 <div>
                   <strong>Nombre del Proyecto Definitivo:</strong>
-                  <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--c-navy)' }}>{project.fase2Justificacion.projectName}</p>
+                  {isEditingContent ? (
+                    <input
+                      type="text"
+                      value={editPayload?.projectName || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.projectName = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '15px', fontWeight: 600, borderRadius: '6px', border: '1px solid #ccc', marginTop: '4px' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--c-navy)' }}>{project.fase2Justificacion.projectName}</p>
+                  )}
                 </div>
                 <div>
                   <strong>Introducción y Justificación Académica:</strong>
-                  <p style={{ fontSize: '14px', whiteSpace: 'pre-line' }}>{project.fase2Justificacion.introduction}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.introduction || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.introduction = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '14px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '140px', marginTop: '4px', fontFamily: 'inherit' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '14px', whiteSpace: 'pre-line' }}>{project.fase2Justificacion.introduction}</p>
+                  )}
                 </div>
                 <div>
                   <strong>Pilares Estratégicos de Viabilidad:</strong>
-                  <ul style={{ listStyleType: 'disc', paddingLeft: '20px', fontSize: '14px' }}>
-                    {project.fase2Justificacion.pilares.map((pilar, i) => (
-                      <li key={i} style={{ marginBottom: '8px' }}>{pilar}</li>
-                    ))}
-                  </ul>
+                  {isEditingContent ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                      {(editPayload?.pilares || []).map((pilar: string, i: number) => (
+                        <input
+                          key={i}
+                          type="text"
+                          value={pilar}
+                          onChange={(e) => {
+                            const copy = { ...editPayload };
+                            copy.pilares[i] = e.target.value;
+                            setEditPayload(copy);
+                          }}
+                          style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc' }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', fontSize: '14px' }}>
+                      {project.fase2Justificacion.pilares.map((pilar, i) => (
+                        <li key={i} style={{ marginBottom: '8px' }}>{pilar}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <div>
                   <strong>Propósitos Integrales del PEC:</strong>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginTop: '8px' }}>
                     <div style={{ padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '6px' }}>
                       <strong style={{ color: 'var(--c-navy)' }}>Propósito Educativo:</strong>
-                      <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.educativo}</p>
+                      {isEditingContent ? (
+                        <textarea
+                          value={editPayload?.proposito?.educativo || ''}
+                          onChange={(e) => {
+                            const copy = { ...editPayload };
+                            copy.proposito.educativo = e.target.value;
+                            setEditPayload(copy);
+                          }}
+                          style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', marginTop: '4px', fontFamily: 'inherit' }}
+                        />
+                      ) : (
+                        <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.educativo}</p>
+                      )}
                     </div>
                     <div style={{ padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '6px' }}>
                       <strong style={{ color: 'var(--c-navy)' }}>Propósito Social:</strong>
-                      <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.social}</p>
+                      {isEditingContent ? (
+                        <textarea
+                          value={editPayload?.proposito?.social || ''}
+                          onChange={(e) => {
+                            const copy = { ...editPayload };
+                            copy.proposito.social = e.target.value;
+                            setEditPayload(copy);
+                          }}
+                          style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', marginTop: '4px', fontFamily: 'inherit' }}
+                        />
+                      ) : (
+                        <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.social}</p>
+                      )}
                     </div>
                     <div style={{ padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '6px' }}>
                       <strong style={{ color: 'var(--c-navy)' }}>Propósito Funcional:</strong>
-                      <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.funcional}</p>
+                      {isEditingContent ? (
+                        <textarea
+                          value={editPayload?.proposito?.funcional || ''}
+                          onChange={(e) => {
+                            const copy = { ...editPayload };
+                            copy.proposito.funcional = e.target.value;
+                            setEditPayload(copy);
+                          }}
+                          style={{ width: '100%', padding: '6px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', marginTop: '4px', fontFamily: 'inherit' }}
+                        />
+                      ) : (
+                        <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.funcional}</p>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div>
                   <strong>Metas Cuantitativas:</strong>
-                  <ul style={{ listStyleType: 'decimal', paddingLeft: '20px', fontSize: '13px' }}>
-                    {project.fase2Justificacion.alcance.metas.map((m, i) => <li key={i}>{m}</li>)}
-                  </ul>
+                  {isEditingContent ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                      {(editPayload?.alcance?.metas || []).map((m: string, i: number) => (
+                        <input
+                          key={i}
+                          type="text"
+                          value={m}
+                          onChange={(e) => {
+                            const copy = { ...editPayload };
+                            copy.alcance.metas[i] = e.target.value;
+                            setEditPayload(copy);
+                          }}
+                          style={{ width: '100%', padding: '6px', fontSize: '12.5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <ul style={{ listStyleType: 'decimal', paddingLeft: '20px', fontSize: '13px' }}>
+                      {project.fase2Justificacion.alcance.metas.map((m, i) => <li key={i}>{m}</li>)}
+                    </ul>
+                  )}
                 </div>
               </div>
             )}
@@ -910,12 +1159,41 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {project.fase2Mapeo.map((r, i) => (
+                    {(isEditingContent && editPayload ? editPayload : project.fase2Mapeo).map((r: any, i: number) => (
                       <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                         <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>{r.semester}°</td>
                         <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.uacName}</td>
-                        <td style={{ padding: '8px 12px' }}>{r.topic}</td>
-                        <td style={{ padding: '8px 12px', lineHeight: 1.4 }}>{r.linking}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          {isEditingContent ? (
+                            <input
+                              type="text"
+                              value={r.topic}
+                              onChange={(e) => {
+                                const copy = [...editPayload];
+                                copy[i].topic = e.target.value;
+                                setEditPayload(copy);
+                              }}
+                              style={{ width: '100%', padding: '6px', fontSize: '12.5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                            />
+                          ) : (
+                            r.topic
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 12px', lineHeight: 1.4 }}>
+                          {isEditingContent ? (
+                            <textarea
+                              value={r.linking}
+                              onChange={(e) => {
+                                const copy = [...editPayload];
+                                copy[i].linking = e.target.value;
+                                setEditPayload(copy);
+                              }}
+                              style={{ width: '100%', padding: '6px', fontSize: '12.5px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                            />
+                          ) : (
+                            r.linking
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -936,11 +1214,39 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {project.fase2Cronograma.map((r, i) => (
+                    {(isEditingContent && editPayload ? editPayload : project.fase2Cronograma).map((r: any, i: number) => (
                       <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                         <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.phase}</td>
-                        <td style={{ padding: '8px 12px' }}>{r.objective}</td>
-                        <td style={{ padding: '8px 12px', lineHeight: 1.4 }}>{r.macroActivities}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          {isEditingContent ? (
+                            <textarea
+                              value={r.objective}
+                              onChange={(e) => {
+                                const copy = [...editPayload];
+                                copy[i].objective = e.target.value;
+                                setEditPayload(copy);
+                              }}
+                              style={{ width: '100%', padding: '6px', fontSize: '12.5px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                            />
+                          ) : (
+                            r.objective
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 12px', lineHeight: 1.4 }}>
+                          {isEditingContent ? (
+                            <textarea
+                              value={r.macroActivities}
+                              onChange={(e) => {
+                                const copy = [...editPayload];
+                                copy[i].macroActivities = e.target.value;
+                                setEditPayload(copy);
+                              }}
+                              style={{ width: '100%', padding: '6px', fontSize: '12.5px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '60px', fontFamily: 'inherit' }}
+                            />
+                          ) : (
+                            r.macroActivities
+                          )}
+                        </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>{r.semesterInvolved}</td>
                       </tr>
                     ))}
@@ -968,15 +1274,59 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {project.fase2PlanOperativo.semestreA.map((r, i) => (
+                        {(isEditingContent && editPayload?.semestreA ? editPayload.semestreA : project.fase2PlanOperativo.semestreA).map((r: any, i: number) => (
                           <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                             <td style={{ padding: '6px 10px' }}>{r.phase}</td>
-                            <td style={{ padding: '6px 10px' }}>{r.activity}</td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {isEditingContent ? (
+                                <textarea
+                                  value={r.activity}
+                                  onChange={(e) => {
+                                    const copy = { ...editPayload };
+                                    copy.semestreA[i].activity = e.target.value;
+                                    setEditPayload(copy);
+                                  }}
+                                  style={{ width: '100%', padding: '4px', fontSize: '11.5px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '50px', fontFamily: 'inherit' }}
+                                />
+                              ) : (
+                                r.activity
+                              )}
+                            </td>
                             <td style={{ padding: '6px 10px', fontWeight: 600 }}>{r.uac}</td>
                             <td style={{ padding: '6px 10px', textAlign: 'center' }}>{r.progression}</td>
-                            <td style={{ padding: '6px 10px' }}>{r.strategy}</td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {isEditingContent ? (
+                                <input
+                                  type="text"
+                                  value={r.strategy}
+                                  onChange={(e) => {
+                                    const copy = { ...editPayload };
+                                    copy.semestreA[i].strategy = e.target.value;
+                                    setEditPayload(copy);
+                                  }}
+                                  style={{ width: '100%', padding: '4px', fontSize: '11.5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                />
+                              ) : (
+                                r.strategy
+                              )}
+                            </td>
                             <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>{r.week}</td>
-                            <td style={{ padding: '6px 10px' }}>{r.responsibles}</td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {isEditingContent ? (
+                                <input
+                                  type="text"
+                                  value={r.responsibles}
+                                  onChange={(e) => {
+                                    const copy = { ...editPayload };
+                                    copy.semestreA[i].responsibles = e.target.value;
+                                    setEditPayload(copy);
+                                  }}
+                                  style={{ width: '100%', padding: '4px', fontSize: '11.5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                />
+                              ) : (
+                                r.responsibles
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1000,15 +1350,59 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {project.fase2PlanOperativo.semestreB.map((r, i) => (
+                        {(isEditingContent && editPayload?.semestreB ? editPayload.semestreB : project.fase2PlanOperativo.semestreB).map((r: any, i: number) => (
                           <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
                             <td style={{ padding: '6px 10px' }}>{r.phase}</td>
-                            <td style={{ padding: '6px 10px' }}>{r.activity}</td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {isEditingContent ? (
+                                <textarea
+                                  value={r.activity}
+                                  onChange={(e) => {
+                                    const copy = { ...editPayload };
+                                    copy.semestreB[i].activity = e.target.value;
+                                    setEditPayload(copy);
+                                  }}
+                                  style={{ width: '100%', padding: '4px', fontSize: '11.5px', borderRadius: '4px', border: '1px solid #ccc', minHeight: '50px', fontFamily: 'inherit' }}
+                                />
+                              ) : (
+                                r.activity
+                              )}
+                            </td>
                             <td style={{ padding: '6px 10px', fontWeight: 600 }}>{r.uac}</td>
                             <td style={{ padding: '6px 10px', textAlign: 'center' }}>{r.progression}</td>
-                            <td style={{ padding: '6px 10px' }}>{r.strategy}</td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {isEditingContent ? (
+                                <input
+                                  type="text"
+                                  value={r.strategy}
+                                  onChange={(e) => {
+                                    const copy = { ...editPayload };
+                                    copy.semestreB[i].strategy = e.target.value;
+                                    setEditPayload(copy);
+                                  }}
+                                  style={{ width: '100%', padding: '4px', fontSize: '11.5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                />
+                              ) : (
+                                r.strategy
+                              )}
+                            </td>
                             <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>{r.week}</td>
-                            <td style={{ padding: '6px 10px' }}>{r.responsibles}</td>
+                            <td style={{ padding: '6px 10px' }}>
+                              {isEditingContent ? (
+                                <input
+                                  type="text"
+                                  value={r.responsibles}
+                                  onChange={(e) => {
+                                    const copy = { ...editPayload };
+                                    copy.semestreB[i].responsibles = e.target.value;
+                                    setEditPayload(copy);
+                                  }}
+                                  style={{ width: '100%', padding: '4px', fontSize: '11.5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                />
+                              ) : (
+                                r.responsibles
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1023,27 +1417,99 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
                   <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 1: Minuta de Reunión 2.0</h3>
-                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo1}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.anexo1 || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.anexo1 = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '180px', fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo1}</p>
+                  )}
                 </div>
                 <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
                   <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 2: Cuadro de Seguimiento de Actividades</h3>
-                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo2}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.anexo2 || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.anexo2 = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '180px', fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo2}</p>
+                  )}
                 </div>
                 <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
                   <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 3: Reporte Mensual de Avances</h3>
-                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo3}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.anexo3 || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.anexo3 = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '180px', fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo3}</p>
+                  )}
                 </div>
                 <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
                   <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 4: Cuestionario de Impacto Social</h3>
-                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo4}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.anexo4 || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.anexo4 = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '180px', fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo4}</p>
+                  )}
                 </div>
                 <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
                   <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 5: Cuestionario de Autoevaluación de Estudiantes</h3>
-                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo5}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.anexo5 || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.anexo5 = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '180px', fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo5}</p>
+                  )}
                 </div>
                 <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
                   <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 6: Plantilla del Informe Final y Socialización</h3>
-                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo6}</p>
+                  {isEditingContent ? (
+                    <textarea
+                      value={editPayload?.anexo6 || ''}
+                      onChange={(e) => {
+                        const copy = { ...editPayload };
+                        copy.anexo6 = e.target.value;
+                        setEditPayload(copy);
+                      }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #ccc', minHeight: '180px', fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo6}</p>
+                  )}
                 </div>
               </div>
             )}
