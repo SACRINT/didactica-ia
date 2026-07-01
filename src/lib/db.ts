@@ -219,6 +219,15 @@ export async function getProgramsCatalog(semester?: number, component?: string) 
   }
 }
 
+export async function getProgramsCatalogForPaec(semesters: number[]) {
+  return sql()`
+    SELECT uac_name, semester
+    FROM programs_catalog
+    WHERE semester = ANY(${semesters})
+    ORDER BY semester, uac_name ASC
+  `;
+}
+
 // ─── Planning Extras queries ──────────────────────────────────────────────────
 
 export async function getPlanningExtras(planningId: string, teacherId: string) {
@@ -284,5 +293,121 @@ export async function deletePlanningExtra(id: string, teacherId: string) {
     )
   `;
 }
+
+// ─── PAEC Projects queries ──────────────────────────────────────────────────
+
+export async function getPaecProjectsByTeacher(teacherId: string) {
+  return sql()`
+    SELECT id, teacher_id, project_name, problem_statement, cycle_type, current_step, status, created_at, updated_at
+    FROM paec_projects
+    WHERE teacher_id = ${teacherId}::uuid
+    ORDER BY created_at DESC
+  `;
+}
+
+export async function getPaecProjectById(id: string, teacherId: string) {
+  const rows = await sql()`
+    SELECT *
+    FROM paec_projects
+    WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function createPaecProject(data: {
+  teacherId: string;
+  projectName: string;
+  problemStatement: string;
+  cycleType: string;
+  communityContext: object;
+  schoolContext: object;
+}) {
+  const rows = await sql()`
+    INSERT INTO paec_projects (
+      teacher_id, project_name, problem_statement, cycle_type,
+      community_context, school_context, current_step, status
+    )
+    VALUES (
+      ${data.teacherId}::uuid,
+      ${data.projectName},
+      ${data.problemStatement},
+      ${data.cycleType},
+      ${JSON.stringify(data.communityContext)}::jsonb,
+      ${JSON.stringify(data.schoolContext)}::jsonb,
+      1,
+      'draft'
+    )
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function updatePaecProjectStep(
+  id: string,
+  teacherId: string,
+  step: number,
+  fieldName: string,
+  stepData: object
+) {
+  const status = step === 6 ? 'completed' : 'draft';
+  const dataStr = JSON.stringify(stepData);
+
+  let rows;
+  if (fieldName === 'fase1_diagnostico') {
+    rows = await sql()`
+      UPDATE paec_projects
+      SET fase1_diagnostico = ${dataStr}::jsonb, current_step = ${step}, status = ${status}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      RETURNING *
+    `;
+  } else if (fieldName === 'fase2_justificacion') {
+    rows = await sql()`
+      UPDATE paec_projects
+      SET fase2_justificacion = ${dataStr}::jsonb, current_step = ${step}, status = ${status}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      RETURNING *
+    `;
+  } else if (fieldName === 'fase2_mapeo') {
+    rows = await sql()`
+      UPDATE paec_projects
+      SET fase2_mapeo = ${dataStr}::jsonb, current_step = ${step}, status = ${status}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      RETURNING *
+    `;
+  } else if (fieldName === 'fase2_cronograma') {
+    rows = await sql()`
+      UPDATE paec_projects
+      SET fase2_cronograma = ${dataStr}::jsonb, current_step = ${step}, status = ${status}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      RETURNING *
+    `;
+  } else if (fieldName === 'fase2_plan_operativo') {
+    rows = await sql()`
+      UPDATE paec_projects
+      SET fase2_plan_operativo = ${dataStr}::jsonb, current_step = ${step}, status = ${status}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      RETURNING *
+    `;
+  } else if (fieldName === 'fase2_anexos') {
+    rows = await sql()`
+      UPDATE paec_projects
+      SET fase2_anexos = ${dataStr}::jsonb, current_step = ${step}, status = ${status}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      RETURNING *
+    `;
+  } else {
+    throw new Error('Campo de paso no válido');
+  }
+  return rows[0];
+}
+
+export async function deletePaecProject(id: string, teacherId: string) {
+  await sql()`
+    DELETE FROM paec_projects
+    WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+  `;
+}
+
 
 

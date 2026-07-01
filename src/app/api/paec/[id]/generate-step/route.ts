@@ -1,0 +1,178 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import {
+  getTeacherByEmail,
+  getPaecProjectById,
+  updatePaecProjectStep,
+  getProgramsCatalogForPaec,
+} from '@/lib/db';
+import Anthropic from '@anthropic-ai/sdk';
+import {
+  PAEC_SYSTEM_PROMPT,
+  buildPrompt1Diagnostico,
+  buildPrompt2Justificacion,
+  buildPrompt3Mapeo,
+  buildPrompt4Cronograma,
+  buildPrompt5PlanOperativo,
+  buildPrompt6Anexos,
+} from '@/lib/prompts/paec-prompts';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds max execution time for Claude generation
+
+if (!process.env.ANTHROPIC_API_KEY) {
+  throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+}
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: 'Docente no encontrado' }, { status: 404 });
+    }
+
+    const { id } = await params;
+    const project = await getPaecProjectById(id, teacher.id);
+    if (!project) {
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const { step } = body as { step: number };
+
+    if (!step || step < 1 || step > 6) {
+      return NextResponse.json({ error: 'Número de paso no válido (debe ser de 1 a 6)' }, { status: 400 });
+    }
+
+    let userPrompt = '';
+    let fieldName = '';
+
+    switch (step) {
+      case 1: {
+        fieldName = 'fase1_diagnostico';
+        const comm = JSON.stringify(project.community_context);
+        const school = JSON.stringify(project.school_context);
+        userPrompt = buildPrompt1Diagnostico(comm, school, project.problem_statement);
+        break;
+      }
+      case 2: {
+        fieldName = 'fase2_justificacion';
+        if (!project.fase1_diagnostico) {
+          return NextResponse.json({ error: 'Debes completar el Paso 1 primero' }, { status: 400 });
+        }
+        const diagStr = JSON.stringify(project.fase1_diagnostico);
+        userPrompt = buildPrompt2Justificacion(diagStr, project.project_name, project.problem_statement);
+        break;
+      }
+      case 3: {
+        fieldName = 'fase2_mapeo';
+        if (!project.fase2_justificacion) {
+          return NextResponse.json({ error: 'Debes completar el Paso 2 primero' }, { status: 400 });
+        }
+        const justStr = JSON.stringify(project.fase2_justificacion);
+        
+        // Filter UAC catalog by cycle type
+        let semesters: number[] = [];
+        if (project.cycle_type === 'A') {
+          semesters = [3, 5];
+        } else if (project.cycle_type === 'B') {
+          semesters = [4, 6];
+        } else {
+          semesters = [3, 4, 5, 6];
+        }
+
+        const uacs = await getProgramsCatalogForPaec(semesters) as { uac_name: string; semester: number }[];
+        userPrompt = buildPrompt3Mapeo(justStr, uacs);
+        break;
+      }
+      case 4: {
+        fieldName = 'fase2_cronograma';
+        if (!project.fase2_mapeo) {
+          return NextResponse.json({ error: 'Debes completar el Paso 3 primero' }, { status: 400 });
+        }
+        const mapeoStr = JSON.stringify(project.fase2_mapeo);
+        userPrompt = buildPrompt4Cronograma(mapeoStr, project.cycle_type);
+        break;
+      }
+      case 5: {
+        fieldName = 'fase2_plan_operativo';
+        if (!project.fase2_cronograma) {
+          return NextResponse.json({ error: 'Debes completar el Paso 4 primero' }, { status: 400 });
+        }
+        const cronStr = JSON.stringify(project.fase2_cronograma);
+        userPrompt = buildPrompt5PlanOperativo(cronStr, project.cycle_type);
+        break;
+      }
+      case 6: {
+        fieldName = 'fase2_anexos';
+        if (!project.fase2_plan_operativo) {
+          return NextResponse.json({ error: 'Debes completar el Paso 5 primero' }, { status: 400 });
+        }
+        const planStr = JSON.stringify(project.fase2_plan_operativo);
+        userPrompt = buildPrompt6Anexos(planStr);
+        break;
+      }
+    }
+
+    // Call Claude Haiku 4.5
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 8192,
+      system: [
+        {
+          type: 'text',
+          text: PAEC_SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+
+    const respText = response.content[0];
+    if (respText.type !== 'text') {
+      throw new Error('Unexpected response type from Claude');
+    }
+
+    let parsedJson: object;
+    try {
+      const cleanJson = respText.text
+        .replace(/^```(?:json)?\n?/m, '')
+        .replace(/\n?```$/m, '')
+        .trim();
+      parsedJson = JSON.parse(cleanJson);
+    } catch (err) {
+      console.error('Failed to parse Claude response:', respText.text.substring(0, 500));
+      return NextResponse.json(
+        { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
+        { status: 500 }
+      );
+    }
+
+    // Save to Neon DB
+    const updatedProject = await updatePaecProjectStep(
+      id,
+      teacher.id,
+      step,
+      fieldName,
+      parsedJson
+    );
+
+    return NextResponse.json({ success: true, step, data: parsedJson, project: updatedProject });
+  } catch (error) {
+    console.error('PAEC Generation step error:', error);
+    const message = error instanceof Error ? error.message : 'Error desconocido';
+    return NextResponse.json({ error: message || 'Error al generar el paso' }, { status: 500 });
+  }
+}

@@ -1,0 +1,803 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import type { PaecProject, CommunityContext, SchoolContext } from '@/types/paec';
+
+interface Props {
+  locale: string;
+  initialId: string | null;
+}
+
+const STEPS = [
+  { num: 1, label: 'Diagnóstico Colectivo' },
+  { num: 2, label: 'Justificación y Propósitos' },
+  { num: 3, label: 'Mapeo de UACs' },
+  { num: 4, label: 'Cronograma' },
+  { num: 5, label: 'Plan Operativo' },
+  { num: 6, label: 'Anexos Técnicos' },
+];
+
+const CYCLE_LABELS: Record<string, string> = {
+  A: 'Semestre A (3° y 5°)',
+  B: 'Semestre B (4° y 6°)',
+  annual: 'Ciclo Anual (3° a 6°)',
+};
+
+export default function PaecWizardClient({ locale, initialId }: Props) {
+  const router = useRouter();
+
+  // Navigation / Loading States
+  const [projectId, setProjectId] = useState<string | null>(initialId);
+  const [project, setProject] = useState<PaecProject | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [activeStep, setActiveStep] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form States (Paso 1: Datos Base)
+  const [projectName, setProjectName] = useState('');
+  const [problemStatement, setProblemStatement] = useState('');
+  const [cycleType, setCycleType] = useState<'A' | 'B' | 'annual'>('A');
+
+  const [community, setCommunity] = useState<CommunityContext>({
+    location: '',
+    demographics: '',
+    economy: '',
+    traditions: '',
+    security: '',
+    environment: '',
+  });
+
+  const [school, setSchool] = useState<SchoolContext>({
+    enrollment: '',
+    teacherCount: '',
+    indicators: '',
+    previousPrograms: '',
+    facilities: '',
+  });
+
+  // Load project details if ID is present
+  useEffect(() => {
+    if (projectId) {
+      loadProject(projectId);
+    }
+  }, [projectId]);
+
+  async function loadProject(id: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/paec/${id}`);
+      if (!res.ok) throw new Error('No se pudo cargar el proyecto.');
+      const data = await res.json();
+      
+      const p = data.project as PaecProject;
+      setProject(p);
+      setProjectName(p.projectName);
+      setProblemStatement(p.problemStatement);
+      setCycleType(p.cycleType);
+      if (p.communityContext) setCommunity(p.communityContext);
+      if (p.schoolContext) setSchool(p.schoolContext);
+
+      // Set active step to the furthest generated step, or current step
+      setActiveStep(p.currentStep);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar los datos.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Handle Form Submission (Create Project)
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!projectName || !problemStatement) {
+      alert('Por favor completa los campos requeridos: Nombre del proyecto y Problemática.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/paec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectName,
+          problemStatement,
+          cycleType,
+          communityContext: community,
+          schoolContext: school,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al guardar el proyecto.');
+      }
+
+      const data = await res.json();
+      setProjectId(data.project.id);
+      router.push(`/${locale}/paec/nuevo?id=${data.project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ocurrió un error.');
+      setLoading(false);
+    }
+  }
+
+  // Handle Step Generation (Call Claude API)
+  async function generateCurrentStep() {
+    if (!projectId) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/paec/${projectId}/generate-step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: activeStep }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al generar los contenidos con IA.');
+      }
+
+      const data = await res.json();
+      setProject(data.project);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error en la comunicación con la IA.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--c-text-muted)' }}>
+        <span className="spinner" style={{ display: 'inline-block', width: '32px', height: '32px', border: '3px solid var(--c-blue-pale)', borderTopColor: 'var(--c-blue-mid)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <p style={{ marginTop: '16px', fontSize: '16px' }}>Cargando proyecto...</p>
+      </div>
+    );
+  }
+
+  // Render Paso 0: Formulario de Creación
+  if (!projectId) {
+    return (
+      <div style={{ maxWidth: '880px', margin: '0 auto', paddingBottom: '40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+          <Link href={`/${locale}/paec`} className="btn btn-ghost" style={{ padding: '8px 12px' }}>
+            ← Volver
+          </Link>
+          <div>
+            <h1 style={{ fontSize: '28px', color: 'var(--c-navy)', margin: 0, fontWeight: 700 }}>Nuevo Proyecto PAEC-PEC</h1>
+            <p style={{ color: 'var(--c-text-muted)', margin: '4px 0 0' }}>Completa los datos iniciales de tu plantel y comunidad para comenzar</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Datos del Proyecto */}
+          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>1. Identificación del Proyecto</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Nombre Preliminar del Proyecto Escolar Comunitario *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Transformando el PET en Soluciones Comunitarias Ecológicas"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Problemática o Necesidad seleccionada por el Comité del Plantel *</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Ej: Alto índice de contaminación por residuos plásticos en los alrededores del plantel y falta de cultura de reciclaje en la comunidad."
+                  value={problemStatement}
+                  onChange={(e) => setProblemStatement(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)', resize: 'vertical' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Ciclo Semestral / Bloque de Relevo *</label>
+                <select
+                  value={cycleType}
+                  onChange={(e) => setCycleType(e.target.value as any)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)', background: '#fff' }}
+                >
+                  <option value="A">Semestre A (3° y 5° Semestre - Septiembre-Enero)</option>
+                  <option value="B">Semestre B (4° y 6° Semestre - Febrero-Junio)</option>
+                  <option value="annual">Proyecto Anual Completo (3° a 6° Semestre)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Contexto Comunitario */}
+          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>2. Ficha de Datos de la Comunidad (INEGI/Entorno)</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Ubicación Geográfica y Nombre de la Localidad</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Coronel Tito Hernández, Villa Juárez, Puebla"
+                  value={community.location}
+                  onChange={(e) => setCommunity({ ...community, location: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Situación Demográfica</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Población de 8,500 habitantes, pirámide joven"
+                  value={community.demographics}
+                  onChange={(e) => setCommunity({ ...community, demographics: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Actividades Socioeconómicas Principales</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Agricultura de temporal, comercio minorista y maquila local"
+                  value={community.economy}
+                  onChange={(e) => setCommunity({ ...community, economy: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Tradiciones Socioculturales</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Fiesta patronal de San Francisco, carnaval tradicional"
+                  value={community.traditions}
+                  onChange={(e) => setCommunity({ ...community, traditions: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Seguridad Pública</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Robos menores ocasionales, patrullaje regular"
+                  value={community.security}
+                  onChange={(e) => setCommunity({ ...community, security: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Situación Medioambiental</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Escasez de agua potable, acumulación de PET en calles"
+                  value={community.environment}
+                  onChange={(e) => setCommunity({ ...community, environment: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Contexto del Plantel */}
+          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>3. Ficha de Datos del Plantel</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Matrícula Escolar (Estudiantes)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: 320 alumnos inscritos en ambos turnos"
+                  value={school.enrollment}
+                  onChange={(e) => setSchool({ ...school, enrollment: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Plantilla Docente</label>
+                <input
+                  type="text"
+                  placeholder="Ej: 14 docentes y 2 administrativos"
+                  value={school.teacherCount}
+                  onChange={(e) => setSchool({ ...school, teacherCount: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Indicadores Educativos (Aprovechamiento/Rezago)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: 85% de aprobación, 8% deserción semestral"
+                  value={school.indicators}
+                  onChange={(e) => setSchool({ ...school, indicators: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Programas Activos Previos</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Programa ConstruyeT, campañas de reforestación"
+                  value={school.previousPrograms}
+                  onChange={(e) => setSchool({ ...school, previousPrograms: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Instalaciones y Equipamiento Destacado</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Laboratorio de informática, taller de electricidad, cancha de usos múltiples, áreas verdes."
+                  value={school.facilities}
+                  onChange={(e) => setSchool({ ...school, facilities: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'right' }}>
+            <button type="submit" className="btn btn-primary" style={{ padding: '12px 28px', fontSize: '16px', background: 'linear-gradient(135deg, var(--c-navy) 0%, var(--c-navy-light) 100%)', border: 'none', cursor: 'pointer' }}>
+              Guardar y Empezar Generación →
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // Helper to determine if current active step is generated
+  function isStepGenerated(s: number): boolean {
+    if (!project) return false;
+    switch (s) {
+      case 1: return !!project.fase1Diagnostico;
+      case 2: return !!project.fase2Justificacion;
+      case 3: return !!project.fase2Mapeo;
+      case 4: return !!project.fase2Cronograma;
+      case 5: return !!project.fase2PlanOperativo;
+      case 6: return !!project.fase2Anexos;
+      default: return false;
+    }
+  }
+
+  const generated = isStepGenerated(activeStep);
+
+  return (
+    <div style={{ maxWidth: '1024px', margin: '0 auto', paddingBottom: '40px' }}>
+      
+      {/* Header */}
+      <div className="page-header" style={{ borderBottom: '1px solid var(--c-border)', paddingBottom: '16px', marginBottom: '24px' }}>
+        <Link href={`/${locale}/paec`} className="btn btn-ghost" style={{ marginBottom: '12px', display: 'inline-flex' }}>
+          ← Volver a Proyectos
+        </Link>
+        <h1 className="page-title" style={{ fontSize: '28px', color: 'var(--c-navy)' }}>{projectName}</h1>
+        <p style={{ color: 'var(--c-text-muted)', fontSize: '15px', margin: '4px 0 0' }}>
+          Problemática: {problemStatement}
+        </p>
+        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span className="badge badge-semester" style={{ backgroundColor: 'var(--c-blue-mid)', color: '#fff' }}>
+            {CYCLE_LABELS[cycleType]}
+          </span>
+          <span className="badge" style={{ backgroundColor: project?.status === 'completed' ? '#28a745' : '#ffc107', color: project?.status === 'completed' ? '#fff' : '#212529' }}>
+            {project?.status === 'completed' ? 'Completado' : `Borrador — Paso ${project?.currentStep || 1} de 6`}
+          </span>
+          {project?.fase2Anexos && (
+            <a href={`/api/docx/paec/${projectId}`} className="btn btn-amber btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--c-amber)', color: '#fff', marginLeft: 'auto' }}>
+              <span>↓</span> Descargar PEC Completo (DOCX)
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Horizontal Step Indicator */}
+      <div className="step-wizard" style={{ marginBottom: '32px' }}>
+        {STEPS.map((s) => {
+          const isDone = isStepGenerated(s.num);
+          const isActive = s.num === activeStep;
+          return (
+            <button
+              key={s.num}
+              onClick={() => {
+                // Allowed to click any step that has been generated or is the current step
+                if (isDone || s.num <= (project?.currentStep || 1)) {
+                  setActiveStep(s.num);
+                  setError(null);
+                }
+              }}
+              className={`step-item ${isDone ? 'done' : isActive ? 'active' : ''}`}
+              style={{ background: 'none', border: 'none', cursor: (isDone || s.num <= (project?.currentStep || 1)) ? 'pointer' : 'not-allowed', outline: 'none' }}
+              disabled={!(isDone || s.num <= (project?.currentStep || 1))}
+            >
+              <div className="step-num">{isDone ? '✓' : s.num}</div>
+              <span className="step-label" style={{ fontWeight: isActive ? 700 : 500 }}>{s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Panel Content */}
+      <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+        
+        {error && (
+          <div style={{ backgroundColor: '#f8d7da', color: '#842029', border: '1px solid #f5c2c7', padding: '16px', borderRadius: '6px', marginBottom: '20px' }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {/* STATE A: NOT GENERATED YET */}
+        {!generated && (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ fontSize: '56px', marginBottom: '16px' }}>🤖</div>
+            <h2 style={{ color: 'var(--c-navy)', marginBottom: '12px', fontSize: '22px', fontWeight: 600 }}>Paso {activeStep}: {STEPS[activeStep - 1].label}</h2>
+            <p style={{ color: 'var(--c-text-muted)', maxWidth: '520px', margin: '0 auto 24px', lineHeight: 1.6 }}>
+              {activeStep === 1 && 'La Inteligencia Artificial recopilará los datos de la comunidad y del plantel para estructurar las 4 tablas oficiales de diagnóstico y realizar el análisis FODA del proyecto.'}
+              {activeStep === 2 && 'Se redactará la justificación formal del proyecto, los 5 pilares estratégicos de viabilidad, los propósitos integrales (educativo, social y funcional) y las metas del PEC.'}
+              {activeStep === 3 && 'La IA cruzará las asignaturas activas de tus semestres seleccionados (Modelo de Relevos) con la problemática común para detallar los temas prácticos de aprendizaje transversal.'}
+              {activeStep === 4 && 'Estructuración del plan macro dividiendo las etapas del proyecto escolar en 6 fases bimestrales ordenadas cronológicamente.'}
+              {activeStep === 5 && 'Desglose detallado de las actividades del día a día (semanas 1 a 16) con metodologías activas y entrega de la estafeta de relevos semestral.'}
+              {activeStep === 6 && 'Generación de todas las plantillas administrativas y de control, incluyendo la minuta de acuerdos, reportes y cuestionarios de impacto social.'}
+            </p>
+
+            <button
+              onClick={generateCurrentStep}
+              disabled={generating}
+              className="btn btn-primary"
+              style={{ padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            >
+              {generating ? (
+                <>
+                  <span className="spinner" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                  Generando con Claude Haiku 4.5 (Toma unos segundos)...
+                </>
+              ) : (
+                <>Generar Fase con IA ✨</>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* STATE B: SUCCESSFULLY GENERATED CONTENT VIEW */}
+        {generated && project && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--c-border)', paddingBottom: '14px', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '20px', color: 'var(--c-navy)', margin: 0, fontWeight: 700 }}>
+                {STEPS[activeStep - 1].label} (Contenido Generado)
+              </h2>
+              <button
+                onClick={generateCurrentStep}
+                disabled={generating}
+                className="btn btn-ghost"
+                style={{ fontSize: '13px', color: 'var(--c-navy-light)', textDecoration: 'underline' }}
+              >
+                {generating ? 'Regenerando...' : 'Regenerar esta fase 🔄'}
+              </button>
+            </div>
+
+            {/* Step 1 Visual Render */}
+            {activeStep === 1 && project.fase1Diagnostico && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy-light)', fontWeight: 600, marginBottom: '10px' }}>Tabla 1: Características de la comunidad (Contexto Externo)</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Aspecto</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left' }}>Descripción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.fase1Diagnostico.tabla1.map((r, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.col1}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.col2}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy-light)', fontWeight: 600, marginBottom: '10px' }}>Tabla 2: Características de la educación e institución (Contexto Interno)</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Aspecto Escolar</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left' }}>Descripción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.fase1Diagnostico.tabla2.map((r, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.col1}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.col2}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy-light)', fontWeight: 600, marginBottom: '10px' }}>Tabla 3: Análisis FODA y Estrategia Maestra del PEC</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Aspecto FODA</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left' }}>Análisis Estratégico</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.fase1Diagnostico.tabla3.map((r, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.aspect}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.analysis}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy-light)', fontWeight: 600, marginBottom: '10px' }}>Tabla 4: Problemáticas o necesidades de la comunidad (Proceso de Selección)</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Etapa del Proceso</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left' }}>Descripción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.fase1Diagnostico.tabla4.map((r, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.col1}</td>
+                          <td style={{ padding: '8px 12px', lineHeight: 1.5 }}>{r.col2}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2 Visual Render */}
+            {activeStep === 2 && project.fase2Justificacion && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', lineHeight: 1.6 }}>
+                <div>
+                  <strong>Nombre del Proyecto Definitivo:</strong>
+                  <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--c-navy)' }}>{project.fase2Justificacion.projectName}</p>
+                </div>
+                <div>
+                  <strong>Introducción y Justificación Académica:</strong>
+                  <p style={{ fontSize: '14px', whiteSpace: 'pre-line' }}>{project.fase2Justificacion.introduction}</p>
+                </div>
+                <div>
+                  <strong>Pilares Estratégicos de Viabilidad:</strong>
+                  <ul style={{ listStyleType: 'disc', paddingLeft: '20px', fontSize: '14px' }}>
+                    {project.fase2Justificacion.pilares.map((pilar, i) => (
+                      <li key={i} style={{ marginBottom: '8px' }}>{pilar}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <strong>Propósitos Integrales del PEC:</strong>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginTop: '8px' }}>
+                    <div style={{ padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '6px' }}>
+                      <strong style={{ color: 'var(--c-navy)' }}>Propósito Educativo:</strong>
+                      <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.educativo}</p>
+                    </div>
+                    <div style={{ padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '6px' }}>
+                      <strong style={{ color: 'var(--c-navy)' }}>Propósito Social:</strong>
+                      <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.social}</p>
+                    </div>
+                    <div style={{ padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '6px' }}>
+                      <strong style={{ color: 'var(--c-navy)' }}>Propósito Funcional:</strong>
+                      <p style={{ margin: '6px 0 0', fontSize: '13px' }}>{project.fase2Justificacion.proposito.funcional}</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <strong>Metas Cuantitativas:</strong>
+                  <ul style={{ listStyleType: 'decimal', paddingLeft: '20px', fontSize: '13px' }}>
+                    {project.fase2Justificacion.alcance.metas.map((m, i) => <li key={i}>{m}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 Visual Render */}
+            {activeStep === 3 && project.fase2Mapeo && (
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'center', width: '10%' }}>Sem</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Asignatura (UAC)</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Actividad / Tema Práctico</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>Vinculación y Progresión Curricular</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.fase2Mapeo.map((r, i) => (
+                      <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>{r.semester}°</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.uacName}</td>
+                        <td style={{ padding: '8px 12px' }}>{r.topic}</td>
+                        <td style={{ padding: '8px 12px', lineHeight: 1.4 }}>{r.linking}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Step 4 Visual Render */}
+            {activeStep === 4 && project.fase2Cronograma && (
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', width: '20%' }}>Fase Bimestral</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', width: '25%' }}>Objetivo de la Etapa</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>Macro-Actividades del Proyecto</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center', width: '15%' }}>Semestre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.fase2Cronograma.map((r, i) => (
+                      <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.phase}</td>
+                        <td style={{ padding: '8px 12px' }}>{r.objective}</td>
+                        <td style={{ padding: '8px 12px', lineHeight: 1.4 }}>{r.macroActivities}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>{r.semesterInvolved}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Step 5 Visual Render */}
+            {activeStep === 5 && project.fase2PlanOperativo && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {project.fase2PlanOperativo.semestreA && project.fase2PlanOperativo.semestreA.length > 0 && (
+                  <div>
+                    <h3 style={{ fontSize: '15px', color: 'var(--c-navy-light)', fontWeight: 600, marginBottom: '10px' }}>Plan Operativo: Semestre A (3° y 5° Semestre - Bloque A)</h3>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '12%' }}>Fase</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '28%' }}>Actividad Semanal</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '18%' }}>UAC</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'center', width: '8%' }}>Progresión</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '12%' }}>Estrategia</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'center', width: '8%' }}>Semana</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '14%' }}>Responsables</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {project.fase2PlanOperativo.semestreA.map((r, i) => (
+                          <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                            <td style={{ padding: '6px 10px' }}>{r.phase}</td>
+                            <td style={{ padding: '6px 10px' }}>{r.activity}</td>
+                            <td style={{ padding: '6px 10px', fontWeight: 600 }}>{r.uac}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>{r.progression}</td>
+                            <td style={{ padding: '6px 10px' }}>{r.strategy}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>{r.week}</td>
+                            <td style={{ padding: '6px 10px' }}>{r.responsibles}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {project.fase2PlanOperativo.semestreB && project.fase2PlanOperativo.semestreB.length > 0 && (
+                  <div>
+                    <h3 style={{ fontSize: '15px', color: 'var(--c-navy-light)', fontWeight: 600, marginBottom: '10px' }}>Plan Operativo: Semestre B (4° y 6° Semestre - Bloque B)</h3>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '12%' }}>Fase</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '28%' }}>Actividad Semanal</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '18%' }}>UAC</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'center', width: '8%' }}>Progresión</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '12%' }}>Estrategia</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'center', width: '8%' }}>Semana</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', width: '14%' }}>Responsables</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {project.fase2PlanOperativo.semestreB.map((r, i) => (
+                          <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderBottom: '1px solid var(--c-border)' }}>
+                            <td style={{ padding: '6px 10px' }}>{r.phase}</td>
+                            <td style={{ padding: '6px 10px' }}>{r.activity}</td>
+                            <td style={{ padding: '6px 10px', fontWeight: 600 }}>{r.uac}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>{r.progression}</td>
+                            <td style={{ padding: '6px 10px' }}>{r.strategy}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>{r.week}</td>
+                            <td style={{ padding: '6px 10px' }}>{r.responsibles}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 6 Visual Render */}
+            {activeStep === 6 && project.fase2Anexos && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 1: Minuta de Reunión 2.0</h3>
+                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo1}</p>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 2: Cuadro de Seguimiento de Actividades</h3>
+                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo2}</p>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 3: Reporte Mensual de Avances</h3>
+                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo3}</p>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 4: Cuestionario de Impacto Social</h3>
+                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo4}</p>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 5: Cuestionario de Autoevaluación de Estudiantes</h3>
+                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo5}</p>
+                </div>
+                <div style={{ padding: '16px', background: 'var(--c-gray)', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', color: 'var(--c-navy)', fontWeight: 600, marginBottom: '8px' }}>Anexo 6: Plantilla del Informe Final y Socialización</h3>
+                  <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{project.fase2Anexos.anexo6}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation / Next actions */}
+            <div style={{ display: 'flex', justifySelf: 'flex-end', gap: '12px', marginTop: '24px', borderTop: '1px solid var(--c-border)', paddingTop: '16px' }}>
+              {activeStep > 1 && (
+                <button
+                  onClick={() => setActiveStep(activeStep - 1)}
+                  className="btn btn-ghost"
+                >
+                  ← Fase Anterior
+                </button>
+              )}
+              
+              {activeStep < 6 ? (
+                <button
+                  onClick={() => {
+                    setActiveStep(activeStep + 1);
+                    setError(null);
+                  }}
+                  className="btn btn-primary"
+                  style={{ marginLeft: 'auto' }}
+                  disabled={project.currentStep < activeStep + 1 && !isStepGenerated(activeStep + 1)}
+                >
+                  Siguiente Fase (Paso {activeStep + 1}) →
+                </button>
+              ) : (
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span style={{ color: '#28a745', fontWeight: 600 }}>🎉 ¡Proyecto PAEC-PEC Completo!</span>
+                  <a href={`/api/docx/paec/${projectId}`} className="btn btn-amber" style={{ backgroundColor: 'var(--c-amber)', color: '#fff' }}>
+                    Descargar Proyecto Completo (Word)
+                  </a>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

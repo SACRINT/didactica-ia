@@ -59,6 +59,13 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
           <span className="sidebar-link-icon">📂</span>
           Mis planeaciones
         </Link>
+        <Link
+          href={`/${locale}/paec`}
+          className={`sidebar-link ${activeSection === 'paec' ? 'active' : ''}`}
+        >
+          <span className="sidebar-link-icon">🏫</span>
+          Proyectos PAEC-PEC
+        </Link>
       </aside>
 
       {/* Main content */}
