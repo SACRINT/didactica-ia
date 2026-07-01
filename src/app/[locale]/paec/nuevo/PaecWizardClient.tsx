@@ -25,6 +25,47 @@ const CYCLE_LABELS: Record<string, string> = {
   annual: 'Proyecto Completo (1° al 6°)',
 };
 
+const CAPACITACION_TITLES: Record<string, string> = {
+  'Administracion': '💼 Administración',
+  'Agricultura Sostenible de Traspatio': '🌱 Agricultura Sostenible de Traspatio',
+  'Area de la Salud': '🩺 Área de la Salud',
+  'Comunicacion Grafica': '🎨 Comunicación Gráfica',
+  'Contabilidad': '📊 Contabilidad',
+  'Domotica': '🏠 Domótica',
+  'Instalaciones Residenciales': '🛠️ Instalaciones Residenciales',
+  'Mecanica Dental': '🦷 Mecánica Dental',
+  'Preparacion de Alimentos Artesanales': '🍯 Preparación de Alimentos Artesanales',
+  'Procesos Culinarios y Reposteria': '🍰 Procesos Culinarios y Repostería',
+  'Redes y Mantenimiento': '💻 Redes y Mantenimiento',
+  'Servicios Ecosistemicos': '🌳 Servicios Ecosistémicos',
+  'Sistemas Electricos': '⚡ Sistemas Eléctricos',
+  'Tecnologia Informatica': '💾 Tecnología Informática',
+  'Turismo': '✈️ Turismo',
+};
+
+const FFE_PAIRS = [
+  { name5: 'Análisis de Fenómenos Físicos I (CNET)', name6: 'Análisis de Fenómenos Físicos II (CNET)', label: 'Análisis de Fenómenos Físicos (CNET)' },
+  { name5: 'Análisis de Fenómenos Biológicos (CNET)', name6: 'Temas Selectos de Biología (CNET)', label: 'Ciencias Biológicas (CNET)' },
+  { name5: 'Salud Integral I (CNET)', name6: 'Salud Integral II (CNET)', label: 'Salud Integral (CNET)' },
+  { name5: 'Organización del Flujo de Materia I (CNET)', name6: 'Organización del Flujo de Materia II (CNET)', label: 'Organización del Flujo de Materia (CNET)' },
+  { name5: 'Derecho y Sociedad I (CS)', name6: 'Derecho y Sociedad II (CS)', label: 'Derecho y Sociedad (CS)' },
+  { name5: 'Fundamentos de Administración I (CS)', name6: 'Fundamentos de Administración II (CS)', label: 'Fundamentos de Administración (CS)' },
+  { name5: 'Economía I (CS)', name6: 'Economía II (CS)', label: 'Economía (CS)' },
+  { name5: 'Procesos Contables I (CS)', name6: 'Procesos Contables II (CS)', label: 'Procesos Contables (CS)' },
+  { name5: 'Psicología I (HUM)', name6: 'Psicología II (HUM)', label: 'Psicología (HUM)' },
+  { name5: 'Pensamiento Filosófico I (HUM)', name6: 'Pensamiento Filosófico II (HUM)', label: 'Pensamiento Filosófico (HUM)' },
+  { name5: 'Arte y Cultura I', name6: 'Arte y Cultura II', label: 'Arte y Cultura' },
+  { name5: 'Lógica y Pensamiento Crítico', name6: 'Experiencia Estética', label: 'Lógica y Estética' },
+  { name5: 'Pensamiento Matemático Finanzas I (CS)', name6: 'Pensamiento Matemático Finanzas II (CS)', label: 'Pensamiento Matemático Finanzas (CS)' },
+  { name5: 'Temas Selectos CS I (CS)', name6: 'Temas Selectos CS II (CS)', label: 'Temas Selectos Ciencias Sociales (CS)' },
+  { name5: 'Comunicación y Sociedad I (Lengua)', name6: 'Comunicación y Sociedad II (Lengua)', label: 'Comunicación y Sociedad (Lengua)' },
+  { name5: 'Inglés V (Lengua)', name6: 'Inglés VI (Lengua)', label: 'Inglés Avanzado (Lengua)' },
+  { name5: 'Raíces etimológicas I (Lengua)', name6: 'Raíces etimológicas II (Lengua)', label: 'Raíces Etimológicas (Lengua)' },
+  { name5: 'Taller Pensamiento Variacional I (PM)', name6: 'Taller Pensamiento Variacional II (PM)', label: 'Taller Pensamiento Variacional (PM)' },
+  { name5: 'Dibujo Técnico I (PM)', name6: 'Dibujo Técnico II (PM)', label: 'Dibujo Técnico (PM)' },
+  { name5: 'Probabilidad y Estadística I (PM)', name6: 'Probabilidad y Estadística II (PM)', label: 'Probabilidad y Estadística (PM)' },
+];
+
 export default function PaecWizardClient({ locale, initialId }: Props) {
   const router = useRouter();
 
@@ -59,8 +100,8 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
   });
 
   // Catalogs and Selections
-  const [laboralCatalog, setLaboralCatalog] = useState<string[]>([]);
-  const [ffeCatalog, setFfeCatalog] = useState<string[]>([]);
+  const [laboralCatalog, setLaboralCatalog] = useState<{ uac_name: string; semester: number; curriculum_name: string }[]>([]);
+  const [ffeCatalog, setFfeCatalog] = useState<{ uac_name: string; semester: number; component: string }[]>([]);
   const [selectedLaboral, setSelectedLaboral] = useState<string[]>([]);
   const [selectedFfe, setSelectedFfe] = useState<string[]>([]);
   const [groupsCount, setGroupsCount] = useState('1');
@@ -73,8 +114,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
         const resLab = await fetch(`/api/programs?component=laboral`);
         const dataLab = await resLab.json();
         if (dataLab.programs) {
-          const names = Array.from(new Set(dataLab.programs.map((p: any) => p.uac_name))) as string[];
-          setLaboralCatalog(names.sort());
+          setLaboralCatalog(dataLab.programs);
         }
 
         const resFfe1 = await fetch(`/api/programs?component=ext_optativo`);
@@ -83,8 +123,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
         const dataFfe2 = await resFfe2.json();
         
         const allFfe = [...(dataFfe1.programs || []), ...(dataFfe2.programs || [])];
-        const ffeNames = Array.from(new Set(allFfe.map((p: any) => p.uac_name))) as string[];
-        setFfeCatalog(ffeNames.sort());
+        setFfeCatalog(allFfe);
       } catch (err) {
         console.error('Error fetching catalogs:', err);
       }
@@ -198,6 +237,15 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
       setGenerating(false);
     }
   }
+
+  // Grouping helper for laboral UACs
+  const groupedLaboral = laboralCatalog.reduce((acc, item) => {
+    const cap = item.curriculum_name || 'General';
+    if (!acc[cap]) acc[cap] = {};
+    if (!acc[cap][item.semester]) acc[cap][item.semester] = [];
+    acc[cap][item.semester].push(item);
+    return acc;
+  }, {} as Record<string, Record<number, typeof laboralCatalog>>);
 
   if (loading) {
     return (
@@ -433,31 +481,79 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
 
               {/* Laboral Checklist */}
               <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: '16px', marginTop: '8px' }}>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '10px', fontSize: '14px', color: 'var(--c-navy)' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '10px', fontSize: '15px', color: 'var(--c-navy)' }}>
                   Capacitaciones para el Trabajo (Formación Laboral) activas *
                 </label>
+                <p style={{ fontSize: '12.5px', color: 'var(--c-text-muted)', marginBottom: '14px', marginTop: '-6px' }}>
+                  Selecciona las capacitaciones de tu escuela. Cada capacitación contiene 8 asignaturas divididas de 3° a 6° semestre.
+                </p>
+
                 {laboralCatalog.length === 0 ? (
                   <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>Cargando catálogo laboral...</p>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px', border: '1px solid var(--c-border)', borderRadius: '6px', background: '#fafafa' }}>
-                    {laboralCatalog.map((name) => {
-                      const isChecked = selectedLaboral.includes(name);
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '420px', overflowY: 'auto', padding: '12px', border: '1px solid var(--c-border)', borderRadius: '8px', background: '#fafafa' }}>
+                    {Object.keys(CAPACITACION_TITLES).map((capKey) => {
+                      const title = CAPACITACION_TITLES[capKey];
+                      const semGroups = groupedLaboral[capKey] || {};
+                      
+                      // Check if all UACs in this capacitación are selected
+                      const capUacs = Object.values(semGroups).flat();
+                      const allSelected = capUacs.length > 0 && capUacs.every(u => selectedLaboral.includes(u.uac_name));
+
                       return (
-                        <label key={name} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              if (isChecked) {
-                                setSelectedLaboral(selectedLaboral.filter(n => n !== name));
-                              } else {
-                                setSelectedLaboral([...selectedLaboral, name]);
-                              }
-                            }}
-                            style={{ marginTop: '2px' }}
-                          />
-                          <span>{name}</span>
-                        </label>
+                        <div key={capKey} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px', background: '#fff' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #edf2f7', paddingBottom: '8px', marginBottom: '10px' }}>
+                            <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--c-navy-light)' }}>{title}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const names = capUacs.map(u => u.uac_name);
+                                if (allSelected) {
+                                  setSelectedLaboral(prev => prev.filter(n => !names.includes(n)));
+                                } else {
+                                  setSelectedLaboral(prev => Array.from(new Set([...prev, ...names])));
+                                }
+                              }}
+                              style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontWeight: 500 }}
+                            >
+                              {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                            </button>
+                          </div>
+                          
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                            {[3, 4, 5, 6].map((sem) => {
+                              const uacs = semGroups[sem] || [];
+                              if (uacs.length === 0) return null;
+                              return (
+                                <div key={sem} style={{ background: '#f8fafc', padding: '8px', borderRadius: '4px' }}>
+                                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-blue-mid)', marginBottom: '6px' }}>{sem}° Semestre</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {uacs.map((u) => {
+                                      const isChecked = selectedLaboral.includes(u.uac_name);
+                                      return (
+                                        <label key={u.uac_name} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '11.5px', cursor: 'pointer', lineHeight: 1.3 }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => {
+                                              if (isChecked) {
+                                                setSelectedLaboral(selectedLaboral.filter(n => n !== u.uac_name));
+                                              } else {
+                                                setSelectedLaboral([...selectedLaboral, u.uac_name]);
+                                              }
+                                            }}
+                                            style={{ marginTop: '2px' }}
+                                          />
+                                          <span>{u.uac_name}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -465,32 +561,66 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
               </div>
 
               {/* FFE Checklist */}
-              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: '16px', marginTop: '8px' }}>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '10px', fontSize: '14px', color: 'var(--c-navy)' }}>
+              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: '16px', marginTop: '16px' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '10px', fontSize: '15px', color: 'var(--c-navy)' }}>
                   Formación Fundamental Extendida (FFE/FFEO) activas
                 </label>
+                <p style={{ fontSize: '12.5px', color: 'var(--c-text-muted)', marginBottom: '14px', marginTop: '-6px' }}>
+                  Selecciona las asignaturas de FFE. Dado que tienen continuidad obligatoria, al seleccionar la materia de 5° Semestre se vinculará automáticamente con su continuación en 6° Semestre.
+                </p>
+
                 {ffeCatalog.length === 0 ? (
                   <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>Cargando catálogo FFE...</p>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px', border: '1px solid var(--c-border)', borderRadius: '6px', background: '#fafafa' }}>
-                    {ffeCatalog.map((name) => {
-                      const isChecked = selectedFfe.includes(name);
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto', padding: '12px', border: '1px solid var(--c-border)', borderRadius: '8px', background: '#fafafa' }}>
+                    {FFE_PAIRS.map((pair) => {
+                      const isChecked5 = selectedFfe.includes(pair.name5);
+                      const isChecked6 = selectedFfe.includes(pair.name6);
+
                       return (
-                        <label key={name} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              if (isChecked) {
-                                setSelectedFfe(selectedFfe.filter(n => n !== name));
-                              } else {
-                                setSelectedFfe([...selectedFfe, name]);
-                              }
-                            }}
-                            style={{ marginTop: '2px' }}
-                          />
-                          <span>{name}</span>
-                        </label>
+                        <div key={pair.label} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '6px', background: '#fff', gap: '10px' }}>
+                          <div style={{ minWidth: '220px', flex: '1' }}>
+                            <strong style={{ fontSize: '13px', color: 'var(--c-navy-light)' }}>{pair.label}</strong>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked5}
+                                onChange={() => {
+                                  if (isChecked5) {
+                                    setSelectedFfe(selectedFfe.filter(n => n !== pair.name5 && n !== pair.name6));
+                                  } else {
+                                    // Autoselect matching 6th semester FFE too
+                                    setSelectedFfe(prev => Array.from(new Set([...prev, pair.name5, pair.name6])));
+                                  }
+                                }}
+                              />
+                              <span style={{ fontWeight: 500 }}>5° Sem:</span>
+                              <span style={{ color: 'var(--c-text-muted)' }}>{pair.name5.split(' (')[0]}</span>
+                            </label>
+
+                            <span style={{ color: '#cbd5e1' }}>➔</span>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked6}
+                                onChange={() => {
+                                  if (isChecked6) {
+                                    setSelectedFfe(selectedFfe.filter(n => n !== pair.name6 && n !== pair.name5));
+                                  } else {
+                                    // Autoselect matching 5th semester FFE too
+                                    setSelectedFfe(prev => Array.from(new Set([...prev, pair.name5, pair.name6])));
+                                  }
+                                }}
+                              />
+                              <span style={{ fontWeight: 500 }}>6° Sem:</span>
+                              <span style={{ color: 'var(--c-text-muted)' }}>{pair.name6.split(' (')[0]}</span>
+                            </label>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
