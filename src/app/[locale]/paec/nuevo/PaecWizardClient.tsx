@@ -387,7 +387,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Ubicación Geográfica y Nombre de la Localidad</label>
                 <input
                   type="text"
-                  placeholder="Ej: Coronel Tito Hernández, Villa Juárez, Puebla"
+                  placeholder="Ej: San Antonio Tepetitlán, Municipio de Chignahuapan, Puebla"
                   value={community.location}
                   onChange={(e) => setCommunity({ ...community, location: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -397,7 +397,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Situación Demográfica</label>
                 <input
                   type="text"
-                  placeholder="Ej: Población de 8,500 habitantes, pirámide joven"
+                  placeholder="Ej: Población de 4,200 habitantes, mayoría joven menor de 25 años"
                   value={community.demographics}
                   onChange={(e) => setCommunity({ ...community, demographics: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -407,7 +407,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Actividades Socioeconómicas Principales</label>
                 <input
                   type="text"
-                  placeholder="Ej: Agricultura de temporal, comercio minorista y maquila local"
+                  placeholder="Ej: Agricultura de temporal, comercio local y artesanías"
                   value={community.economy}
                   onChange={(e) => setCommunity({ ...community, economy: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -417,7 +417,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Tradiciones Socioculturales</label>
                 <input
                   type="text"
-                  placeholder="Ej: Fiesta patronal de San Francisco, carnaval tradicional"
+                  placeholder="Ej: Fiestas patronales locales, tradiciones comunitarias"
                   value={community.traditions}
                   onChange={(e) => setCommunity({ ...community, traditions: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -427,7 +427,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Seguridad Pública</label>
                 <input
                   type="text"
-                  placeholder="Ej: Robos menores ocasionales, patrullaje regular"
+                  placeholder="Ej: Nivel de seguridad moderado, presencia de policía municipal"
                   value={community.security}
                   onChange={(e) => setCommunity({ ...community, security: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -437,7 +437,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Situación Medioambiental</label>
                 <input
                   type="text"
-                  placeholder="Ej: Escasez de agua potable, acumulación de PET en calles"
+                  placeholder="Ej: Escasez de agua en temporada seca, manejo deficiente de residuos sólidos"
                   value={community.environment}
                   onChange={(e) => setCommunity({ ...community, environment: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -454,7 +454,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Matrícula Escolar (Estudiantes)</label>
                 <input
                   type="text"
-                  placeholder="Ej: 320 alumnos inscritos en ambos turnos"
+                  placeholder="Ej: 280 alumnos inscritos en ambos semestres"
                   value={school.enrollment}
                   onChange={(e) => setSchool({ ...school, enrollment: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -464,7 +464,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Plantilla Docente</label>
                 <input
                   type="text"
-                  placeholder="Ej: 14 docentes y 2 administrativos"
+                  placeholder="Ej: 12 docentes, 1 orientador y 2 administrativos"
                   value={school.teacherCount}
                   onChange={(e) => setSchool({ ...school, teacherCount: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -474,7 +474,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Indicadores Educativos (Aprovechamiento/Rezago)</label>
                 <input
                   type="text"
-                  placeholder="Ej: 85% de aprobación, 8% deserción semestral"
+                  placeholder="Ej: 78% de aprobación, 10% deserción semestral"
                   value={school.indicators}
                   onChange={(e) => setSchool({ ...school, indicators: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -484,7 +484,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Programas Activos Previos</label>
                 <input
                   type="text"
-                  placeholder="Ej: Programa ConstruyeT, campañas de reforestación"
+                  placeholder="Ej: Programa ConstruyeT, campaña de salud escolar"
                   value={school.previousPrograms}
                   onChange={(e) => setSchool({ ...school, previousPrograms: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
@@ -494,7 +494,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 <label style={{ display: 'block', fontWeight: 500, marginBottom: '6px', fontSize: '13px' }}>Instalaciones y Equipamiento Destacado</label>
                 <input
                   type="text"
-                  placeholder="Ej: Laboratorio de informática, taller de electricidad, cancha de usos múltiples, áreas verdes."
+                  placeholder="Ej: Aulas equipadas, biblioteca, cancha deportiva, área verde"
                   value={school.facilities}
                   onChange={(e) => setSchool({ ...school, facilities: e.target.value })}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--c-border)' }}

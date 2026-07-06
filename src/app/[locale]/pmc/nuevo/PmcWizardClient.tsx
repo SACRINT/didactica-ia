@@ -418,11 +418,11 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Nombre oficial del plantel *</label>
-                  <input style={inputStyle} value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="Ej: Bachillerato General Oficial 'Juan Aldama'" />
+                  <input style={inputStyle} value={schoolName} onChange={e => setSchoolName(e.target.value)} placeholder="Ej: Bachillerato General Oficial 'Lázaro Cárdenas'" />
                 </div>
                 <div>
                   <label style={labelStyle}>Clave de Centro de Trabajo (CCT) *</label>
-                  <input style={inputStyle} value={schoolCct} onChange={e => setSchoolCct(e.target.value.toUpperCase())} placeholder="Ej: 21EBH0799S" maxLength={12} />
+                  <input style={inputStyle} value={schoolCct} onChange={e => setSchoolCct(e.target.value.toUpperCase())} placeholder="Ej: 21EBH0000A" maxLength={12} />
                   <small style={{ color: 'var(--c-text-muted)', fontSize: '11px' }}>Formato: 21EBH0000X (10 caracteres)</small>
                 </div>
                 <div>
@@ -433,11 +433,11 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                 </div>
                 <div>
                   <label style={labelStyle}>Municipio *</label>
-                  <input style={inputStyle} value={municipality} onChange={e => setMunicipality(e.target.value)} placeholder="Ej: Jalpan" />
+                  <input style={inputStyle} value={municipality} onChange={e => setMunicipality(e.target.value)} placeholder="Ej: Zacapoaxtla" />
                 </div>
                 <div>
                   <label style={labelStyle}>Localidad / Comunidad *</label>
-                  <input style={inputStyle} value={locality} onChange={e => setLocality(e.target.value)} placeholder="Ej: Nuevo Zoquiapan" />
+                  <input style={inputStyle} value={locality} onChange={e => setLocality(e.target.value)} placeholder="Ej: San Marcos Tlacoyalco" />
                 </div>
                 <div>
                   <label style={labelStyle}>Zona Escolar</label>
