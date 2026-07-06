@@ -66,6 +66,13 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
           <span className="sidebar-link-icon">🏫</span>
           Proyectos PAEC-PEC
         </Link>
+        <Link
+          href={`/${locale}/pmc`}
+          className={`sidebar-link ${activeSection === 'pmc' ? 'active' : ''}`}
+        >
+          <span className="sidebar-link-icon">📈</span>
+          Plan de Mejora (PMC)
+        </Link>
       </aside>
 
       {/* Main content */}
