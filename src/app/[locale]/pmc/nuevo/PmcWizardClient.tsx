@@ -157,7 +157,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
   const [municipality, setMunicipality] = useState(existingProject?.municipality || teacherMunicipality || '');
   const [locality, setLocality] = useState(existingProject?.locality || '');
   const [schoolZone, setSchoolZone] = useState(existingProject?.school_zone || '');
-  const [directorName, setDirectorName] = useState(existingProject?.director_name || teacherName || '');
+  const [directorName, setDirectorName] = useState(existingProject?.director_name || '');
   const [supervisorName, setSupervisorName] = useState(existingProject?.supervisor_name || '');
   const [cicloEscolar, setCicloEscolar] = useState(existingProject?.ciclo_escolar || '2025-2026');
   const [subsystem, setSubsystem] = useState(existingProject?.subsystem || 'BGE');
