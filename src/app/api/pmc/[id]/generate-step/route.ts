@@ -289,80 +289,108 @@ Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO in
         .join('\n\n')
         .substring(0, 2000);
 
-      // categorias_priorizadas may be string[] like ['1','2','3'] or object[]
-      const CATEGORIA_NAMES: Record<string, string> = {
-        '1': 'Desarrollo académico y del aprendizaje',
-        '2': 'Gestión y administración escolar',
-        '3': 'Desarrollo socioemocional y prevención de la violencia',
-        '4': 'Proyectos educativos transversales',
-        '5': 'Indicadores académicos',
-        '6': 'Seguridad, convivencia y prevención',
-        '7': 'Seguimiento de egresados',
-      };
-      const rawCategorias = parseJson<unknown[]>(project.categorias_priorizadas);
-      const categoriasStr = Array.isArray(rawCategorias)
-        ? rawCategorias.map((c) => {
-            if (typeof c === 'string') return `- Categoría ${c}: ${CATEGORIA_NAMES[c] ?? 'Sin nombre'}`;
-            const obj = c as { id?: string; nombre?: string };
-            return `- Categoría ${obj.id ?? '?'}: ${obj.nombre ?? CATEGORIA_NAMES[obj.id ?? ''] ?? 'Sin nombre'}`;
-          }).join('\n')
+      // Parse the new CategoriaPriorizada[] format (with temas)
+      interface CategoriaPriorizadaAPI {
+        id?: string;
+        nombre?: string;
+        temas?: string[];
+      }
+      const rawCategorias = parseJson<CategoriaPriorizadaAPI[]>(project.categorias_priorizadas);
+      const categoriasList = Array.isArray(rawCategorias)
+        ? rawCategorias
+            .map((c) => {
+              const nombre = c.nombre ?? `Categoría ${c.id}`;
+              const temas = Array.isArray(c.temas) && c.temas.length > 0
+                ? c.temas.map((t) => `    • ${t}`).join('\n')
+                : '    • (sin temas específicos)';
+              return `- ${nombre}:\n${temas}`;
+            })
+            .join('\n')
         : 'No especificadas';
+
+      // Count total temas for proper instruction
+      const totalTemas = Array.isArray(rawCategorias)
+        ? rawCategorias.reduce((sum, c) => sum + (Array.isArray(c.temas) ? c.temas.length : 0), 0)
+        : 0;
 
       const staffData = parseJson<{ nombre?: string; cargo?: string }[]>(project.staff_data);
       const staffList = Array.isArray(staffData)
         ? staffData.map((s) => `- ${s.nombre ?? 'N/D'} — ${s.cargo ?? 'N/D'}`).join('\n')
         : 'No especificado';
 
-      const prompt = `Eres un experto en planeación de mejora continua para planteles BGE de Puebla bajo metodología SMART.
+      const prompt = `Eres un experto en planeación de Mejora Continua para planteles BGE de Puebla bajo los LINEAMIENTOS DBEPA 2025-2026.
 
-Plantel: ${safeStr(project.school_name)} | CCT: ${safeStr(project.school_cct)} | Ciclo: ${safeStr(project.ciclo_escolar)}
-Director(a): ${safeStr(project.director_name)}
+CONTEXTO DEL PLANTEL:
+- Nombre: ${safeStr(project.school_name)} | CCT: ${safeStr(project.school_cct)} | Ciclo: ${safeStr(project.ciclo_escolar)}
+- Director(a): ${safeStr(project.director_name)}
+- Municipio: ${safeStr(project.municipality)}, ${safeStr(project.locality)}
 
-Diagnóstico generado:
+DIAGNÓSTICO GENERADO:
 ${diagnosticoResumen}
 
-Indicadores actuales:
+INDICADORES:
 - Abandono: ${indic.abandono_ant ?? 'N/D'}% → Meta: ${indic.abandono_meta ?? 'N/D'}%
 - Aprobación: ${indic.aprobacion_ant ?? 'N/D'}% → Meta: ${indic.aprobacion_meta ?? 'N/D'}%
 - Eficiencia terminal: ${indic.et_ant ?? 'N/D'}% → Meta: ${indic.et_meta ?? 'N/D'}%
 
-Categorías priorizadas por el director:
-${categoriasStr}
+CATEGORÍAS Y TEMAS PRIORIZADOS POR EL DIRECTOR:
+${categoriasList}
 
-Personal del plantel (${project.total_staff ?? 0} trabajadores):
+PERSONAL DEL PLANTEL (${project.total_staff ?? 0} trabajadores):
 ${staffList}
 
-Instrucciones:
-1. Genera el Plan de Acción con al menos UNA meta por cada categoría priorizada, mínimo 3 metas en total.
-2. Para CADA TRABAJADOR del personal listado, genera su meta individual específica acorde a su cargo.
-3. Las metas deben ser SMART: verbo de resultado medible + porcentaje o número + plazo específico.
-4. Los entregables DEBEN ser documentos analíticos (informes, reportes, rúbricas), NUNCA solo fotografías o listas.
-5. Los períodos deben tener fechas específicas (mes/año), NO "permanente".
+═══════════════════════════════════════════
+INSTRUCCIONES OBLIGATORIAS:
+═══════════════════════════════════════════
 
-Responde con JSON con esta estructura:
+METAS INSTITUCIONALES:
+• Genera EXACTAMENTE UNA (1) meta institucional por cada TEMA (subcategoría) seleccionado.
+  - Total de temas seleccionados: ${totalTemas}. Debe haber ${totalTemas} metas institucionales.
+• CADA meta debe seguir la estructura de la Figura 2 (Lineamientos DBEPA):
+  - diagnostico_meta: Describe la problemática o necesidad detectada en el diagnóstico que justifica esta meta (2-3 oraciones)
+  - meta: Redacta la meta SMART siguiendo: VERBO DE ACCIÓN + QUÉ + INDICADOR CUANTITATIVO + PLAZO. Ejemplo: "Incrementar el porcentaje de aprobación del 72% al 82% al término del semestre B (junio 2026), mediante el seguimiento tutoral mensual de alumnos en riesgo."
+  - estrategia: Lista de 3-5 acciones concretas que implementará el plantel para alcanzar la meta.
+  - entregable (Producto): Documento o evidencia tangible que demuestran el resultado. NUNCA solo fotografías. Deben ser informes, reportes, rúbricas, actas, bitácoras, etc.
+  - periodo_inicio y periodo_fin: Fechas específicas en formato MM/YYYY (NO "permanente")
+  - personal_designado: Nombre y cargo del responsable principal
+  - linea_base: Valor actual medible del indicador
+
+METODOLOGÍA SMART OBLIGATORIA para cada meta:
+  ✓ Específica: delimitada con qué, quién, dónde, cuándo y por qué
+  ✓ Medible: con indicador numérico o porcentual
+  ✓ Alcanzable: realista con los recursos disponibles
+  ✓ Relevante: vinculada al diagnóstico y a las necesidades del plantel
+  ✓ Temporal: con fecha de inicio y fin definidas
+
+METAS PERSONALES:
+• Genera UNA meta personal para CADA trabajador del personal listado.
+• Cada meta personal debe ser congruente con el cargo de la persona y con al menos una categoría priorizada.
+• Aplicar también metodología SMART.
+
+Responde con JSON con esta estructura EXACTA:
 {
   "metas_institucionales": [
     {
       "categoria": "1",
-      "nombre_categoria": "Desarrollo académico y del aprendizaje",
-      "tema": "Indicadores académicos",
-      "meta": "Reducir el abandono escolar del X% al Y% al finalizar el ciclo ${safeStr(project.ciclo_escolar)}",
-      "estrategia": "Descripción de 3-4 acciones pedagógicas concretas",
-      "linea_base": "X% (ciclo 2024-2025)",
-      "personal_designado": "Nombre - Cargo",
-      "entregable": "Informe analítico de seguimiento académico con fichas individuales por alumno en riesgo",
+      "nombre_categoria": "Categoría 1: Desarrollo académico y aprendizaje",
+      "tema": "Nombre exacto del tema seleccionado",
+      "diagnostico_meta": "Problemática detectada en el diagnóstico que justifica esta meta...",
+      "meta": "Verbo + qué + indicador cuantitativo + plazo. Ej: Reducir el abandono escolar del 12% al 7% al cierre del ciclo 2025-2026 mediante estrategias de tutoría intensiva.",
+      "estrategia": "1. Acción concreta. 2. Acción concreta. 3. Acción concreta.",
+      "linea_base": "Valor actual del indicador (fuente)",
+      "personal_designado": "Nombre — Cargo",
+      "entregable": "Nombre del documento o evidencia documental tangible",
       "periodo_inicio": "08/2025",
-      "periodo_fin": "06/2026",
-      "diagnostico_meta": "Conexión entre el dato diagnóstico y la meta propuesta"
+      "periodo_fin": "06/2026"
     }
   ],
   "metas_personales": [
     {
       "nombre": "Nombre del trabajador",
-      "cargo": "Cargo",
-      "meta_individual": "Meta SMART específica para este cargo",
-      "estrategia": "Acciones específicas para este trabajador",
-      "entregable": "Evidencia documental específica para este cargo",
+      "cargo": "Cargo exacto",
+      "meta_individual": "Meta SMART específica para este cargo, con verbo + indicador + plazo",
+      "estrategia": "Acciones concretas que realizará esta persona",
+      "entregable": "Evidencia documental que aportará esta persona",
       "periodo": "agosto 2025 - junio 2026"
     }
   ]
@@ -373,7 +401,7 @@ Responde con JSON con esta estructura:
         messages: [
           {
             role: 'system',
-            content: 'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado.',
+            content: 'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado. Nunca omitas metas institucionales para los temas indicados.',
           },
           { role: 'user', content: prompt },
         ],
@@ -412,3 +440,4 @@ Responde con JSON con esta estructura:
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

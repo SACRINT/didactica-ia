@@ -82,7 +82,7 @@ interface PmcProject {
   staff_data?: StaffMember[];
   indicadores_academicos?: IndicadoresAcademicos;
   foda?: Foda;
-  categorias_priorizadas?: string[];
+  categorias_priorizadas?: CategoriaPriorizada[];
   diagnostico_comunidad?: string;
   normativa?: Record<string, string>;
   diagnostico_generado?: DiagnosticoGenerado;
@@ -102,14 +102,52 @@ interface Props {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORIAS = [
-  { id: '1', label: 'Categoría 1: Desarrollo académico y del aprendizaje' },
-  { id: '2', label: 'Categoría 2: Gestión y administración escolar' },
-  { id: '3', label: 'Categoría 3: Desarrollo socioemocional y prevención de la violencia' },
-  { id: '4', label: 'Categoría 4: Proyectos educativos transversales' },
-  { id: '5', label: 'Categoría 5: Indicadores académicos' },
-  { id: '6', label: 'Categoría 6: Seguridad, convivencia y prevención' },
-  { id: '7', label: 'Categoría 7: Seguimiento de egresados' },
+interface CategoriaPriorizada {
+  id: string;
+  nombre: string;
+  temas: string[];
+}
+
+const CATEGORIAS_OFICIALES = [
+  {
+    id: '1',
+    nombre: 'Categoría 1: Desarrollo académico y aprendizaje',
+    color: '#1a4a7a',
+    temas: [
+      'Formación y actualización docente',
+      'Propuestas pedagógicas',
+      'Trabajo colegiado',
+      'Proyecto Escolar Comunitario (PEC)',
+      'Movimiento Nacional por la Alfabetización y la Educación (MONAE)',
+      'Clubes de lectura',
+      'Indicadores académicos (reprobación, eficiencia terminal y abandono escolar)',
+      'Orientación y Tutoría',
+      'Planeación didáctica',
+      'Otras actividades académicas (proyectos escolares)',
+    ],
+  },
+  {
+    id: '2',
+    nombre: 'Categoría 2: Gestión y administración escolar',
+    color: '#2d6a2d',
+    temas: [
+      'Vinculación con instituciones educativas',
+      'Vinculación con empresas, fundaciones e instituciones públicas',
+      'Gestión y administración de recursos, equipamiento y servicios',
+      'Seguimiento al desempeño docente en el aula',
+      'Seguimiento de egresados',
+    ],
+  },
+  {
+    id: '3',
+    nombre: 'Categoría 3: Desarrollo socioemocional y prevención de la violencia',
+    color: '#7a1a1a',
+    temas: [
+      'Ámbitos de formación socioemocional (Currículum Ampliado)',
+      'Estrategias, programas y/o proyectos sobre violencia',
+      'Orientación educativa',
+    ],
+  },
 ];
 
 const CARGOS_COMUNES = [
@@ -182,7 +220,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
   const [foda, setFoda] = useState<Foda>(
     existingProject?.foda || { fortalezas: '', oportunidades: '', debilidades: '', amenazas: '' }
   );
-  const [categoriasPriorizadas, setCategoriasPriorizadas] = useState<string[]>(
+  const [categoriasPriorizadas, setCategoriasPriorizadas] = useState<CategoriaPriorizada[]>(
     existingProject?.categorias_priorizadas || []
   );
 
@@ -278,11 +316,30 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
     });
   };
 
-  const toggleCategoria = (id: string) => {
-    setCategoriasPriorizadas(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-    );
+  // Toggle categoria (activa/desactiva la categoría completa)
+  const toggleCategoria = (cat: typeof CATEGORIAS_OFICIALES[0]) => {
+    setCategoriasPriorizadas(prev => {
+      const exists = prev.find(c => c.id === cat.id);
+      if (exists) return prev.filter(c => c.id !== cat.id);
+      return [...prev, { id: cat.id, nombre: cat.nombre, temas: [] }];
+    });
   };
+
+  // Toggle tema dentro de una categoría
+  const toggleTema = (catId: string, tema: string) => {
+    setCategoriasPriorizadas(prev => prev.map(c => {
+      if (c.id !== catId) return c;
+      const temas = c.temas.includes(tema)
+        ? c.temas.filter(t => t !== tema)
+        : [...c.temas, tema];
+      return { ...c, temas };
+    }));
+  };
+
+  const isCatSelected = (id: string) => categoriasPriorizadas.some(c => c.id === id);
+  const isTemaSelected = (catId: string, tema: string) =>
+    categoriasPriorizadas.find(c => c.id === catId)?.temas.includes(tema) ?? false;
+  const totalTemasSeleccionados = categoriasPriorizadas.reduce((sum, c) => sum + c.temas.length, 0);
 
   // ── Step navigation ────────────────────────────────────────────────────────
 
@@ -312,8 +369,8 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         setError('Por favor describe el contexto de la comunidad.');
         return;
       }
-      if (categoriasPriorizadas.length === 0) {
-        setError('Selecciona al menos una categoría a priorizar.');
+      if (categoriasPriorizadas.length === 0 || totalTemasSeleccionados === 0) {
+        setError('Selecciona al menos una categoría y al menos un tema a priorizar.');
         return;
       }
       idToUse = await saveProject({
@@ -670,29 +727,69 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
               </div>
             </div>
 
-            {/* Categorías priorizadas */}
+            {/* Categorías y Temas Priorizados */}
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '8px' }}>🎯 Categorías a Priorizar *</h3>
-              <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', marginBottom: '16px' }}>
-                Selecciona las categorías que abordarás en este PMC. Debes elegir al menos 3. La IA generará metas para cada una.
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '4px' }}>🎯 Categorías y Temas a Priorizar *</h3>
+              <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', marginBottom: '8px' }}>
+                Según los <strong>Lineamientos DBEPA 2025-2026</strong>, el PMC se organiza en <strong>3 categorías oficiales</strong>. Selecciona la(s) categoría(s) y marca los <strong>temas específicos</strong> que tu plantel abordará. La IA generará metas SMART (con Diagnóstico → Meta → Estrategia → Producto) para cada tema seleccionado.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {CATEGORIAS.map(cat => (
-                  <label key={cat.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${categoriasPriorizadas.includes(cat.id) ? 'var(--c-navy)' : 'var(--c-border)'}`, background: categoriasPriorizadas.includes(cat.id) ? 'var(--c-blue-pale)' : '#fff', transition: 'all 0.15s' }}>
-                    <input
-                      type="checkbox"
-                      checked={categoriasPriorizadas.includes(cat.id)}
-                      onChange={() => toggleCategoria(cat.id)}
-                      style={{ marginTop: '2px', accentColor: 'var(--c-navy)', width: '16px', height: '16px', flexShrink: 0 }}
-                    />
-                    <span style={{ fontSize: '14px', fontWeight: categoriasPriorizadas.includes(cat.id) ? 700 : 400 }}>{cat.label}</span>
-                  </label>
-                ))}
+              {/* Nota metodológica SMART */}
+              <div style={{ background: '#f0f7ff', border: '1px solid #c8dff5', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#1a4a7a' }}>
+                <strong>📐 Metodología SMART:</strong> Cada meta que genere la IA será: <em>Específica · Medible · Alcanzable · Relevante · Temporal</em> — siguiendo la estructura: <strong>Diagnóstico → Meta → Estrategia → Producto</strong>
               </div>
-              {categoriasPriorizadas.length > 0 && (
-                <p style={{ fontSize: '13px', color: 'var(--c-navy)', marginTop: '12px', fontWeight: 600 }}>
-                  ✓ {categoriasPriorizadas.length} categoría(s) seleccionada(s) — se generará al menos 1 meta institucional por categoría
-                </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {CATEGORIAS_OFICIALES.map(cat => {
+                  const selected = isCatSelected(cat.id);
+                  const temasSeleccionados = categoriasPriorizadas.find(c => c.id === cat.id)?.temas ?? [];
+                  return (
+                    <div key={cat.id} style={{ border: `2px solid ${selected ? cat.color : 'var(--c-border)'}`, borderRadius: '10px', overflow: 'hidden', transition: 'all 0.2s' }}>
+                      {/* Categoría header */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', background: selected ? `${cat.color}18` : '#fafafa', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleCategoria(cat)}
+                          style={{ width: '18px', height: '18px', accentColor: cat.color, flexShrink: 0 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: selected ? cat.color : 'var(--c-text)' }}>{cat.nombre}</span>
+                          {selected && temasSeleccionados.length > 0 && (
+                            <span style={{ marginLeft: '10px', fontSize: '11px', background: cat.color, color: '#fff', borderRadius: '20px', padding: '2px 8px' }}>
+                              {temasSeleccionados.length} tema(s)
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                      {/* Temas (subcategorías) — solo visibles si la categoría está seleccionada */}
+                      {selected && (
+                        <div style={{ padding: '8px 16px 14px 48px', background: '#fff', borderTop: `1px solid ${cat.color}30` }}>
+                          <p style={{ fontSize: '11px', color: 'var(--c-text-muted)', marginBottom: '8px', fontStyle: 'italic' }}>
+                            Selecciona los temas específicos que trabajará tu plantel en esta categoría:
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {cat.temas.map(tema => (
+                              <label key={tema} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: isTemaSelected(cat.id, tema) ? cat.color : 'var(--c-text)', fontWeight: isTemaSelected(cat.id, tema) ? 600 : 400 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isTemaSelected(cat.id, tema)}
+                                  onChange={() => toggleTema(cat.id, tema)}
+                                  style={{ width: '14px', height: '14px', marginTop: '2px', accentColor: cat.color, flexShrink: 0 }}
+                                />
+                                {tema}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Resumen */}
+              {totalTemasSeleccionados > 0 && (
+                <div style={{ marginTop: '14px', padding: '10px 14px', background: '#e8f4e8', borderRadius: '8px', fontSize: '13px', color: '#2d6a2d', fontWeight: 600 }}>
+                  ✅ {categoriasPriorizadas.length} categoría(s) · {totalTemasSeleccionados} tema(s) seleccionado(s) — la IA generará una meta SMART por cada tema
+                </div>
               )}
             </div>
           </div>
