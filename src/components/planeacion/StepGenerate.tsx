@@ -77,6 +77,20 @@ export default function StepGenerate({
         }
       }
 
+      // Check if server sent an error marker through the stream
+      if (accumulatedText.startsWith('__ERROR__:')) {
+        const rawError = accumulatedText.replace('__ERROR__:', '').trim();
+        // Translate common Gemini API errors to readable Spanish messages
+        if (rawError.includes('429') || rawError.toLowerCase().includes('quota')) {
+          throw new Error(
+            'Se agotó la cuota diaria de la API de Google AI. ' +
+            'El plan gratuito permite hasta 1,500 generaciones por día. ' +
+            'Por favor intenta mañana o revisa tu plan en ai.google.dev.'
+          );
+        }
+        throw new Error(rawError);
+      }
+
       // Simple validation of the final JSON result structure
       try {
         const cleanJson = accumulatedText

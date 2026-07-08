@@ -78,8 +78,11 @@ export async function POST(
 
           controller.close();
         } catch (streamErr) {
-          console.error('Stream generation error:', streamErr);
-          controller.error(streamErr);
+          const errMsg = streamErr instanceof Error ? streamErr.message : 'Error desconocido al generar';
+          console.error('Stream generation error:', errMsg);
+          // Send the error as a readable marker through the stream so the frontend can show it
+          controller.enqueue(encoder.encode(`__ERROR__:${errMsg}`));
+          controller.close();
         }
       }
     });
