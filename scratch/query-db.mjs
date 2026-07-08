@@ -11,7 +11,7 @@ async function main() {
     const rows = await sql`
       SELECT id, uac_name, component, activities, contenidos_formativos
       FROM programs_catalog
-      WHERE uac_name = 'Ciencias Sociales I';
+      WHERE uac_name = 'Pensamiento Matemático I';
     `;
     console.log(JSON.stringify(rows[0], null, 2));
   } catch (err) {

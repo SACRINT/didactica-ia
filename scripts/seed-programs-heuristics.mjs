@@ -375,6 +375,7 @@ function parseUacsFromText(text, component, curriculumName) {
       const semester = 1;
 
       const activities = [];
+      const contenidosFormativos = [];
       const purposesRegex = /\b([1-8])\s+([A-ZÁÉÍÓÚÑ][\s\S]+?)(?=\s*(?:\b[1-8]\s+[A-ZÁÉÍÓÚÑ]|\bMeta\b|\bOrientaciones\b|=== PAGE|$))/g;
       const actMatches = [...uacBlock.matchAll(purposesRegex)];
       const seen = new Set();
@@ -394,10 +395,24 @@ function parseUacsFromText(text, component, curriculumName) {
           'Bachillerato', 'Secretaría de'
         ].some(word => name.toUpperCase().includes(word.toUpperCase()));
         
-        const cleanName = removeHyphens(extractPurposeOnly(name));
-        if (isEducational && cleanName.length > 25 && !isFalsePositive && !seen.has(cleanName)) {
-          seen.add(cleanName);
-          activities.push({ name: cleanName.substring(0, 250), order });
+        const cleanPurpose = removeHyphens(extractPurposeOnly(name));
+        if (isEducational && cleanPurpose.length > 25 && !isFalsePositive && !seen.has(cleanPurpose)) {
+          seen.add(cleanPurpose);
+          activities.push({ name: cleanPurpose.substring(0, 250), order });
+
+          // Extract contenidos formativos (topics)
+          const restText = name.slice(extractPurposeOnly(name).length).trim();
+          const rawTopics = restText.split(/(?=\b[A-ZÁÉÍÓÚÑ][a-záéíóúñü])/);
+          const cleanTopics = rawTopics
+            .map(t => removeHyphens(t.trim()))
+            .filter(t => t.length > 5 && !t.toUpperCase().includes('HORAS') && !t.toUpperCase().includes('META') && !t.toUpperCase().includes('TABLA'));
+
+          contenidosFormativos.push({
+            proposito: cleanPurpose.substring(0, 250),
+            hours: 18,
+            order,
+            contenidos: cleanTopics
+          });
         }
       });
 
@@ -409,6 +424,9 @@ function parseUacsFromText(text, component, curriculumName) {
         activities.forEach((act, idx) => {
           act.hours = baseHours + (idx < remainder ? 1 : 0);
         });
+        contenidosFormativos.forEach((cf, idx) => {
+          cf.hours = baseHours + (idx < remainder ? 1 : 0);
+        });
       }
 
       uacs.push({
@@ -419,7 +437,8 @@ function parseUacsFromText(text, component, curriculumName) {
         learningOutcome: `Desarrollar capacidades socioemocionales en el ámbito de ${current.subjectAndRoman}`,
         activities,
         evidences: ['Bitácora de registro', 'Autoevaluación formativa', 'Proyecto comunitario'],
-        totalHours
+        totalHours,
+        contenidosFormativos
       });
     }
   } else {
@@ -500,6 +519,7 @@ function parseUacsFromText(text, component, curriculumName) {
       
       // Activities (Propósitos y contenidos formativos)
       const activities = [];
+      const contenidosFormativos = [];
       
       const purposesRegex = /\b([1-8])\s+([A-ZÁÉÍÓÚÑ][\s\S]+?)(?=\s*(?:\b[1-8]\s+[A-ZÁÉÍÓÚÑ]|\bMeta\b|\bOrientaciones\b|=== PAGE|$))/g;
       const actMatches = [...uacBlock.matchAll(purposesRegex)];
@@ -525,18 +545,30 @@ function parseUacsFromText(text, component, curriculumName) {
           'Bachillerato', 'Secretaría de'
         ].some(word => name.toUpperCase().includes(word.toUpperCase()));
         
-        const cleanName = removeHyphens(extractPurposeOnly(name));
-        if (isEducational && cleanName.length > 25 && !isFalsePositive && !seen.has(cleanName)) {
-          seen.add(cleanName);
-          activities.push({ name: cleanName.substring(0, 250), hours: 18, order });
+        const cleanPurpose = removeHyphens(extractPurposeOnly(name));
+        if (isEducational && cleanPurpose.length > 25 && !isFalsePositive && !seen.has(cleanPurpose)) {
+          seen.add(cleanPurpose);
+          activities.push({ name: cleanPurpose.substring(0, 250), hours: 18, order });
+
+          // Extract contenidos formativos (topics)
+          const restText = name.slice(extractPurposeOnly(name).length).trim();
+          const rawTopics = restText.split(/(?=\b[A-ZÁÉÍÓÚÑ][a-záéíóúñü])/);
+          const cleanTopics = rawTopics
+            .map(t => removeHyphens(t.trim()))
+            .filter(t => t.length > 5 && !t.toUpperCase().includes('HORAS') && !t.toUpperCase().includes('META') && !t.toUpperCase().includes('TABLA'));
+
+          contenidosFormativos.push({
+            proposito: cleanPurpose.substring(0, 250),
+            hours: 18,
+            order,
+            contenidos: cleanTopics
+          });
         }
       });
 
       // Sort by order
       activities.sort((a, b) => a.order - b.order);
-
-      // Fallback activities are not added here to allow correct deduplication.
-      // They are added at the end before database insertion if still empty.
+      contenidosFormativos.sort((a, b) => a.order - b.order);
 
       // Distribute total UAC hours among purposes
       const totalHours = extractTotalHours(uacBlock);
@@ -546,6 +578,9 @@ function parseUacsFromText(text, component, curriculumName) {
         const remainder = totalHours % count;
         activities.forEach((act, idx) => {
           act.hours = baseHours + (idx < remainder ? 1 : 0);
+        });
+        contenidosFormativos.forEach((cf, idx) => {
+          cf.hours = baseHours + (idx < remainder ? 1 : 0);
         });
       }
 
@@ -566,7 +601,8 @@ function parseUacsFromText(text, component, curriculumName) {
           learningOutcome: removeHyphens(learningOutcome) || `Desarrollar propósitos y contenidos formativos para ${uacName}`,
           activities,
           evidences: ['Portafolio de evidencias', 'Evaluación formativa', 'Proyecto integrador'],
-          totalHours
+          totalHours,
+          contenidosFormativos
         });
       }
     }
@@ -729,7 +765,7 @@ async function seed() {
       await sql`
         INSERT INTO programs_catalog (
           uac_name, semester, component, curriculum_name, year,
-          total_hours, learning_outcome, activities, evidences
+          total_hours, learning_outcome, activities, evidences, contenidos_formativos
         )
         VALUES (
           ${uac.uacName},
@@ -740,7 +776,8 @@ async function seed() {
           ${uac.totalHours},
           ${uac.learningOutcome},
           ${JSON.stringify(uac.activities)},
-          ${JSON.stringify(uac.evidences)}
+          ${JSON.stringify(uac.evidences)},
+          ${JSON.stringify(uac.contenidosFormativos || [])}
         )
         ON CONFLICT (uac_name) DO UPDATE SET
           semester = EXCLUDED.semester,
@@ -750,7 +787,8 @@ async function seed() {
           total_hours = EXCLUDED.total_hours,
           learning_outcome = EXCLUDED.learning_outcome,
           activities = EXCLUDED.activities,
-          evidences = EXCLUDED.evidences
+          evidences = EXCLUDED.evidences,
+          contenidos_formativos = EXCLUDED.contenidos_formativos
       `;
       count++;
     } catch (err) {
