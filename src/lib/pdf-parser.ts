@@ -135,15 +135,24 @@ Analiza el siguiente texto extraído de un programa de estudios oficial y extrae
   "activities": [
     { "name": "Nombre literal de la Actividad Clave o del Propósito Formativo X", "hours": número de horas dosificadas, "order": 1 }
   ],
-  "evidences": ["evidencia o producto esperado literal del programa"]
+  "evidences": ["evidencia o producto esperado literal del programa"],
+  "contenidosFormativos": [
+    {
+      "proposito": "Nombre literal y exacto del Propósito Formativo X",
+      "contenidos": [
+        "Tema o contenido formativo 1",
+        "Tema o contenido formativo 2"
+      ]
+    }
+  ]
 }
 
 REGLAS ABSOLUTAS DE EXTRACCIÓN Y CALIDAD:
-1. COPIA VERBATIM (LITERAL): Copia el nombre de la UAC, el Resultado de aprendizaje, los Propósitos Formativos / Actividades Clave y las Evidencias EXACTAMENTE palabra por palabra, tal como aparecen escritos en el documento original.
+1. COPIA VERBATIM (LITERAL): Copia el nombre de la UAC, el Resultado de aprendizaje, los Propósitos Formativos / Actividades Clave, los Contenidos Formativos (temas) y las Evidencias EXACTAMENTE palabra por palabra, tal como aparecen escritos en el documento original.
 2. PROHIBIDO PARAFRASEAR: Queda estrictamente prohibido resumir, acortar, simplificar, reescribir, traducir o inventar palabras. El texto extraído debe ser idéntico al del PDF original.
 3. DETECCIÓN DE ACTIVIDADES / PROPÓSITOS:
    - Si es una UAC de Formación Laboral, extrae las "Actividades Clave" verbatim.
-   - Si es una UAC de Currículum Fundamental o Ampliado (como Pensamiento Matemático, Ciencias, Lengua, etc.), extrae cada uno de los "Propósitos formativos" literales (ej: "Aplica conceptos básicos de lógica matemática...", "Comprende el concepto de conteo...", etc.) que se listan en las tablas o secciones principales.
+   - Si es una UAC de Currículum Fundamental o Ampliado (como Pensamiento Matemático, Ciencias, Lengua, etc.), extrae cada uno de los "Propósitos formativos" y asóciales sus "Contenidos Formativos" (temas o contenidos específicos) verbatim en el campo "contenidosFormativos".
 4. Si hay múltiples UACs o programas en el texto, extrae únicamente la información de la primera.
 5. Responde exclusivamente con el JSON, sin agregar explicaciones ni markdown.
 

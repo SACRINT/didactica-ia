@@ -7,8 +7,24 @@ export function buildUserPrompt(
   component: string
 ): string {
   const activitiesText = extractedData.activities
-    .map((a, i) => `  ${i + 1}. ${a.name} (${a.hours} horas)`)
-    .join('\n');
+    .map((a, i) => {
+      let text = `  ${i + 1}. ${a.name} (${a.hours} horas)`;
+      
+      // If catalog has loaded topics / contenidos formativos for this propósito, pass them to Gemini
+      if (extractedData.contenidosFormativos && Array.isArray(extractedData.contenidosFormativos)) {
+        // Find matching purpose object
+        const match = extractedData.contenidosFormativos.find((cf: any) => 
+          cf.proposito === a.name || 
+          (cf.proposito && cf.proposito.substring(0, 50) === a.name.substring(0, 50))
+        );
+        if (match && Array.isArray(match.contenidos) && match.contenidos.length > 0) {
+          text += `\n     [Contenidos Formativos / Temas Oficiales para esta unidad]:\n` + 
+                  match.contenidos.map((t: string) => `       - ${t}`).join('\n');
+        }
+      }
+      return text;
+    })
+    .join('\n\n');
 
   const evidencesText =
     extractedData.evidences.length > 0

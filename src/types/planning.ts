@@ -21,6 +21,7 @@ export interface ExtractedPdfData {
   rawText?: string;
   parseConfidence: 'high' | 'medium' | 'low' | 'failed';
   year?: number;
+  contenidosFormativos?: any;
 }
 
 export interface TeacherContext {

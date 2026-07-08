@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS programs_catalog (
   learning_outcome TEXT NOT NULL,
   activities       JSONB NOT NULL,    -- Array of KeyActivity
   evidences        JSONB NOT NULL,    -- Array of strings
+  contenidos_formativos JSONB,        -- Array of objects containing propósito + temas/contenidos
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

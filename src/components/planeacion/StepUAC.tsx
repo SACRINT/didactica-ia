@@ -239,6 +239,7 @@ export default function StepUAC({ onNext }: Props) {
         evidences: selectedCatalogUac.evidences,
         parseConfidence: 'high',
         year: selectedCatalogUac.year,
+        contenidosFormativos: selectedCatalogUac.contenidos_formativos,
       };
       onNext(form, initialData);
     }
