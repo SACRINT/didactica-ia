@@ -15,7 +15,7 @@ type GenStep = 'preparing' | 'sending' | 'generating' | 'building' | 'done';
 
 const GEN_STEPS: { key: GenStep; label: string }[] = [
   { key: 'preparing',  label: 'Preparando el contexto' },
-  { key: 'sending',    label: 'Enviando a Claude Haiku 4.5' },
+  { key: 'sending',    label: 'Enviando información...' },
   { key: 'generating', label: 'Generando las 7 secciones del formato DBEPA' },
   { key: 'building',   label: 'Construyendo el documento' },
   { key: 'done',       label: '¡Planeación lista!' },
@@ -106,7 +106,7 @@ export default function StepGenerate({
         <p className="generation-subtitle">
           {currentStep === 'done'
             ? 'Tu planeación didáctica está lista para descargar en formato DOCX editable.'
-            : 'Claude está construyendo las 7 secciones del formato oficial DBEPA 2026-2027.'}
+            : 'La inteligencia artificial está construyendo las 7 secciones del formato oficial DBEPA 2026-2027.'}
         </p>
 
         <div className="generation-steps">

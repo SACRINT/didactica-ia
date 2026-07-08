@@ -801,7 +801,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
               {generating ? (
                 <>
                   <span className="spinner" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-                  Generando con Claude Haiku 4.5 (Toma unos segundos)...
+                  Generando con Inteligencia Artificial (Toma unos segundos)...
                 </>
               ) : (
                 <>Generar Fase con IA ✨</>
