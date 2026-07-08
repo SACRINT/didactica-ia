@@ -23,12 +23,13 @@ SECCIÓN III — TRANSVERSALIDAD
 Contiene: vinculación con el Currículum Fundamental (Lengua y Comunicación, Pensamiento Matemático, Cultura Digital, Ciencias Naturales Experimentales y Tecnología, Ciencias Sociales, Humanidades) y con el Currículum Ampliado (Habilidades para la Vida y el Trabajo — HVyT, y Conceptos Centrales de la Educación para el Desarrollo Sostenible — CoCEDS). Para cada elemento describe brevemente cómo la UAC se vincula con él.
 
 SECCIÓN IV — DISEÑO DE ESCENARIOS DE APRENDIZAJE (SECUENCIA DE ACTIVIDADES DIDÁCTICAS)
-Contiene: una secuencia completa para CADA Actividad Clave, con las tres fases:
+Contiene: una secuencia completa para CADA Actividad Clave (si es laboral) o para CADA Propósito Formativo (si no es laboral), con las tres fases:
   - APERTURA: Actividad detonadora (situación problema, caso real, objeto cotidiano). Activa conocimientos previos.
   - EJECUCIÓN/DESARROLLO: Actividades paso a paso por sesiones. OBLIGATORIO usar EXCLUSIVAMENTE metodologías activas.
   - CONCLUSIÓN/CIERRE: Presentación de resultados, reflexión metacognitiva, entrega de evidencias.
+  - OBLIGATORIO PARA ASIGNATURAS NO LABORALES (Currículum Fundamental o Ampliado): Debes especificar el "contenidoFormativo" (el tema de estudio específico del programa de estudios, por ejemplo: 'Tablas de verdad' o 'Sistemas de conteo') para el cual se diseñó la secuencia didáctica, vinculándolo a su Propósito Formativo correspondiente.
 
-METODOLOGÍAS ACTIVAS OBLIGATORIAS (usar al menos una por Actividad Clave):
+METODOLOGÍAS ACTIVAS OBLIGATORIAS (usar al menos una por Actividad Clave o Propósito Formativo):
   • Aprendizaje Basado en Proyectos (ABP): proyecto integrador con producto final real
   • Simulación / Juego de roles: escenificación de situaciones reales del campo laboral
   • Método de Casos: análisis de situaciones reales o ficticias del área profesional
@@ -63,7 +64,9 @@ ESPECIFICACIONES DE EVALUACIÓN PARA FORMACIÓN LABORAL:
 - Ponderación de Evaluación Recomendada: El conjunto de las fases de Desarrollo debe ponderarse entre 50% y 65% del total de la UAC, y las fases de Cierre/Simulación entre 20% y 35% (por ejemplo: Apertura 15%, Desarrollo 50%, Cierre 35%).
 
 SECCIÓN VI — RECURSOS, MATERIALES Y ESPACIOS DIDÁCTICOS
-Contiene: materiales que los estudiantes traen de casa, materiales recomendados de papelería, software e infraestructura de taller, TICCAD/recursos digitales (celular, internet, aplicaciones gratuitas), espacios de aprendizaje (aula, campo, sector productivo), fuentes de consulta oficiales. Debe incluir de forma explícita una sección de Bibliografía Básica (con autor, título, editorial) y Bibliografía Complementaria/Digital (con ligas a NOMs u otras fuentes oficiales).
+Contiene: materiales que los estudiantes traen de casa, materiales pedagógicos elaborados por el docente, software e infraestructura de taller, TICCAD/recursos digitales (celular, internet, aplicaciones gratuitas), espacios de aprendizaje (aula, campo, sector productivo), fuentes de consulta oficiales.
+  - DIRECTRIZ CRÍTICA DE MATERIALES DEL DOCENTE (teacherMaterials): Debes proponer únicamente materiales didácticos o recursos impresos/digitales creados o diseñados pedagógicamente por el docente para dar la clase (ej. infografías temáticas, presentaciones de diapositivas diseñadas por él, hojas de trabajo impresas, guías de lectura, manuales de prácticas, rúbricas de evaluación físicas, etc.).
+  - PROHIBICIÓN ESTRICTA: Queda TOTALMENTE PROHIBIDO colocar en "teacherMaterials" recursos de infraestructura física o hardware del plantel (como proyector, computadora, conexión a internet, pizarrones o marcadores), aunque el docente los utilice. Estos elementos de infraestructura escolar deben colocarse únicamente bajo la categoría de recursos digitales (digital) o espacios (spaces).
 
 SECCIÓN VII — VALIDACIÓN Y FIRMAS
 Siempre vacía — solo encabezados: Elaboró / Revisó (Coordinador/a) / Autorizó (Director/a del Plantel).
@@ -89,7 +92,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
   },
   "sectionII": {
     "purpose": "string (2-4 oraciones, contextualizado a Puebla y vinculándolo explícitamente con otras asignaturas del mismo semestre)",
-    "learningOutcomes": ["string por cada Actividad Clave"],
+    "learningOutcomes": ["string por cada Actividad Clave o Propósito Formativo"],
     "paecConnection": "string (describe cómo la UAC aborda la problemática del PAEC)",
     "activities": [{"name": "string", "hours": number, "order": number, "corte": "Corte 1 | Corte 2 | Corte 3"}]
   },
@@ -111,13 +114,14 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
     "note": "string",
     "activities": [
       {
-        "name": "string",
+        "name": "string (Nombre exacto de la Actividad Clave si es laboral, o del Propósito Formativo si no es laboral)",
+        "contenidoFormativo": "string (OBLIGATORIO si no es laboral: Nombre exacto del Contenido Formativo o tema del programa para el cual se diseña la secuencia, por ejemplo: 'Tablas de verdad')",
         "hours": number,
         "methodology": "string (nombre de la metodología activa usada)",
         "apertura": {
           "activities": "string (descripción detallada de la actividad detonadora)",
           "processes": "string (procesos de pensamiento activados)",
-          "materials": "string (materiales y recursos)"
+          "materials": "string (materiales y recursos del estudiante)"
         },
         "ejecucion": {
           "activities": "string (descripción detallada paso a paso por sesiones)",
@@ -147,8 +151,8 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura exac
   },
   "sectionVI": {
     "studentMaterials": ["string"],
-    "teacherMaterials": ["string"],
-    "digital": ["string"],
+    "teacherMaterials": ["string (OBLIGATORIO: Proponer únicamente materiales creados o elaborados físicamente/digitalmente por el docente como infografías, presentaciones, hojas de trabajo, guías, rúbricas impresas, etc. PROHIBIDO proponer proyectores, computadoras, internet, pizarrones o marcadores aquí)"],
+    "digital": ["string (Aquí sí debes colocar recursos del plantel como proyectores, computadoras, internet, plataformas de aprendizaje y simuladores)"],
     "spaces": ["string"],
     "references": ["string (referencias formales: básica con autor, título, editorial, y complementaria/digital con ligas a NOMs oficiales u otros)"]
   },

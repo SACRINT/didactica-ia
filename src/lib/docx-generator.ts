@@ -282,23 +282,40 @@ function buildActivityTable(activity: GeneratedPlanningContent['sectionIV']['act
     });
   }
 
+  const label = isLaboral ? 'ACTIVIDAD CLAVE' : 'PROPÓSITO FORMATIVO';
+  const rows: TableRow[] = [
+    new TableRow({ children: [tcH(`${label}: ${activity.name} (${activity.hours} horas)`, { w: CONTENT, span: 4, align: AlignmentType.CENTER, size: 19 })] }),
+  ];
+
+  // If it's not laboral and has a defined Contenido Formativo, add a row for it
+  const actAny = activity as any;
+  if (!isLaboral && actAny.contenidoFormativo) {
+    rows.push(new TableRow({
+      children: [
+        new TableCell({ columnSpan: 1, shading: { fill: C.mid, type: ShadingType.CLEAR }, borders: bdr(), margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Tema / Contenido:', bold: true, size: 17, color: C.white, font: 'Arial' })] })] }),
+        new TableCell({ columnSpan: 3, shading: { fill: C.alt, type: ShadingType.CLEAR }, borders: bdr(), margins: CELLMRG, children: [new Paragraph({ children: [new TextRun({ text: actAny.contenidoFormativo, bold: true, size: 18, font: 'Arial', color: C.dark })] })] })
+      ]
+    }));
+  }
+
+  rows.push(
+    new TableRow({ children: [new TableCell({ columnSpan: 1, shading: { fill: C.mid, type: ShadingType.CLEAR }, borders: bdr(), margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Metodología:', bold: true, size: 17, color: C.white, font: 'Arial' })] })] }), new TableCell({ columnSpan: 3, shading: { fill: C.alt, type: ShadingType.CLEAR }, borders: bdr(), margins: CELLMRG, children: [new Paragraph({ children: [new TextRun({ text: activity.methodology, bold: true, size: 18, font: 'Arial', color: C.dark })] })] })] }),
+    new TableRow({ children: [tcM('Fase /\nMomento', { w: cols[0], align: AlignmentType.CENTER }), tcM('Actividades del Estudiante\n(Metodologías Activas)', { w: cols[1] }), tcM('Procesos de Pensamiento /\nConstrucción o Resignificación', { w: cols[2] }), tcM('Materiales /\nRecursos Didácticos', { w: cols[3] })] }),
+    phaseRow('APER-\nTURA', C.apertura, activity.apertura),
+    phaseRow('DESA-\nRROLLO', C.ejecucion, activity.ejecucion),
+    phaseRow('CIERRE', C.conclusion, activity.conclusion)
+  );
+
   return new Table({
     width: { size: CONTENT, type: WidthType.DXA },
     columnWidths: cols,
-    rows: [
-      new TableRow({ children: [tcH(`${isLaboral ? 'ACTIVIDAD CLAVE' : 'PROPÓSITO o CONTENIDO FORMATIVO'}: ${activity.name} (${activity.hours} horas)`, { w: CONTENT, span: 4, align: AlignmentType.CENTER, size: 19 })] }),
-      new TableRow({ children: [new TableCell({ columnSpan: 1, shading: { fill: C.mid, type: ShadingType.CLEAR }, borders: bdr(), margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Metodología:', bold: true, size: 17, color: C.white, font: 'Arial' })] })] }), new TableCell({ columnSpan: 3, shading: { fill: C.alt, type: ShadingType.CLEAR }, borders: bdr(), margins: CELLMRG, children: [new Paragraph({ children: [new TextRun({ text: activity.methodology, bold: true, size: 18, font: 'Arial', color: C.dark })] })] })] }),
-      new TableRow({ children: [tcM('Fase /\nMomento', { w: cols[0], align: AlignmentType.CENTER }), tcM('Actividades del Estudiante\n(Metodologías Activas)', { w: cols[1] }), tcM('Procesos de Pensamiento /\nConstrucción o Resignificación', { w: cols[2] }), tcM('Materiales /\nRecursos Didácticos', { w: cols[3] })] }),
-      phaseRow('APER-\nTURA', C.apertura, activity.apertura),
-      phaseRow('DESA-\nRROLLO', C.ejecucion, activity.ejecucion),
-      phaseRow('CIERRE', C.conclusion, activity.conclusion),
-    ],
+    rows: rows,
   });
 }
 
 function buildSectionIV(content: GeneratedPlanningContent): (Paragraph | Table)[] {
   const isLaboral = content.sectionI.component?.toLowerCase().includes('laboral') || false;
-  const label = isLaboral ? 'ACTIVIDAD CLAVE' : 'PROPÓSITO o CONTENIDO FORMATIVO';
+  const label = isLaboral ? 'ACTIVIDAD CLAVE' : 'PROPÓSITO FORMATIVO';
 
   const elements: (Paragraph | Table)[] = [
     secHeading('IV. DISEÑO DE ESCENARIOS DE APRENDIZAJE (SECUENCIA DE ACTIVIDADES DIDÁCTICAS)'),

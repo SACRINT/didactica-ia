@@ -52,6 +52,7 @@ export interface ActivityPhase {
 
 export interface KeyActivityPlan {
   name: string;
+  contenidoFormativo?: string;
   hours: number;
   methodology: string;
   apertura: ActivityPhase;

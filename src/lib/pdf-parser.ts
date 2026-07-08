@@ -124,27 +124,28 @@ async function structureWithGemini(rawText: string): Promise<PdfParseResult> {
   // Truncate text to ~6000 chars (first pages have the important info)
   const excerpt = rawText.slice(0, 6000);
 
-  const prompt = `Eres un experto en programas de estudio del bachillerato mexicano (MCCEMS/DBEPA 2025-2026).
+  const prompt = `Eres un experto en programas de estudio del bachillerato de la Nueva Escuela Mexicana en Puebla (MCCEMS/DBEPA).
 
-Analiza el siguiente texto extraído de un programa de estudios y extrae en JSON:
+Analiza el siguiente texto extraído de un programa de estudios oficial y extrae los datos en formato JSON exacto:
 
 {
-  "uacName": "Nombre completo de la UAC (Unidad de Aprendizaje Curricular) tal como aparece en el documento",
-  "learningOutcome": "Resultado de aprendizaje completo (qué logrará el estudiante al finalizar la UAC)",
-  "totalHours": número entero de horas totales de la UAC,
+  "uacName": "Nombre completo de la UAC (Unidad de Aprendizaje Curricular) tal como aparece literalmente en el documento",
+  "learningOutcome": "Resultado de aprendizaje completo tal como aparece en el documento",
+  "totalHours": número entero de horas totales de la carga horaria de la UAC,
   "activities": [
-    { "name": "Nombre de la Actividad Clave 1", "hours": número, "order": 1 },
-    { "name": "Nombre de la Actividad Clave 2", "hours": número, "order": 2 }
+    { "name": "Nombre literal de la Actividad Clave o del Propósito Formativo X", "hours": número de horas dosificadas, "order": 1 }
   ],
-  "evidences": ["evidencia o producto esperado 1", "evidencia 2"]
+  "evidences": ["evidencia o producto esperado literal del programa"]
 }
 
-REGLAS:
-- Copia el nombre de la UAC EXACTAMENTE como aparece (puede ser muy largo)
-- Si hay múltiples UACs, extrae SOLO la primera que aparezca
-- Si no encuentras un campo, usa null
-- Las actividades clave son las grandes secciones del programa (usualmente 2-5)
-- Responde SOLO con el JSON, sin markdown ni texto adicional
+REGLAS ABSOLUTAS DE EXTRACCIÓN Y CALIDAD:
+1. COPIA VERBATIM (LITERAL): Copia el nombre de la UAC, el Resultado de aprendizaje, los Propósitos Formativos / Actividades Clave y las Evidencias EXACTAMENTE palabra por palabra, tal como aparecen escritos en el documento original.
+2. PROHIBIDO PARAFRASEAR: Queda estrictamente prohibido resumir, acortar, simplificar, reescribir, traducir o inventar palabras. El texto extraído debe ser idéntico al del PDF original.
+3. DETECCIÓN DE ACTIVIDADES / PROPÓSITOS:
+   - Si es una UAC de Formación Laboral, extrae las "Actividades Clave" verbatim.
+   - Si es una UAC de Currículum Fundamental o Ampliado (como Pensamiento Matemático, Ciencias, Lengua, etc.), extrae cada uno de los "Propósitos formativos" literales (ej: "Aplica conceptos básicos de lógica matemática...", "Comprende el concepto de conteo...", etc.) que se listan en las tablas o secciones principales.
+4. Si hay múltiples UACs o programas en el texto, extrae únicamente la información de la primera.
+5. Responde exclusivamente con el JSON, sin agregar explicaciones ni markdown.
 
 TEXTO DEL PROGRAMA:
 ${excerpt}`;
