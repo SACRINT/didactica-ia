@@ -64,7 +64,7 @@ async function extractPagesText(pdfPath, startPage, endPage) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
       const pageText = content.items.map(item => ('str' in item ? item.str : '')).join(' ');
-      text += `=== PAGE ${i} ===\n${pageText}\n\n`;
+      text += `=== PAGINA ${i} ===\n${pageText}\n\n`;
     }
     return { text, numPages: doc.numPages };
   } catch (err) {
@@ -73,7 +73,6 @@ async function extractPagesText(pdfPath, startPage, endPage) {
   }
 }
 
-// Función auxiliar para reintentar la llamada en caso de error de cuota (429 / 503)
 async function generateWithRetry(model, prompt, maxRetries = 5) {
   let attempt = 0;
   while (attempt < maxRetries) {
@@ -84,8 +83,8 @@ async function generateWithRetry(model, prompt, maxRetries = 5) {
       attempt++;
       const isRateLimit = err.message.includes('429') || err.message.includes('Quota exceeded') || err.message.includes('503') || err.message.includes('high demand');
       if (isRateLimit && attempt < maxRetries) {
-        console.warn(`  ⚠️ Rate limit detectado (Intento ${attempt}/${maxRetries}). Durmiendo 30 segundos antes de reintentar...`);
-        await new Promise(r => setTimeout(r, 30000));
+        console.warn(`  ⚠️ Rate limit detectado (Intento ${attempt}/${maxRetries}). Durmiendo 45 segundos para resetear cuota...`);
+        await new Promise(r => setTimeout(r, 45000));
       } else {
         throw err;
       }
@@ -95,18 +94,9 @@ async function generateWithRetry(model, prompt, maxRetries = 5) {
 }
 
 async function main() {
-  console.log('🚀 Iniciando extracción de Propósitos y Contenidos Formativos con reintentos y lógica de bloques numerados...');
+  console.log('🚀 Iniciando extracción masiva por PDF (una sola llamada por plan de estudios)...');
 
-  // 1. Obtener los programas no-laborales de la BD
-  const uacs = await sql`
-    SELECT id, uac_name, component, semester
-    FROM programs_catalog
-    WHERE component <> 'laboral'
-    ORDER BY semester, uac_name;
-  `;
-  console.log(`Encontradas ${uacs.length} UACs no-laborales en la base de datos.`);
-
-  // 2. Encontrar todos los PDFs disponibles
+  // 1. Obtener la lista de PDFs disponibles
   const pdfs = [];
   for (const dir of BASE_DIRS) {
     if (!fs.existsSync(dir.path)) continue;
@@ -123,63 +113,49 @@ async function main() {
   }
   console.log(`Encontrados ${pdfs.length} PDFs de planes de estudio en disco.`);
 
-  for (const uac of uacs) {
+  for (const pdf of pdfs) {
     console.log(`\n────────────────────────────────────────────────────────────────`);
-    console.log(`UAC: "${uac.uac_name}" (Semestre: ${uac.semester}, ${uac.component})`);
+    console.log(`📄 Procesando PDF: "${pdf.filename}" (${pdf.component})`);
 
-    // Intentar emparejar la UAC con un PDF
-    const normUacName = uac.uac_name.toLowerCase()
-      .replace(/ i+$/g, '') // Quitar números romanos del final
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-    const matchedPdf = pdfs.find(p => {
-      const normFilename = p.filename.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const cleanUac = normUacName.replace(/( i| ii| iii| iv| v| vi)$/gi, '').trim();
-      return normFilename.includes(cleanUac) || cleanUac.split(' ').every(word => normFilename.includes(word));
-    });
-
-    if (!matchedPdf) {
-      console.warn(`⚠️ No se encontró PDF coincidente para la UAC: ${uac.uac_name}`);
-      continue;
-    }
-
-    console.log(`✓ Coincidencia de PDF: ${matchedPdf.filename}`);
-
-    // Extraer páginas (páginas 1 a 28 para asegurar abarcar las tablas didácticas)
-    const extract = await extractPagesText(matchedPdf.fullPath, 1, 28);
+    // Leer páginas de la 10 a la 40 para capturar todas las tablas de UACs de todos los semestres de este plan
+    const extract = await extractPagesText(pdf.fullPath, 10, 42);
     if (!extract) {
-      console.error(`❌ Error al extraer texto de ${matchedPdf.filename}`);
+      console.error(`❌ Error al extraer texto de ${pdf.filename}`);
       continue;
     }
 
-    // Pedirle a Gemini estructurar los propósitos y temas
-    const prompt = `Analiza el siguiente fragmento del programa de estudios oficial para la UAC "${uac.uac_name}" (Semestre ${uac.semester}).
+    const prompt = `Analiza el siguiente texto de un plan y programa de estudios. Este documento contiene los contenidos y propósitos formativos oficiales de múltiples semestres o asignaturas (UACs) del mismo campo de conocimiento.
 
-Identifica y extrae:
-1. El nombre exacto de CADA uno de los Propósitos Formativos de la asignatura (los bloques o propósitos principales).
-2. Para cada Propósito Formativo, extrae verbatim la lista de todos sus Contenidos Formativos (temas detallados, conceptos clave o contenidos específicos asociados a dicho propósito).
-3. Estima el número de horas sugerido para cada propósito si viene indicado, o repártelo proporcionalmente si el total es de 54 o 72 horas.
+Extrae para CADA Unidad de Aprendizaje Curricular (UAC) que se mencione en el documento (ej: "Pensamiento Matemático I", "Pensamiento Matemático II", "Cultura Digital I", "Cultura Digital II", "Ciencias Sociales I", etc.):
+1. El nombre completo de la UAC.
+2. La lista de sus Propósitos Formativos verbatim.
+3. Para cada Propósito Formativo, la lista verbatim de todos sus Contenidos Formativos (temas o conceptos clave asociados).
 
-Responde ÚNICAMENTE con un JSON en el siguiente formato, sin markdown ni explicaciones:
-[
-  {
-    "proposito": "Nombre literal verbatim y completo del Propósito Formativo X",
-    "hours": 11,
-    "order": 1,
-    "contenidos": [
-      "Contenido formativo tema 1",
-      "Contenido formativo tema 2"
-    ]
-  }
-]
+Responde ÚNICAMENTE con un objeto JSON con el siguiente formato exacto, sin markdown ni explicaciones adicionales:
+{
+  "Nombre exacto de la UAC 1 (ej: Pensamiento Matemático I)": [
+    {
+      "proposito": "Nombre literal verbatim del Propósito Formativo 1",
+      "hours": 11,
+      "order": 1,
+      "contenidos": [
+        "Tema o contenido formativo A",
+        "Tema o contenido formativo B"
+      ]
+    }
+  ],
+  "Nombre de la UAC 2 (ej: Pensamiento Matemático II)": [
+    ...
+  ]
+}
 
-REGLAS ABSOLUTAS DE EXTRACCIÓN:
-- IDENTIFICACIÓN DE PROPÓSITOS: Los propósitos formativos verdaderos siempre empiezan con un número indicativo de orden (ej: "1 Aplica conceptos...", "2 Comprende el...", "3 Analiza...") en las tablas del programa. NO extraigas títulos generales de secciones o temas de la tabla como "Pensamiento aritmético", "Nombre de la asignatura" o "Meta educativa".
-- COPIA EXACTA VERBATIM: Tanto el "proposito" como los "contenidos" individuales deben ser copiados EXACTAMENTE, letra por letra, tal como aparecen en el documento original. PROHIBIDO parafrasear, acortar, resumir o editar.
-- Si no encuentras los contenidos formativos (temas específicos) para un propósito formativo en este fragmento, deja el arreglo de "contenidos" vacío para ese elemento.
+REGLAS DE ORO:
+- IDENTIFICACIÓN DE PROPÓSITOS: Los propósitos formativos verdaderos siempre empiezan con un número indicativo (ej: "1 Aplica conceptos...", "2 Comprende el...", etc.) en las tablas. Ignora títulos generales de tablas.
+- COPIA VERBATIM: Tanto el "proposito" como los "contenidos" individuales deben ser copiados EXACTAMENTE palabra por palabra, sin resumir ni parafrasear.
+- Si no hay contenidos formativos explícitos para un propósito, deja el arreglo de "contenidos" vacío para ese elemento.
 
 TEXTO DEL PROGRAMA:
-${extract.text.slice(0, 15000)}`;
+${extract.text.slice(0, 24000)}`;
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
@@ -187,7 +163,7 @@ ${extract.text.slice(0, 15000)}`;
     });
 
     try {
-      console.log('  🧠 Analizando con Gemini (con reintentos si hay cuota)...');
+      console.log('  🧠 Analizando con Gemini...');
       const responseText = await generateWithRetry(model, prompt);
       const cleanJson = responseText
         .replace(/^```(?:json)?\n?/m, '')
@@ -195,48 +171,61 @@ ${extract.text.slice(0, 15000)}`;
         .trim();
 
       const parsedData = JSON.parse(cleanJson);
-      
-      // Filtrar objetos vacíos o erróneos si Gemini extrajo algo que no correspondía a un propósito
-      const validData = parsedData.filter(item => 
-        item.proposito && 
-        !item.proposito.toLowerCase().includes('tabla') &&
-        !item.proposito.toLowerCase().includes('meta educativa') &&
-        item.proposito.trim().length > 15
-      );
+      const keys = Object.keys(parsedData);
+      console.log(`  ✓ Extraídas ${keys.length} UACs del plan: [${keys.join(', ')}]`);
 
-      console.log(`  ✓ Extraídos ${validData.length} propósitos válidos con sus temas.`);
+      for (const uacKey of keys) {
+        const uacData = parsedData[uacKey];
+        if (!Array.isArray(uacData)) continue;
 
-      if (validData.length === 0) {
-        console.warn(`  ⚠️ Advertencia: No se encontraron propósitos válidos para "${uac.uac_name}". Saltando guardado.`);
-        continue;
+        // Filtrar elementos vacíos o inválidos
+        const validData = uacData.filter(item => 
+          item.proposito && 
+          !item.proposito.toLowerCase().includes('tabla') &&
+          item.proposito.trim().length > 12
+        );
+
+        if (validData.length === 0) continue;
+
+        // Mapear a actividades
+        const activities = validData.map((item, idx) => ({
+          name: item.proposito,
+          hours: item.hours || Math.round(72 / validData.length),
+          order: item.order || (idx + 1)
+        }));
+
+        // Buscar correspondencia en la BD (coincidencia aproximada o exacta de nombre)
+        const matchDb = await sql`
+          SELECT id, uac_name 
+          FROM programs_catalog
+          WHERE uac_name ILIKE ${uacKey} OR uac_name ILIKE ${uacKey.replace(/( I| II| III| IV| V| VI)$/i, '') + '%'}
+          LIMIT 1
+        `;
+
+        if (matchDb.length > 0) {
+          const dbUac = matchDb[0];
+          await sql`
+            UPDATE programs_catalog
+            SET
+              activities = ${JSON.stringify(activities)},
+              contenidos_formativos = ${JSON.stringify(validData)}
+            WHERE id = ${dbUac.id}::uuid
+          `;
+          console.log(`  💾 BD actualizada con éxito para UAC: "${dbUac.uac_name}" (desde clave "${uacKey}")`);
+        } else {
+          console.log(`  ⚠️ No se encontró UAC correspondiente en la BD para la clave: "${uacKey}"`);
+        }
       }
 
-      // Mapear al formato 'activities' esperado en el catálogo
-      const activities = validData.map((item, idx) => ({
-        name: item.proposito,
-        hours: item.hours || Math.round(72 / validData.length),
-        order: item.order || (idx + 1)
-      }));
-
-      // Guardar en la base de datos
-      await sql`
-        UPDATE programs_catalog
-        SET 
-          activities = ${JSON.stringify(activities)},
-          contenidos_formativos = ${JSON.stringify(validData)}
-        WHERE id = ${uac.id}::uuid
-      `;
-      console.log(`  💾 Base de datos actualizada con éxito para: "${uac.uac_name}"`);
-
     } catch (err) {
-      console.error(`  ❌ Error al procesar detalles con Gemini en "${uac.uac_name}":`, err.message);
+      console.error(`  ❌ Error al procesar PDF "${pdf.filename}":`, err.message);
     }
 
-    // Espera normal entre llamadas de 6 segundos para evitar el rate limit de 15 RPM
-    await new Promise(r => setTimeout(r, 6000));
+    // Esperar 12 segundos entre PDFs para evitar saturación de RPM
+    await new Promise(r => setTimeout(r, 12000));
   }
 
-  console.log('\n🎉 Proceso de migración y siembra finalizado.');
+  console.log('\n🎉 ¡Proceso de migración y siembra masiva por PDF completado!');
 }
 
 main().catch(err => {

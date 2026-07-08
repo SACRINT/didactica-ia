@@ -1,7 +1,7 @@
 import fs from 'fs';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-const pdfPath = 'c:/Secuencias_Didacticas/Curriculum Fundamental/2025_MCC_PENSAMIENTO MATEMATICO_BN.pdf';
+const pdfPath = 'c:/Secuencias_Didacticas/Curriculum Fundamental/vf_MCC_CIENCIAS SOCIALES_BN.pdf';
 
 async function main() {
   try {
@@ -15,11 +15,16 @@ async function main() {
       verbosity: 0,
     }).promise;
 
-    const page = await doc.getPage(14);
-    const content = await page.getTextContent();
-    const text = content.items.map(item => item.str || '').join(' ');
-    console.log('--- PAGE 14 TEXT ---');
-    console.log(text);
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items.map(item => item.str || '').join(' ');
+      
+      if (text.toLowerCase().includes('propósito formativo') || text.toLowerCase().includes('proposito formativo')) {
+        console.log(`🎯 Encontrado 'Propósito formativo' en página ${i}:`);
+        console.log(text.substring(0, 400));
+      }
+    }
   } catch (err) {
     console.error(err);
   }
