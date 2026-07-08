@@ -1,9 +1,45 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { PaecProject, CommunityContext, SchoolContext } from '@/types/paec';
+import { clearAllWizardDrafts } from '@/hooks/useWizardPersistence';
+
+const PAEC_DRAFT_KEY = 'didactica_paec_draft';
+
+/** Reads the PAEC draft from localStorage (returns null if none) */
+function readPaecDraft(): PaecFormDraft | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PAEC_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/** Saves PAEC form draft to localStorage */
+function savePaecDraft(draft: PaecFormDraft) {
+  try {
+    window.localStorage.setItem(PAEC_DRAFT_KEY, JSON.stringify(draft));
+  } catch { /* storage full or unavailable */ }
+}
+
+/** Clears PAEC form draft from localStorage */
+function clearPaecDraft() {
+  try { window.localStorage.removeItem(PAEC_DRAFT_KEY); } catch { /* ignore */ }
+}
+
+interface PaecFormDraft {
+  projectName: string;
+  problemStatement: string;
+  cycleType: 'A' | 'B' | 'annual';
+  community: CommunityContext;
+  school: SchoolContext;
+  selectedLaboral: string[];
+  selectedFfe: string[];
+  groupsCount: string;
+  groupsConfig: string;
+}
 
 interface Props {
   locale: string;
@@ -69,6 +105,9 @@ const FFE_PAIRS = [
 export default function PaecWizardClient({ locale, initialId }: Props) {
   const router = useRouter();
 
+  // Restore draft from localStorage if this is a fresh wizard (no project ID in URL)
+  const savedDraft = !initialId ? readPaecDraft() : null;
+
   // Navigation / Loading States
   const [projectId, setProjectId] = useState<string | null>(initialId);
   const [project, setProject] = useState<PaecProject | null>(null);
@@ -77,12 +116,12 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
   const [activeStep, setActiveStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
-  // Form States (Paso 1: Datos Base)
-  const [projectName, setProjectName] = useState('');
-  const [problemStatement, setProblemStatement] = useState('');
-  const [cycleType, setCycleType] = useState<'A' | 'B' | 'annual'>('A');
+  // Form States (Paso 1: Datos Base) — initialized from saved draft if present
+  const [projectName, setProjectName] = useState(savedDraft?.projectName ?? '');
+  const [problemStatement, setProblemStatement] = useState(savedDraft?.problemStatement ?? '');
+  const [cycleType, setCycleType] = useState<'A' | 'B' | 'annual'>(savedDraft?.cycleType ?? 'A');
 
-  const [community, setCommunity] = useState<CommunityContext>({
+  const [community, setCommunity] = useState<CommunityContext>(savedDraft?.community ?? {
     location: '',
     demographics: '',
     economy: '',
@@ -91,7 +130,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
     environment: '',
   });
 
-  const [school, setSchool] = useState<SchoolContext>({
+  const [school, setSchool] = useState<SchoolContext>(savedDraft?.school ?? {
     enrollment: '',
     teacherCount: '',
     indicators: '',
@@ -102,14 +141,22 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
   // Catalogs and Selections
   const [laboralCatalog, setLaboralCatalog] = useState<{ uac_name: string; semester: number; curriculum_name: string }[]>([]);
   const [ffeCatalog, setFfeCatalog] = useState<{ uac_name: string; semester: number; component: string }[]>([]);
-  const [selectedLaboral, setSelectedLaboral] = useState<string[]>([]);
-  const [selectedFfe, setSelectedFfe] = useState<string[]>([]);
-  const [groupsCount, setGroupsCount] = useState('1');
-  const [groupsConfig, setGroupsConfig] = useState('');
+  const [selectedLaboral, setSelectedLaboral] = useState<string[]>(savedDraft?.selectedLaboral ?? []);
+  const [selectedFfe, setSelectedFfe] = useState<string[]>(savedDraft?.selectedFfe ?? []);
+  const [groupsCount, setGroupsCount] = useState(savedDraft?.groupsCount ?? '1');
+  const [groupsConfig, setGroupsConfig] = useState(savedDraft?.groupsConfig ?? '');
 
   // Manual Edit States
   const [isEditingContent, setIsEditingContent] = useState(false);
   const [editPayload, setEditPayload] = useState<any>(null);
+
+  // Auto-save form draft to localStorage whenever step-1 form fields change (only when no projectId)
+  const isFirstRenderDraft = useRef(true);
+  useEffect(() => {
+    if (isFirstRenderDraft.current) { isFirstRenderDraft.current = false; return; }
+    if (projectId) return; // project already in DB, no need to save draft
+    savePaecDraft({ projectName, problemStatement, cycleType, community, school, selectedLaboral, selectedFfe, groupsCount, groupsConfig });
+  }, [projectId, projectName, problemStatement, cycleType, community, school, selectedLaboral, selectedFfe, groupsCount, groupsConfig]);
 
   // Load UAC lists for select checklists
   useEffect(() => {
@@ -208,6 +255,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
       }
 
       const data = await res.json();
+      clearPaecDraft(); // Draft saved to DB — clear localStorage
       setProjectId(data.project.id);
       router.push(`/${locale}/paec/nuevo?id=${data.project.id}`);
     } catch (err) {

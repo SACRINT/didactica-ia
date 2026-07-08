@@ -1,8 +1,39 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { clearAllWizardDrafts } from '@/hooks/useWizardPersistence';
+
+const PMC_DRAFT_KEY = 'didactica_pmc_draft';
+
+interface PmcFormDraft {
+  schoolName: string;
+  schoolCct: string;
+  municipality: string;
+  locality: string;
+  schoolZone: string;
+  directorName: string;
+  supervisorName: string;
+  cicloEscolar: string;
+  subsystem: string;
+}
+
+function readPmcDraft(): PmcFormDraft | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PMC_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function savePmcDraft(draft: PmcFormDraft) {
+  try { window.localStorage.setItem(PMC_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+}
+
+function clearPmcDraft() {
+  try { window.localStorage.removeItem(PMC_DRAFT_KEY); } catch { /* ignore */ }
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,7 +211,10 @@ const STEPS = [
 export default function PmcWizardClient({ locale, teacherId, teacherName, teacherSchool, teacherMunicipality, existingProject }: Props) {
   const router = useRouter();
 
-  // Initialize state from existing project or defaults
+  // Restore draft from localStorage if this is a fresh PMC wizard (no existing project)
+  const savedDraft = !existingProject ? readPmcDraft() : null;
+
+  // Initialize state from existing project or from saved localStorage draft or defaults
   const [projectId, setProjectId] = useState<string | null>(existingProject?.id || null);
   const [activeStep, setActiveStep] = useState<number>(existingProject?.current_step || 1);
   const [saving, setSaving] = useState(false);
@@ -189,16 +223,16 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
   const [editingMeta, setEditingMeta] = useState<number | null>(null);
   const [editingPersonal, setEditingPersonal] = useState<number | null>(null);
 
-  // Step 1: Institutional data
-  const [schoolName, setSchoolName] = useState(existingProject?.school_name || teacherSchool || '');
-  const [schoolCct, setSchoolCct] = useState(existingProject?.school_cct || '');
-  const [municipality, setMunicipality] = useState(existingProject?.municipality || teacherMunicipality || '');
-  const [locality, setLocality] = useState(existingProject?.locality || '');
-  const [schoolZone, setSchoolZone] = useState(existingProject?.school_zone || '');
-  const [directorName, setDirectorName] = useState(existingProject?.director_name || '');
-  const [supervisorName, setSupervisorName] = useState(existingProject?.supervisor_name || '');
-  const [cicloEscolar, setCicloEscolar] = useState(existingProject?.ciclo_escolar || '2025-2026');
-  const [subsystem, setSubsystem] = useState(existingProject?.subsystem || 'BGE');
+  // Step 1: Institutional data — restored from draft if no existing project in DB
+  const [schoolName, setSchoolName] = useState(existingProject?.school_name || savedDraft?.schoolName || teacherSchool || '');
+  const [schoolCct, setSchoolCct] = useState(existingProject?.school_cct || savedDraft?.schoolCct || '');
+  const [municipality, setMunicipality] = useState(existingProject?.municipality || savedDraft?.municipality || teacherMunicipality || '');
+  const [locality, setLocality] = useState(existingProject?.locality || savedDraft?.locality || '');
+  const [schoolZone, setSchoolZone] = useState(existingProject?.school_zone || savedDraft?.schoolZone || '');
+  const [directorName, setDirectorName] = useState(existingProject?.director_name || savedDraft?.directorName || '');
+  const [supervisorName, setSupervisorName] = useState(existingProject?.supervisor_name || savedDraft?.supervisorName || '');
+  const [cicloEscolar, setCicloEscolar] = useState(existingProject?.ciclo_escolar || savedDraft?.cicloEscolar || '2025-2026');
+  const [subsystem, setSubsystem] = useState(existingProject?.subsystem || savedDraft?.subsystem || 'BGE');
 
   // Step 2: Staff
   const [totalStaff, setTotalStaff] = useState(existingProject?.total_staff || 1);
@@ -232,7 +266,13 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
     existingProject?.plan_accion || null
   );
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // Auto-save step-1 form fields to localStorage (only when no project in DB yet)
+  const isFirstRenderDraft = useRef(true);
+  useEffect(() => {
+    if (isFirstRenderDraft.current) { isFirstRenderDraft.current = false; return; }
+    if (projectId) return; // project already saved in DB
+    savePmcDraft({ schoolName, schoolCct, municipality, locality, schoolZone, directorName, supervisorName, cicloEscolar, subsystem });
+  }, [projectId, schoolName, schoolCct, municipality, locality, schoolZone, directorName, supervisorName, cicloEscolar, subsystem]);
 
   const saveProject = useCallback(async (data: Partial<PmcProject>, goToStep?: number): Promise<string | null> => {
     setSaving(true);
@@ -255,6 +295,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         });
         if (!res.ok) throw new Error(await res.text());
         const created = await res.json();
+        clearPmcDraft(); // Draft saved to DB — clear localStorage
         setProjectId(created.id);
         router.replace(`/${locale}/pmc/nuevo?id=${created.id}`);
         return created.id;

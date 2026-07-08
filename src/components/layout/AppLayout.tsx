@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { signOutAction } from '@/lib/server-actions';
+import SignOutButton from './SignOutButton';
 
 type Props = {
   children: React.ReactNode;
@@ -39,10 +40,8 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
             </div>
             <span>{user.name?.split(' ')[0] || user.email}</span>
           </div>
-          {/* Server action extracted to separate file to satisfy Next.js App Router rules */}
-          <form action={signOutAction.bind(null, locale)}>
-            <button type="submit" className="header-btn">Cerrar sesión</button>
-          </form>
+          {/* Client component clears localStorage drafts before signing out */}
+          <SignOutButton locale={locale} signOutAction={signOutAction} />
         </div>
       </header>
 

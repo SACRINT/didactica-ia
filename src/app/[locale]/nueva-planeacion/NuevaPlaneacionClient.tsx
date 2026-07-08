@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 import StepUAC from '@/components/planeacion/StepUAC';
 import StepPdfUpload from '@/components/planeacion/StepPdfUpload';
 import StepContext from '@/components/planeacion/StepContext';
 import StepGenerate from '@/components/planeacion/StepGenerate';
+import { useWizardPersistence } from '@/hooks/useWizardPersistence';
 
 const STEPS = [
   { num: 1, label: 'Datos UAC' },
@@ -15,12 +16,30 @@ const STEPS = [
   { num: 4, label: 'Generar' },
 ];
 
+const STORAGE_KEY = 'didactica_planeacion_draft';
+
 interface UACSelection {
   uacName: string;
   semester: number;
   component: string;
   curriculumName?: string;
 }
+
+interface WizardDraft {
+  step: number;
+  uacSelection: UACSelection | null;
+  extractedData: ExtractedPdfData | null;
+  context: TeacherContext | null;
+  planningId: string | null;
+}
+
+const INITIAL_DRAFT: WizardDraft = {
+  step: 1,
+  uacSelection: null,
+  extractedData: null,
+  context: null,
+  planningId: null,
+};
 
 interface Props {
   locale: string;
@@ -29,53 +48,55 @@ interface Props {
 export default function NuevaPlaneacionClient({ locale }: Props) {
   const router = useRouter();
 
-  const [step, setStep] = useState(1);
-  const [uacSelection, setUacSelection] = useState<UACSelection | null>(null);
-  const [extractedData, setExtractedData] = useState<ExtractedPdfData | null>(null);
-  const [context, setContext] = useState<TeacherContext | null>(null);
-  const [planningId, setPlanningId] = useState<string | null>(null);
+  // All wizard state is persisted in localStorage automatically
+  const { state: draft, setState: setDraft, clearDraft } = useWizardPersistence<WizardDraft>(
+    STORAGE_KEY,
+    INITIAL_DRAFT
+  );
+
+  // Convenience setters
+  const setStep = (step: number) => setDraft(prev => ({ ...prev, step }));
 
   const handleUACNext = (data: UACSelection, initialData?: ExtractedPdfData) => {
-    setUacSelection(data);
-    if (initialData) {
-      setExtractedData(initialData);
-    } else {
-      setExtractedData(null);
-    }
-    setStep(2);
+    setDraft(prev => ({
+      ...prev,
+      uacSelection: data,
+      extractedData: initialData ?? null,
+      step: 2,
+    }));
   };
 
   const handlePdfNext = (data: ExtractedPdfData) => {
-    setExtractedData(data);
-    setStep(3);
+    setDraft(prev => ({ ...prev, extractedData: data, step: 3 }));
   };
 
   const handleContextNext = async (ctx: TeacherContext) => {
-    setContext(ctx);
+    setDraft(prev => ({ ...prev, context: ctx, step: 4 }));
     try {
       const res = await fetch('/api/plannings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          uacName: uacSelection!.uacName,
-          semester: uacSelection!.semester,
-          component: uacSelection!.component,
-          curriculumName: uacSelection!.curriculumName,
+          uacName: draft.uacSelection!.uacName,
+          semester: draft.uacSelection!.semester,
+          component: draft.uacSelection!.component,
+          curriculumName: draft.uacSelection!.curriculumName,
           paecContext: ctx.paecProblem,
-          extractedData,
+          extractedData: draft.extractedData,
         }),
       });
       const data = await res.json();
       if (data.planning?.id) {
-        setPlanningId(data.planning.id);
+        setDraft(prev => ({ ...prev, planningId: data.planning.id }));
       }
     } catch (err) {
       console.error('Error creating planning record:', err);
     }
-    setStep(4);
   };
 
   const handleDone = (id: string) => {
+    // Clear the draft when the wizard is completed successfully
+    clearDraft();
     router.push(`/${locale}/planeacion/${id}`);
   };
 
@@ -94,11 +115,11 @@ export default function NuevaPlaneacionClient({ locale }: Props) {
             <div
               key={s.num}
               className={`step-item ${
-                s.num < step ? 'done' : s.num === step ? 'active' : ''
+                s.num < draft.step ? 'done' : s.num === draft.step ? 'active' : ''
               }`}
             >
               <div className="step-num">
-                {s.num < step ? '✓' : s.num}
+                {s.num < draft.step ? '✓' : s.num}
               </div>
               <span className="step-label">{s.label}</span>
             </div>
@@ -106,33 +127,33 @@ export default function NuevaPlaneacionClient({ locale }: Props) {
         </div>
 
         {/* Step content */}
-        {step === 1 && (
+        {draft.step === 1 && (
           <StepUAC onNext={handleUACNext} />
         )}
 
-        {step === 2 && uacSelection && (
+        {draft.step === 2 && draft.uacSelection && (
           <StepPdfUpload
-            uacSelection={uacSelection}
-            initialData={extractedData}
+            uacSelection={draft.uacSelection}
+            initialData={draft.extractedData}
             onNext={handlePdfNext}
             onBack={() => setStep(1)}
           />
         )}
 
-        {step === 3 && extractedData && (
+        {draft.step === 3 && draft.extractedData && (
           <StepContext
-            extractedData={extractedData}
+            extractedData={draft.extractedData}
             onNext={handleContextNext}
             onBack={() => setStep(2)}
           />
         )}
 
-        {step === 4 && extractedData && context && (
+        {draft.step === 4 && draft.extractedData && draft.context && (
           <StepGenerate
-            planningId={planningId}
-            extractedData={extractedData}
-            context={context}
-            uacSelection={uacSelection!}
+            planningId={draft.planningId}
+            extractedData={draft.extractedData}
+            context={draft.context}
+            uacSelection={draft.uacSelection!}
             onDone={handleDone}
           />
         )}
