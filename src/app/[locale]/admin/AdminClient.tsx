@@ -67,7 +67,11 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
   const [editPromptId, setEditPromptId] = useState<string | null>(null);
   const [editPromptContent, setEditPromptContent] = useState('');
+  const [editLabelId, setEditLabelId] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState('');
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [seedingPrompts, setSeedingPrompts] = useState(false);
 
   // ── Data fetchers ────────────────────────────────────────────────────────
 
@@ -88,7 +92,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'users') loadTeachers();
+    if (activeTab === 'users') { loadTeachers().then(() => setUsersLoaded(true)); }
     if (activeTab === 'prompts') loadPrompts();
     if (activeTab === 'docs') loadDocs();
     if (activeTab === 'activity') loadActivity();
@@ -142,6 +146,25 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   async function toggleUser(teacherId: string, isBlocked: boolean) {
     await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacherId, isBlocked }) });
     loadTeachers(); showMsg(isBlocked ? 'Usuario bloqueado' : 'Usuario reactivado');
+  }
+
+  async function saveKeyLabel(id: string) {
+    if (!editLabelValue.trim()) return;
+    await fetch('/api/admin/api-keys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, label: editLabelValue.trim() }) });
+    setEditLabelId(null);
+    loadKeys();
+    showMsg('Etiqueta actualizada ✓');
+  }
+
+  async function seedPrompts() {
+    setSeedingPrompts(true);
+    try {
+      const r = await fetch('/api/admin/prompts/seed', { method: 'POST' });
+      const d = await r.json();
+      if (r.ok) { loadPrompts(); showMsg(`${d.count} prompts sembrados ✓`); }
+      else showMsg(d.error || 'Error al sembrar prompts', false);
+    } catch { showMsg('Error de red', false); }
+    setSeedingPrompts(false);
   }
 
   async function savePrompt() {
@@ -408,7 +431,27 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         </div>
                       </td>
                       <td><span className="badge badge-blue">{k.provider}</span></td>
-                      <td>{k.label}</td>
+                      <td>
+                        {editLabelId === k.id ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                              value={editLabelValue}
+                              onChange={e => setEditLabelValue(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveKeyLabel(k.id); if (e.key === 'Escape') setEditLabelId(null); }}
+                              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #6366f1', borderRadius: 6, padding: '4px 8px', color: '#f0f4ff', fontSize: 12, width: 180 }}
+                              autoFocus
+                            />
+                            <button className="btn-sm btn-primary" onClick={() => saveKeyLabel(k.id)}>✓</button>
+                            <button className="btn-sm btn-ghost" onClick={() => setEditLabelId(null)}>✗</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span>{k.label}</span>
+                            <button className="btn-sm btn-ghost" style={{ fontSize: 10, padding: '3px 8px' }}
+                              onClick={() => { setEditLabelId(k.id); setEditLabelValue(k.label); }}>✏️</button>
+                          </div>
+                        )}
+                      </td>
                       <td style={{ fontFamily: 'monospace', color: '#facc15' }}>{k.key_preview}</td>
                       <td>
                         <span className={`badge ${k.is_active ? 'badge-green' : 'badge-yellow'}`}>
@@ -487,9 +530,17 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
         {/* ── USERS ── */}
         {activeTab === 'users' && (
           <>
-            <h1>👥 Gestión de Docentes</h1>
-            {teachers.length === 0 ? (
+            <div className="section-header">
+              <h1>👥 Gestión de Docentes</h1>
+              <button className="btn-sm btn-ghost" onClick={() => { setUsersLoaded(false); loadTeachers().then(() => setUsersLoaded(true)); }}>↺ Actualizar</button>
+            </div>
+            {!usersLoaded ? (
               <div className="empty-state">Cargando docentes...</div>
+            ) : teachers.length === 0 ? (
+              <div className="empty-state">
+                No hay docentes registrados aún.<br/>
+                <span style={{ fontSize: 12, opacity: 0.6 }}>Los docentes aparecen aquí cuando inician sesión por primera vez.</span>
+              </div>
             ) : (
               <table className="admin-table">
                 <thead>
@@ -543,29 +594,36 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                   <textarea value={editPromptContent} onChange={e => setEditPromptContent(e.target.value)} style={{ minHeight: 450 }} />
                 </div>
               </div>
+            ) : prompts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>✏️</div>
+                <h3 style={{ color: '#f0f4ff', marginBottom: 8 }}>No hay prompts en la base de datos</h3>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 24 }}>
+                  Haz clic en el botón para cargar los prompts del sistema en la base de datos.
+                </p>
+                <button className="btn-sm btn-primary" style={{ padding: '10px 24px', fontSize: 14 }}
+                  onClick={seedPrompts} disabled={seedingPrompts}>
+                  {seedingPrompts ? 'Cargando prompts...' : '🌱 Cargar Prompts del Sistema'}
+                </button>
+              </div>
             ) : (
-              prompts.length === 0 ? (
-                <div className="empty-state">No hay prompts registrados en la base de datos.<br/>
-                  Los prompts se agregan automáticamente al ejecutar la migración.</div>
-              ) : (
-                prompts.map(p => (
-                  <div key={p.id} className="prompt-item">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div className="prompt-label">{p.label}</div>
-                        <div className="prompt-meta">
-                          ID: {p.id} · {p.content.length.toLocaleString()} caracteres
-                          {p.updated_by && ` · Editado por ${p.updated_by}`}
-                          {p.updated_at && ` · ${new Date(p.updated_at).toLocaleDateString('es-MX')}`}
-                        </div>
+              prompts.map(p => (
+                <div key={p.id} className="prompt-item">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div className="prompt-label">{p.label}</div>
+                      <div className="prompt-meta">
+                        ID: {p.id} · {p.content.length.toLocaleString()} caracteres
+                        {p.updated_by && ` · Editado por ${p.updated_by}`}
+                        {p.updated_at && ` · ${new Date(p.updated_at).toLocaleDateString('es-MX')}`}
                       </div>
-                      <button className="btn-sm btn-ghost" onClick={() => { setEditPromptId(p.id); setEditPromptContent(p.content); }}>
-                        Editar
-                      </button>
                     </div>
+                    <button className="btn-sm btn-ghost" onClick={() => { setEditPromptId(p.id); setEditPromptContent(p.content); }}>
+                      ✏️ Editar
+                    </button>
                   </div>
-                ))
-              )
+                </div>
+              ))
             )}
           </>
         )}

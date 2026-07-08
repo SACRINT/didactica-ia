@@ -12,23 +12,41 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('q') || '';
 
-    const teachers = await sql`
-      SELECT
-        t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
-        t.is_blocked, t.created_at,
-        (SELECT COUNT(*) FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
-        (SELECT COUNT(*) FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
-        (SELECT COUNT(*) FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
-        (SELECT COUNT(*) FROM user_documents ud WHERE ud.teacher_email = t.email) AS doc_count,
-        (SELECT MAX(created_at) FROM activity_log al WHERE al.teacher_email = t.email) AS last_active
-      FROM teachers t
-      WHERE (${search} = '' OR t.name ILIKE ${'%' + search + '%'} OR t.email ILIKE ${'%' + search + '%'})
-      ORDER BY t.created_at DESC
-    `;
+    // Ensure is_blocked column exists (safe migration)
+    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
+
+    const teachers = search
+      ? await sql`
+          SELECT
+            t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
+            COALESCE(t.is_blocked, false) AS is_blocked, t.created_at,
+            (SELECT COUNT(*)::int FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
+            (SELECT COUNT(*)::int FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
+            (SELECT COUNT(*)::int FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
+            (SELECT COUNT(*)::int FROM user_documents ud WHERE ud.teacher_email = t.email) AS doc_count,
+            (SELECT MAX(created_at) FROM activity_log al WHERE al.teacher_email = t.email) AS last_active
+          FROM teachers t
+          WHERE t.name ILIKE ${'%' + search + '%'} OR t.email ILIKE ${'%' + search + '%'}
+          ORDER BY t.created_at DESC
+        `
+      : await sql`
+          SELECT
+            t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
+            COALESCE(t.is_blocked, false) AS is_blocked, t.created_at,
+            (SELECT COUNT(*)::int FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
+            (SELECT COUNT(*)::int FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
+            (SELECT COUNT(*)::int FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
+            (SELECT COUNT(*)::int FROM user_documents ud WHERE ud.teacher_email = t.email) AS doc_count,
+            (SELECT MAX(created_at) FROM activity_log al WHERE al.teacher_email = t.email) AS last_active
+          FROM teachers t
+          ORDER BY t.created_at DESC
+        `;
+
     return NextResponse.json({ teachers });
   } catch (e: any) {
     if (e.message === 'UNAUTHORIZED') return adminUnauthorized();
     if (e.message === 'FORBIDDEN') return adminForbidden();
+    console.error('GET /api/admin/users error:', e);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
@@ -40,11 +58,7 @@ export async function PUT(req: NextRequest) {
     const { teacherId, isBlocked } = await req.json();
     const sql = getDb();
 
-    // Ensure teachers table has is_blocked column
-    await sql`
-      ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE
-    `.catch(() => {}); // Ignore if already exists
-
+    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
     await sql`UPDATE teachers SET is_blocked = ${isBlocked} WHERE id = ${teacherId}`;
     return NextResponse.json({ success: true });
   } catch (e: any) {

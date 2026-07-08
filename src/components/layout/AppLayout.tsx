@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { neon } from '@neondatabase/serverless';
-import { signOutAction } from '@/lib/server-actions';
+import { signOutAction, signOutPlain } from '@/lib/server-actions';
 import SignOutButton from './SignOutButton';
 
 type Props = {
@@ -20,6 +20,24 @@ async function checkIsAdmin(email: string): Promise<boolean> {
   return process.env.ADMIN_EMAIL === email;
 }
 
+async function getMaintenanceStatus(): Promise<{ active: boolean; message: string }> {
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    const rows = await sql`
+      SELECT key, value FROM platform_config
+      WHERE key IN ('maintenance_mode', 'maintenance_message')
+    `;
+    const cfg: Record<string, string> = {};
+    for (const r of rows) cfg[r.key] = r.value;
+    return {
+      active: cfg.maintenance_mode === 'true',
+      message: cfg.maintenance_message || 'La plataforma está en mantenimiento. Por favor regresa más tarde.',
+    };
+  } catch {
+    return { active: false, message: '' };
+  }
+}
+
 export default async function AppLayout({ children, locale, activeSection }: Props) {
   const session = await auth();
   if (!session?.user) redirect(`/${locale}/login`);
@@ -29,7 +47,67 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
     ? user.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
     : user.email?.[0].toUpperCase() || '?';
 
-  const isAdmin = user.email ? await checkIsAdmin(user.email) : false;
+  const [isAdmin, maintenance] = await Promise.all([
+    user.email ? checkIsAdmin(user.email) : Promise.resolve(false),
+    getMaintenanceStatus(),
+  ]);
+
+  // ── Maintenance gate — admins bypass it ──────────────────────────────────────
+  if (maintenance.active && !isAdmin) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
+        padding: '24px',
+        fontFamily: 'Inter, sans-serif',
+      }}>
+        <div style={{
+          maxWidth: 480,
+          textAlign: 'center',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 20,
+          padding: '48px 40px',
+        }}>
+          <div style={{ fontSize: 64, marginBottom: 24 }}>🔧</div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#f0f4ff', marginBottom: 12 }}>
+            Plataforma en Mantenimiento
+          </h1>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, marginBottom: 32 }}>
+            {maintenance.message}
+          </p>
+          <div style={{
+            background: 'rgba(99,102,241,0.1)',
+            border: '1px solid rgba(99,102,241,0.3)',
+            borderRadius: 10,
+            padding: '12px 20px',
+            fontSize: 13,
+            color: '#818cf8',
+          }}>
+            📚 DidácticaIA · DBEPA Puebla 2026-2027
+          </div>
+          {/* Sign-out button so users can log in with admin account if needed */}
+          <form action={signOutPlain} style={{ marginTop: 24 }}>
+            <button type="submit" style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.4)',
+              borderRadius: 8,
+              padding: '8px 20px',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}>
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-layout">
@@ -58,6 +136,22 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
 
       {/* Sidebar */}
       <aside className="app-sidebar">
+        {/* Maintenance banner for admins */}
+        {maintenance.active && isAdmin && (
+          <div style={{
+            background: 'rgba(234,179,8,0.15)',
+            border: '1px solid rgba(234,179,8,0.3)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            margin: '8px 0',
+            fontSize: 11,
+            color: '#facc15',
+            textAlign: 'center',
+          }}>
+            ⚠️ Modo mantenimiento activo<br/>
+            <span style={{ opacity: 0.7 }}>Solo tú puedes ver la plataforma</span>
+          </div>
+        )}
         <Link href={`/${locale}/nueva-planeacion`} className="sidebar-new-btn">
           + Nueva planeación
         </Link>

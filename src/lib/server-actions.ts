@@ -9,3 +9,10 @@ import { signOut } from '@/lib/auth';
 export async function signOutAction(locale: string) {
   await signOut({ redirectTo: `/${locale}/login` });
 }
+
+/**
+ * Sign out without locale — used as a form action (e.g. maintenance screen).
+ */
+export async function signOutPlain() {
+  await signOut({ redirectTo: '/es/login' });
+}
