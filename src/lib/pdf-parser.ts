@@ -36,23 +36,23 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
     };
   }
 
-  // ── STEP 2: Use Claude text API to structure the extracted text ───────────
-  if (!process.env.ANTHROPIC_API_KEY) {
+  // ── STEP 2: Use Gemini text API to structure the extracted text ───────────
+  if (!process.env.GEMINI_API_KEY) {
     return {
       success: false,
       confidence: 'failed',
       data: buildEmptyData(),
       rawText,
-      errors: ['Error de configuración del servidor. Contacta al administrador.'],
+      errors: ['Error de configuración del servidor (falta GEMINI_API_KEY). Contacta al administrador.'],
     };
   }
 
   try {
-    const structured = await structureWithClaude(rawText);
+    const structured = await structureWithGemini(rawText);
     return structured;
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error desconocido';
-    console.error('[pdf-parser] Claude structuring failed:', msg);
+    console.error('[pdf-parser] Gemini structuring failed:', msg);
 
     // Return partial data — let user complete manually
     return {
@@ -60,7 +60,9 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
       confidence: 'failed',
       data: buildEmptyData(),
       rawText,
-      errors: ['No se pudieron estructurar los datos automáticamente. Por favor completa los campos manualmente.'],
+      errors: [
+        `No se pudieron estructurar los datos automáticamente: ${msg}. Por favor completa los campos manualmente.`,
+      ],
     };
   }
 }
@@ -103,11 +105,11 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<string> {
   return fullText.trim();
 }
 
-// ─── Claude text structuring ─────────────────────────────────────────────────
+// ─── Gemini text structuring ─────────────────────────────────────────────────
 
-async function structureWithClaude(rawText: string): Promise<PdfParseResult> {
-  const Anthropic = (await import('@anthropic-ai/sdk')).default;
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+async function structureWithGemini(rawText: string): Promise<PdfParseResult> {
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
   // Truncate text to ~6000 chars (first pages have the important info)
   const excerpt = rawText.slice(0, 6000);
@@ -137,16 +139,23 @@ REGLAS:
 TEXTO DEL PROGRAMA:
 ${excerpt}`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
   });
 
-  const content = response.content[0];
-  if (content.type !== 'text') throw new Error('Unexpected response type');
+  const response = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  });
 
-  const cleanJson = content.text
+  const text = response.response.text();
+  if (!text) {
+    throw new Error('Empty response from Gemini API');
+  }
+
+  const cleanJson = text
     .replace(/^```(?:json)?\n?/m, '')
     .replace(/\n?```$/m, '')
     .trim();

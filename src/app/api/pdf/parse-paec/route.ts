@@ -36,12 +36,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El PDF no contiene texto legible.' }, { status: 400 });
     }
 
-    // 2. Parse PAEC data (resilient: Claude first, fallback to heuristics)
+    // 2. Parse PAEC data (resilient: Gemini first, fallback to heuristics)
     let parsedData;
     try {
-      parsedData = await structurePaecWithClaude(rawText);
+      parsedData = await structurePaecWithGemini(rawText);
     } catch (err: any) {
-      console.warn('[paec-parser] Claude failed, falling back to heuristics:', err.message || err);
+      console.warn('[paec-parser] Gemini failed, falling back to heuristics:', err.message || err);
       parsedData = parsePaecHeuristics(rawText);
     }
 
@@ -91,14 +91,14 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<string> {
   return fullText.trim();
 }
 
-// ─── Claude PAEC structuring ──────────────────────────────────────────────────
-async function structurePaecWithClaude(rawText: string) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('No ANTHROPIC_API_KEY');
+// ─── Gemini PAEC structuring ──────────────────────────────────────────────────
+async function structurePaecWithGemini(rawText: string) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('No GEMINI_API_KEY');
   }
 
-  const Anthropic = (await import('@anthropic-ai/sdk')).default;
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
   // Excerpt first 8000 characters
   const excerpt = rawText.slice(0, 8000);
@@ -122,16 +122,23 @@ async function structurePaecWithClaude(rawText: string) {
   TEXTO DEL DOCUMENTO:
   ${excerpt}`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
   });
 
-  const content = response.content[0];
-  if (content.type !== 'text') throw new Error('Unexpected response type');
+  const response = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  });
 
-  const cleanJson = content.text
+  const text = response.response.text();
+  if (!text) {
+    throw new Error('Empty response from Gemini API');
+  }
+
+  const cleanJson = text
     .replace(/^```(?:json)?\n?/m, '')
     .replace(/\n?```$/m, '')
     .trim();
