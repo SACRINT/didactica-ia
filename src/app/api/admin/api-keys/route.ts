@@ -70,20 +70,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT /api/admin/api-keys/[id] — update a key (active status, priority, label)
+// PUT /api/admin/api-keys — update a key (active status, priority, label, modelDefault)
 export async function PUT(req: NextRequest) {
   try {
     await requireAdmin();
-    const url = new URL(req.url);
-    const id = url.pathname.split('/').pop();
-    const { isActive, priority, label, modelDefault } = await req.json();
+    const { id, isActive, priority, label, modelDefault } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: 'El ID de la API Key es requerido' }, { status: 400 });
+    }
     const sql = getDb();
 
     await sql`
       UPDATE api_keys SET
-        is_active    = COALESCE(${isActive ?? null}, is_active),
-        priority     = COALESCE(${priority ?? null}, priority),
-        label        = COALESCE(${label ?? null}, label),
+        is_active     = COALESCE(${isActive ?? null}, is_active),
+        priority      = COALESCE(${priority ?? null}, priority),
+        label         = COALESCE(${label ?? null}, label),
         model_default = COALESCE(${modelDefault ?? null}, model_default)
       WHERE id = ${id}
     `;
@@ -95,12 +96,14 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// DELETE /api/admin/api-keys/[id]
+// DELETE /api/admin/api-keys
 export async function DELETE(req: NextRequest) {
   try {
     await requireAdmin();
-    const url = new URL(req.url);
-    const id = url.pathname.split('/').pop();
+    const { id } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: 'El ID de la API Key es requerido' }, { status: 400 });
+    }
     const sql = getDb();
     await sql`DELETE FROM api_keys WHERE id = ${id}`;
     return NextResponse.json({ success: true });
@@ -110,3 +113,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
+

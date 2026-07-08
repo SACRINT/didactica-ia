@@ -6,6 +6,22 @@ export function buildUserPrompt(
   semester: number,
   component: string
 ): string {
+  // ── Hour distribution math ─────────────────────────────────────────────────
+  // The semester has 3 evaluation periods (cortes), each with 6 weeks.
+  // Total semester weeks ≈ 18.
+  // Weekly load = totalHours / 18  (rounded to nearest integer)
+  // Hours per corte = weeklyLoad × 6
+  // Expected values:
+  //   3 h/week → 18 h/corte (54 h total)
+  //   4 h/week → 24 h/corte (72 h total)
+  const totalHours = extractedData.totalHours;
+  const weeklyLoad = Math.round(totalHours / 18);           // e.g. 3 or 4
+  const hoursPerCorte = weeklyLoad * 6;                     // e.g. 18 or 24
+  const hoursPerCorteVerified = Math.round(totalHours / 3); // fallback if totalHours/18 doesn't give round number
+
+  // Use the most consistent value
+  const hpc = Number.isInteger(totalHours / 3) ? hoursPerCorteVerified : hoursPerCorte;
+
   const activitiesText = extractedData.activities
     .map((a, i) => {
       let text = `  ${i + 1}. ${a.name} (${a.hours} horas)`;
@@ -58,7 +74,8 @@ export function buildUserPrompt(
 UAC: ${extractedData.uacName}
 Semestre: ${semester}° Semestre
 Componente: ${componentLabels[component] || component}
-Carga horaria total: ${extractedData.totalHours} horas
+Carga horaria TOTAL del semestre: ${totalHours} horas
+Carga horaria SEMANAL: ${weeklyLoad} horas por semana
 Resultado de aprendizaje: ${extractedData.learningOutcome || '(Inferir del nombre de la UAC y el contexto)'}
 
 ${component === 'laboral' ? 'Actividades Clave' : 'Propósitos y Contenidos formativos'} del programa:
@@ -66,6 +83,21 @@ ${activitiesText}
 
 Evidencias sugeridas por el programa:
 ${evidencesText}
+
+═══════════ DISTRIBUCIÓN HORARIA OBLIGATORIA POR CORTE ═══════════
+REGLA MATEMÁTICA ESTRICTA — NO MODIFICAR:
+  • El semestre se divide en 3 Cortes de evaluación (Corte 1, Corte 2, Corte 3)
+  • Cada Corte tiene exactamente 6 semanas de clases
+  • Carga semanal de esta UAC: ${weeklyLoad} horas/semana
+  • HORAS POR CORTE: ${weeklyLoad} h/semana × 6 semanas = ${hpc} horas exactas por Corte
+  • Total: ${hpc} h × 3 Cortes = ${hpc * 3} horas (debe coincidir con la carga total de ${totalHours} h)
+
+DISTRIBUCIÓN DE ACTIVIDADES POR CORTE:
+  - La suma de horas de las actividades asignadas al Corte 1 debe ser EXACTAMENTE ${hpc} horas.
+  - La suma de horas de las actividades asignadas al Corte 2 debe ser EXACTAMENTE ${hpc} horas.
+  - La suma de horas de las actividades asignadas al Corte 3 debe ser EXACTAMENTE ${hpc} horas.
+  - Si una actividad no cabe completa en un Corte, divídela entre dos Cortes para cuadrar exactamente.
+  - Las horas de cada actividad en la Sección IV deben sumar ${hpc} por Corte.
 
 ═══════════ DATOS DEL DOCENTE Y PLANTEL ═══════════
 Docente: ${context.teacherName}
@@ -96,6 +128,8 @@ ${context.studentContext || '(No especificada — adapta al contexto general del
 6. Genera exactamente ${extractedData.activities.length} secuencias didácticas correspondientes a cada ${component === 'laboral' ? 'Actividad Clave' : 'Propósito/Contenido formativo'} en la Sección IV
 7. Las ponderaciones en la Sección V deben sumar exactamente 100%
 8. El período de aplicación en Sección I debe ser: ${context.applicationPeriod || 'Agosto – Diciembre 2026'}
+9. HORAS POR CORTE: Verifica antes de responder que la suma de horas por Corte sea exactamente ${hpc} en cada uno de los 3 Cortes.
 
 Responde SOLO con el JSON, sin markdown ni texto adicional.`;
 }
+

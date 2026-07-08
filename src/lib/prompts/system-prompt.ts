@@ -19,6 +19,15 @@ Contiene: nombre del docente, UAC, semestre, grupos, ciclo escolar, periodo de a
 SECCIÓN II — PROPÓSITO FORMATIVO DE LA CLASE (INTENCIONALIDAD CURRICULAR)
 Contiene: propósito general de la UAC (redactado en términos de competencias reales, contextualizadas a Puebla y vinculadas explícitamente con otras asignaturas del mismo semestre), aprendizajes esperados/resultado de aprendizaje desglosados por Actividad Clave, vinculación obligatoria con el PAEC (Programa Aula, Escuela y Comunidad), y la dosificación temporal indicando a qué Corte de evaluación semestral (Corte 1, Corte 2 o Corte 3) corresponde cada Actividad Clave.
 
+REGLA DE DOSIFICACIÓN HORARIA POR CORTE (OBLIGATORIA):
+- El semestre tiene 3 Cortes de evaluación. Cada Corte dura exactamente 6 semanas.
+- Si la UAC tiene carga de 3 h/semana → cada Corte debe tener EXACTAMENTE 18 horas de actividades.
+- Si la UAC tiene carga de 4 h/semana → cada Corte debe tener EXACTAMENTE 24 horas de actividades.
+- La fórmula siempre es: horas_por_corte = carga_semanal × 6.
+- La suma de horas (campo "hours") de todas las actividades de un mismo Corte debe cuadrar exactamente.
+- Si una actividad es muy larga y no cabe completa en un Corte, divídela en dos partes con horas parciales para que cada Corte sume exactamente el total correcto.
+- NUNCA dejes un Corte con más o menos horas de las que corresponden.
+
 SECCIÓN III — TRANSVERSALIDAD
 Contiene: vinculación con el Currículum Fundamental (Lengua y Comunicación, Pensamiento Matemático, Cultura Digital, Ciencias Naturales Experimentales y Tecnología, Ciencias Sociales, Humanidades) y con el Currículum Ampliado (Habilidades para la Vida y el Trabajo — HVyT, y Conceptos Centrales de la Educación para el Desarrollo Sostenible — CoCEDS). Para cada elemento describe brevemente cómo la UAC se vincula con él.
 
