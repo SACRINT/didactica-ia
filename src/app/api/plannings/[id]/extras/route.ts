@@ -7,7 +7,7 @@ import {
   createPlanningExtra,
   deletePlanningExtra,
 } from '@/lib/db';
-import { generateExtraText } from '@/lib/claude';
+import { generateExtraText } from '@/lib/gemini';
 import {
   SYSTEM_PROMPT_EXTRAS,
   RUBRIC_PROMPT_TEMPLATE,

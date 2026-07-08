@@ -6,7 +6,6 @@ import {
   updatePaecProjectStep,
   getProgramsCatalogForPaec,
 } from '@/lib/db';
-import Anthropic from '@anthropic-ai/sdk';
 import {
   PAEC_SYSTEM_PROMPT,
   buildPrompt1Diagnostico,
@@ -18,15 +17,16 @@ import {
 } from '@/lib/prompts/paec-prompts';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 60 seconds max execution time for Claude generation
+export const maxDuration = 120; // Increase to 120s as Gemini 2.5 Pro can take slightly longer for high-depth tasks
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  return new GoogleGenerativeAI(apiKey);
 }
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function POST(
   request: NextRequest,
@@ -145,36 +145,43 @@ export async function POST(
       }
     }
 
-    // Call Claude Haiku 4.5
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 8192,
-      system: [
-        {
-          type: 'text',
-          text: PAEC_SYSTEM_PROMPT,
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages: [{ role: 'user', content: userPrompt }],
+    // Call Gemini 2.5 Pro
+    console.log(`Generating PAEC Step ${step} using Gemini...`);
+    const genAI = getGeminiClient();
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
     });
 
-    const respText = response.content[0];
-    if (respText.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
+    const response = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: `System Instructions:\n${PAEC_SYSTEM_PROMPT}\n\nUser Input:\n${userPrompt}` }
+          ]
+        }
+      ]
+    });
+
+    const text = response.response.text();
+    if (!text) {
+      throw new Error('Unexpected empty response from Gemini API');
     }
 
     let parsedJson: object;
     try {
-      const cleanJson = respText.text
+      const cleanJson = text
         .replace(/^```(?:json)?\n?/m, '')
         .replace(/\n?```$/m, '')
         .trim();
       parsedJson = JSON.parse(cleanJson);
     } catch (err) {
-      console.error('Failed to parse Claude response:', respText.text.substring(0, 500));
+      console.error('Failed to parse Gemini response:', text.substring(0, 500));
       return NextResponse.json(
-        { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
+        { error: 'La IA de Google no retornó un formato JSON válido. Por favor reintenta.' },
         { status: 500 }
       );
     }

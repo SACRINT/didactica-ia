@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail, getPlanningById, updatePlanningContent } from '@/lib/db';
-import { generatePlanning } from '@/lib/claude';
+import { generatePlanning } from '@/lib/gemini';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
