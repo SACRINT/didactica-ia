@@ -5,8 +5,7 @@ import { generatePlanningStream } from '@/lib/gemini';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
-export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const runtime = 'edge';
 
 export async function POST(
   request: NextRequest,

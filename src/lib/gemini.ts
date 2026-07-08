@@ -1,14 +1,13 @@
 
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { SYSTEM_PROMPT } from './prompts/system-prompt';
 import type { GeneratedPlanningContent } from '@/types/planning';
 
-// We dynamically initialize GoogleGenAI to allow running build tasks without the env variable set.
 function getGeminiClient() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY environment variable is not set');
   }
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
   return new GoogleGenerativeAI(apiKey);
 }
 
