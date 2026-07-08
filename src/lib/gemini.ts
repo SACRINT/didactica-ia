@@ -23,7 +23,7 @@ export async function generatePlanning(
 ): Promise<GeneratedPlanningContent> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.5-flash',
     generationConfig: {
       responseMimeType: 'application/json',
     },
@@ -75,7 +75,7 @@ export async function* generatePlanningStream(
 ): AsyncGenerator<string> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.5-flash',
   });
 
   const result = await model.generateContentStream({

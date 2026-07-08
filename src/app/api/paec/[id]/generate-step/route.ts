@@ -145,11 +145,11 @@ export async function POST(
       }
     }
 
-    // Call Gemini 2.5 Pro
+    // Call Gemini 2.5 Flash
     console.log(`Generating PAEC Step ${step} using Gemini...`);
     const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
       },

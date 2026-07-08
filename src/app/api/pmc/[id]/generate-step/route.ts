@@ -10,10 +10,13 @@ export const maxDuration = 120;
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// Lazily instantiate OpenAI to avoid build-time errors when env var is missing
-function getOpenAI() {
-  const OpenAI = require('openai').default as typeof import('openai').default;
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  return new GoogleGenerativeAI(apiKey);
 }
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -230,27 +233,36 @@ Genera el apartado de DIAGNÓSTICO del PMC con:
 
 Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO inventes datos no proporcionados.`;
 
-      const response = await getOpenAI().chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 4096,
+      const genAI = getGeminiClient();
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
       });
 
-      const rawText = response.choices[0]?.message?.content ?? '{}';
+      const response = await model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: `System Instructions:\nEres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado.\n\nUser Input:\n${prompt}` }
+            ]
+          }
+        ]
+      });
+
+      const rawText = response.response.text();
+      if (!rawText) {
+        throw new Error('Empty response from Gemini');
+      }
+
       let parsedDiag: object;
       try {
         parsedDiag = JSON.parse(cleanJsonResponse(rawText));
       } catch {
         return NextResponse.json(
-          { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
+          { error: 'La IA de Google no retornó un formato JSON válido. Por favor reintenta.' },
           { status: 500 }
         );
       }
@@ -396,27 +408,36 @@ Responde con JSON con esta estructura EXACTA:
   ]
 }`;
 
-      const response = await getOpenAI().chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado. Nunca omitas metas institucionales para los temas indicados.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 8192,
+      const genAI = getGeminiClient();
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
       });
 
-      const rawText = response.choices[0]?.message?.content ?? '{}';
+      const response = await model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: `System Instructions:\nEres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado. Nunca omitas metas institucionales para los temas indicados.\n\nUser Input:\n${prompt}` }
+            ]
+          }
+        ]
+      });
+
+      const rawText = response.response.text();
+      if (!rawText) {
+        throw new Error('Empty response from Gemini');
+      }
+
       let parsedPlan: object;
       try {
         parsedPlan = JSON.parse(cleanJsonResponse(rawText));
       } catch {
         return NextResponse.json(
-          { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
+          { error: 'La IA de Google no retornó un formato JSON válido. Por favor reintenta.' },
           { status: 500 }
         );
       }
