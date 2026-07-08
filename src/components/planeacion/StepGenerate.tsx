@@ -55,8 +55,39 @@ export default function StepGenerate({
         body: JSON.stringify({ extractedData, context }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al generar la planeación');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al generar la planeación');
+      }
+
+      // Read stream chunk-by-chunk to bypass gateway timeout limits
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+      let accumulatedText = '';
+
+      if (reader) {
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            const chunk = decoder.decode(value, { stream: !done });
+            accumulatedText += chunk;
+          }
+        }
+      }
+
+      // Simple validation of the final JSON result structure
+      try {
+        const cleanJson = accumulatedText
+          .replace(/^```(?:json)?\n?/m, '')
+          .replace(/\n?```$/m, '')
+          .trim();
+        JSON.parse(cleanJson);
+      } catch (err) {
+        console.error('Incomplete stream content:', accumulatedText);
+        throw new Error('La respuesta del servidor no se completó correctamente. Por favor intenta de nuevo.');
+      }
 
       setCurrentStep('building');
       await delay(900);
@@ -106,7 +137,7 @@ export default function StepGenerate({
         <p className="generation-subtitle">
           {currentStep === 'done'
             ? 'Tu planeación didáctica está lista para descargar en formato DOCX editable.'
-            : 'La inteligencia artificial está construyendo las 7 secciones del formato oficial DBEPA 2026-2027.'}
+            : 'La plataforma Didáctica-IA está construyendo las 7 secciones del formato oficial DBEPA 2026-2027.'}
         </p>
 
         <div className="generation-steps">

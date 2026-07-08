@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail, getPlanningById, updatePlanningContent } from '@/lib/db';
-import { generatePlanning } from '@/lib/gemini';
+import { generatePlanningStream } from '@/lib/gemini';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
@@ -50,13 +50,49 @@ export async function POST(
       planning.component as string
     );
 
-    // Generate with Claude Haiku 4.5 (with Prompt Caching)
-    const content = await generatePlanning(userPrompt);
+    const encoder = new TextEncoder();
 
-    // Save to database (teacher_id enforced = only owner can update)
-    await updatePlanningContent(id, teacher.id, content);
+    // ReadableStream configuration to feed Gemini chunks to the frontend
+    const stream = new ReadableStream({
+      async start(controller) {
+        let accumulatedText = '';
+        try {
+          const textGenerator = await generatePlanningStream(userPrompt);
+          
+          for await (const chunk of textGenerator) {
+            accumulatedText += chunk;
+            controller.enqueue(encoder.encode(chunk));
+          }
 
-    return NextResponse.json({ content });
+          // Once generation is finished, parse and save to database
+          try {
+            const cleanJson = accumulatedText
+              .replace(/^```(?:json)?\n?/m, '')
+              .replace(/\n?```$/m, '')
+              .trim();
+            const parsedContent = JSON.parse(cleanJson);
+            
+            await updatePlanningContent(id, teacher.id, parsedContent);
+          } catch (dbErr) {
+            console.error('Failed to parse or save accumulated JSON stream to database:', dbErr);
+          }
+
+          controller.close();
+        } catch (streamErr) {
+          console.error('Stream generation error:', streamErr);
+          controller.error(streamErr);
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+      },
+    });
+
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
     console.error('Generate planning error:', message);
