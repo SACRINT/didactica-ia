@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/generative-ai';
+
 import { SYSTEM_PROMPT } from './prompts/system-prompt';
 import type { GeneratedPlanningContent } from '@/types/planning';
 
