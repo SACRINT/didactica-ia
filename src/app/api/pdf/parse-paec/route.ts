@@ -3,6 +3,14 @@ import { auth } from '@/lib/auth';
 import { getTeacherByEmail } from '@/lib/db';
 import path from 'path';
 
+// Polyfills for browser-only globals required by pdfjs-dist v6 under Node/Vercel environments
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {} as any;
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  globalThis.Path2D = class Path2D {} as any;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();

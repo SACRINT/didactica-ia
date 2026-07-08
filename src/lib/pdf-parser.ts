@@ -2,6 +2,14 @@ import type { PdfParseResult } from '@/types/pdf-extraction';
 import type { KeyActivity } from '@/types/planning';
 import path from 'path';
 
+// Polyfills for browser-only globals required by pdfjs-dist v6 under Node/Vercel environments
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {} as any;
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  globalThis.Path2D = class Path2D {} as any;
+}
+
 /**
  * Two-step PDF extraction:
  * 1. pdfjs-dist  → extract raw text from PDF (handles owner-restricted SEP PDFs)
