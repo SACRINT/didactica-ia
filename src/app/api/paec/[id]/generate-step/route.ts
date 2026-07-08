@@ -15,18 +15,10 @@ import {
   buildPrompt5PlanOperativo,
   buildPrompt6Anexos,
 } from '@/lib/prompts/paec-prompts';
+import { getAIProvider, logActivity } from '@/lib/ai-provider';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120; // Increase to 120s as Gemini 2.5 Pro can take slightly longer for high-depth tasks
-
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not set');
-  }
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  return new GoogleGenerativeAI(apiKey);
-}
+export const maxDuration = 120;
 
 export async function POST(
   request: NextRequest,
@@ -145,30 +137,13 @@ export async function POST(
       }
     }
 
-    // Call Gemini 2.5 Flash
-    console.log(`Generating PAEC Step ${step} using Gemini...`);
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-    });
+    // Call AI Provider (reads active provider + key from DB)
+    console.log(`Generating PAEC Step ${step} using AI Provider...`);
+    const ai = await getAIProvider();
+    const text = await ai.generate(PAEC_SYSTEM_PROMPT, userPrompt);
 
-    const response = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: `System Instructions:\n${PAEC_SYSTEM_PROMPT}\n\nUser Input:\n${userPrompt}` }
-          ]
-        }
-      ]
-    });
-
-    const text = response.response.text();
     if (!text) {
-      throw new Error('Unexpected empty response from Gemini API');
+      throw new Error('Respuesta vacía del proveedor de IA');
     }
 
     let parsedJson: object;
@@ -179,9 +154,9 @@ export async function POST(
         .trim();
       parsedJson = JSON.parse(cleanJson);
     } catch (err) {
-      console.error('Failed to parse Gemini response:', text.substring(0, 500));
+      console.error('Failed to parse AI response:', text.substring(0, 500));
       return NextResponse.json(
-        { error: 'La IA de Google no retornó un formato JSON válido. Por favor reintenta.' },
+        { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
         { status: 500 }
       );
     }
@@ -194,6 +169,15 @@ export async function POST(
       fieldName,
       parsedJson
     );
+
+    // Log activity
+    await logActivity({
+      teacherEmail: session.user.email!,
+      action: `generate_paec_step_${step}`,
+      entityType: 'paec',
+      entityId: id,
+      success: true,
+    });
 
     return NextResponse.json({ success: true, step, data: parsedJson, project: updatedProject });
   } catch (error) {

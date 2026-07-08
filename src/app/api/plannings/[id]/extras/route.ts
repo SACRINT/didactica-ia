@@ -8,6 +8,7 @@ import {
   deletePlanningExtra,
 } from '@/lib/db';
 import { generateExtraText } from '@/lib/gemini';
+import { logActivity } from '@/lib/ai-provider';
 import {
   SYSTEM_PROMPT_EXTRAS,
   RUBRIC_PROMPT_TEMPLATE,
@@ -135,8 +136,8 @@ Resultados de Aprendizaje: ${(contentJson?.sectionII?.learningOutcomes || []).jo
       return NextResponse.json({ error: 'Tipo de recurso no válido' }, { status: 400 });
     }
 
-    // Call Claude
-    console.log(`Generating extra of type ${type} using Claude...`);
+    // Call AI via wrapper (generateExtraText delegates to getAIProvider())
+    console.log(`Generating extra of type ${type} using AI Provider...`);
     const generatedMarkdown = await generateExtraText(SYSTEM_PROMPT_EXTRAS, userPrompt);
 
     // Save to Database
@@ -150,6 +151,15 @@ Resultados de Aprendizaje: ${(contentJson?.sectionII?.learningOutcomes || []).jo
       },
       teacher.id
     );
+
+    // Log activity
+    await logActivity({
+      teacherEmail: session.user.email!,
+      action: `generate_extra_${type}`,
+      entityType: 'planning',
+      entityId: planningId,
+      success: true,
+    });
 
     return NextResponse.json({ success: true, extra: newExtra });
   } catch (error) {

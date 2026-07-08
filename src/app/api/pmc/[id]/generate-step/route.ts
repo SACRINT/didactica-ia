@@ -2,22 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail } from '@/lib/db';
 import { neon } from '@neondatabase/serverless';
-import OpenAI from 'openai';
-
+import { getAIProvider, logActivity } from '@/lib/ai-provider';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 const sql = neon(process.env.DATABASE_URL!);
-
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not set');
-  }
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  return new GoogleGenerativeAI(apiKey);
-}
 
 type RouteContext = { params: Promise<{ id: string }> };
 type StepType = 'normativa' | 'diagnostico' | 'plan_accion';
@@ -233,28 +223,13 @@ Genera el apartado de DIAGNÓSTICO del PMC con:
 
 Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO inventes datos no proporcionados.`;
 
-      const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-      });
-
-      const response = await model.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: `System Instructions:\nEres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado.\n\nUser Input:\n${prompt}` }
-            ]
-          }
-        ]
-      });
-
-      const rawText = response.response.text();
+      const ai = await getAIProvider();
+      const rawText = await ai.generate(
+        'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado.',
+        prompt
+      );
       if (!rawText) {
-        throw new Error('Empty response from Gemini');
+        throw new Error('Respuesta vacía del proveedor de IA');
       }
 
       let parsedDiag: object;
@@ -262,7 +237,7 @@ Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO in
         parsedDiag = JSON.parse(cleanJsonResponse(rawText));
       } catch {
         return NextResponse.json(
-          { error: 'La IA de Google no retornó un formato JSON válido. Por favor reintenta.' },
+          { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
           { status: 500 }
         );
       }
@@ -276,6 +251,7 @@ Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO in
           AND teacher_id = ${teacher.id}
         RETURNING *
       `;
+      await logActivity({ teacherEmail: teacher.email, action: 'generate_pmc_diagnostico', entityType: 'pmc', entityId: id, success: true });
       return NextResponse.json({ success: true, step, diagnostico_generado: parsedDiag, project: updated });
     }
 
@@ -408,28 +384,13 @@ Responde con JSON con esta estructura EXACTA:
   ]
 }`;
 
-      const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        generationConfig: {
-          responseMimeType: 'application/json',
-        },
-      });
-
-      const response = await model.generateContent({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: `System Instructions:\nEres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado. Nunca omitas metas institucionales para los temas indicados.\n\nUser Input:\n${prompt}` }
-            ]
-          }
-        ]
-      });
-
-      const rawText = response.response.text();
+      const ai2 = await getAIProvider();
+      const rawText = await ai2.generate(
+        'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado. Nunca omitas metas institucionales para los temas indicados.',
+        prompt
+      );
       if (!rawText) {
-        throw new Error('Empty response from Gemini');
+        throw new Error('Respuesta vacía del proveedor de IA');
       }
 
       let parsedPlan: object;
@@ -437,7 +398,7 @@ Responde con JSON con esta estructura EXACTA:
         parsedPlan = JSON.parse(cleanJsonResponse(rawText));
       } catch {
         return NextResponse.json(
-          { error: 'La IA de Google no retornó un formato JSON válido. Por favor reintenta.' },
+          { error: 'La IA no retornó un formato JSON válido. Por favor reintenta.' },
           { status: 500 }
         );
       }
@@ -451,6 +412,7 @@ Responde con JSON con esta estructura EXACTA:
           AND teacher_id = ${teacher.id}
         RETURNING *
       `;
+      await logActivity({ teacherEmail: teacher.email, action: 'generate_pmc_plan_accion', entityType: 'pmc', entityId: id, success: true });
       return NextResponse.json({ success: true, step, plan_accion: parsedPlan, project: updated });
     }
 

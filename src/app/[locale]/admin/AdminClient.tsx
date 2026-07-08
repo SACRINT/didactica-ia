@@ -1,0 +1,640 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface ApiKey {
+  id: string; label: string; provider: string; model_default: string | null;
+  key_preview: string; is_active: boolean; priority: number;
+  usage_count: number; error_count: number; last_used_at: string | null;
+  last_error_at: string | null;
+}
+interface PlatformConfig { [key: string]: string; }
+interface Stats {
+  totals: { teachers: number; plannings: number; paec: number; pmc: number; todayActivity: number };
+  activityByDay: { date: string; count: number; action: string }[];
+  providerStats: { provider_used: string; model_used: string; count: number; successes: number; failures: number }[];
+  topUsers: { teacher_email: string; total_actions: number }[];
+}
+interface Teacher {
+  id: string; name: string; email: string; school_name: string;
+  planning_count: number; paec_count: number; pmc_count: number;
+  doc_count: number; last_active: string | null; is_blocked: boolean;
+}
+interface Prompt { id: string; label: string; content: string; is_active: boolean; updated_at: string; updated_by: string | null; }
+interface UserDoc { id: string; teacher_email: string; doc_type: string; label: string; uac_name: string | null; file_name: string | null; used_count: number; created_at: string; }
+interface ActivityEntry { id: string; teacher_email: string; action: string; provider_used: string | null; model_used: string | null; success: boolean; error_msg: string | null; created_at: string; }
+
+const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral'];
+const MODELS: Record<string, string[]> = {
+  gemini:  ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'],
+  claude:  ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4-5'],
+  openai:  ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
+  nvidia:  ['meta/llama-3.1-70b-instruct', 'microsoft/phi-3-mini-4k-instruct'],
+  qwen:    ['qwen-plus', 'qwen-max', 'qwen-turbo'],
+  mistral: ['mistral-small-latest', 'mistral-large-latest'],
+};
+
+// ── Helper ───────────────────────────────────────────────────────────────────
+
+function relativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'Nunca';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60000) return 'Hace un momento';
+  if (diff < 3600000) return `Hace ${Math.floor(diff / 60000)} min`;
+  if (diff < 86400000) return `Hace ${Math.floor(diff / 3600000)} h`;
+  return `Hace ${Math.floor(diff / 86400000)} días`;
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
+export default function AdminClient({ locale, adminEmail }: { locale: string; adminEmail: string }) {
+  const [activeTab, setActiveTab] = useState<'provider' | 'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity'>('stats');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // Data states
+  const [keys, setKeys]       = useState<ApiKey[]>([]);
+  const [config, setConfig]   = useState<PlatformConfig>({});
+  const [stats, setStats]     = useState<Stats | null>(null);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [adminDocs, setAdminDocs] = useState<UserDoc[]>([]);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+
+  // Form states
+  const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
+  const [editPromptId, setEditPromptId] = useState<string | null>(null);
+  const [editPromptContent, setEditPromptContent] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  // ── Data fetchers ────────────────────────────────────────────────────────
+
+  const showMsg = (text: string, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 4000); };
+
+  const loadKeys    = useCallback(() => fetch('/api/admin/api-keys').then(r => r.json()).then(d => setKeys(d.keys || [])), []);
+  const loadConfig  = useCallback(() => fetch('/api/admin/config').then(r => r.json()).then(d => setConfig(d.config || {})), []);
+  const loadStats   = useCallback(() => fetch('/api/admin/stats').then(r => r.json()).then(d => setStats(d)), []);
+  const loadTeachers = useCallback(() => fetch('/api/admin/users').then(r => r.json()).then(d => setTeachers(d.teachers || [])), []);
+  const loadPrompts = useCallback(() => fetch('/api/admin/prompts').then(r => r.json()).then(d => setPrompts(d.prompts || [])), []);
+  const loadDocs    = useCallback(() => fetch('/api/admin/documents').then(r => r.json()).then(d => setAdminDocs(d.documents || [])), []);
+  const loadActivity = useCallback(() => fetch('/api/admin/activity').then(r => r.json()).then(d => setActivity(d.activity || [])), []);
+
+  useEffect(() => {
+    loadStats();
+    loadConfig();
+    loadKeys();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'users') loadTeachers();
+    if (activeTab === 'prompts') loadPrompts();
+    if (activeTab === 'docs') loadDocs();
+    if (activeTab === 'activity') loadActivity();
+  }, [activeTab]);
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  async function saveConfig(updates: Record<string, string>) {
+    setSaving(true);
+    const r = await fetch('/api/admin/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+    setSaving(false);
+    if (r.ok) { setConfig(c => ({ ...c, ...updates })); showMsg('Configuración guardada ✓'); }
+    else showMsg('Error al guardar', false);
+  }
+
+  async function addKey() {
+    if (!newKey.label || !newKey.provider || !newKey.apiKey) return showMsg('Completa todos los campos', false);
+    setSaving(true);
+    const r = await fetch('/api/admin/api-keys', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newKey.label, provider: newKey.provider, apiKey: newKey.apiKey, modelDefault: newKey.modelDefault }),
+    });
+    setSaving(false);
+    if (r.ok) { setNewKey({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' }); loadKeys(); showMsg('API Key agregada y cifrada ✓'); }
+    else { const d = await r.json(); showMsg(d.error || 'Error', false); }
+  }
+
+  async function toggleKey(id: string, isActive: boolean) {
+    await fetch('/api/admin/api-keys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, isActive }) });
+    loadKeys();
+  }
+
+  async function deleteKey(id: string) {
+    if (!confirm('¿Eliminar esta API Key?')) return;
+    await fetch('/api/admin/api-keys', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    loadKeys(); showMsg('Key eliminada');
+  }
+
+  async function movePriority(id: string, dir: 'up' | 'down') {
+    const sorted = [...keys].sort((a, b) => a.priority - b.priority);
+    const idx = sorted.findIndex(k => k.id === id);
+    const swap = dir === 'up' ? sorted[idx - 1] : sorted[idx + 1];
+    if (!swap) return;
+    await Promise.all([
+      fetch('/api/admin/api-keys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, priority: swap.priority }) }),
+      fetch('/api/admin/api-keys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: swap.id, priority: sorted[idx].priority }) }),
+    ]);
+    loadKeys();
+  }
+
+  async function toggleUser(teacherId: string, isBlocked: boolean) {
+    await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacherId, isBlocked }) });
+    loadTeachers(); showMsg(isBlocked ? 'Usuario bloqueado' : 'Usuario reactivado');
+  }
+
+  async function savePrompt() {
+    if (!editPromptId) return;
+    setSaving(true);
+    const r = await fetch('/api/admin/prompts', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editPromptId, content: editPromptContent }),
+    });
+    setSaving(false);
+    if (r.ok) { setEditPromptId(null); loadPrompts(); showMsg('Prompt actualizado ✓'); }
+    else showMsg('Error al guardar prompt', false);
+  }
+
+  async function deleteDoc(id: string) {
+    if (!confirm('¿Eliminar este documento del usuario?')) return;
+    await fetch('/api/admin/documents', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    loadDocs(); showMsg('Documento eliminado');
+  }
+
+  async function testConnection() {
+    setTestResult('Probando conexión...');
+    try {
+      const r = await fetch('/api/admin/api-keys');
+      if (r.ok) setTestResult('✅ Conexión exitosa con la base de datos');
+      else setTestResult('❌ Error al conectar');
+    } catch { setTestResult('❌ Error de red'); }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const tabs: { id: typeof activeTab; label: string; icon: string }[] = [
+    { id: 'stats',    label: 'Estadísticas',  icon: '📊' },
+    { id: 'provider', label: 'Proveedor IA',  icon: '🤖' },
+    { id: 'keys',     label: 'API Keys',      icon: '🔑' },
+    { id: 'config',   label: 'Configuración', icon: '⚙️' },
+    { id: 'users',    label: 'Usuarios',      icon: '👥' },
+    { id: 'prompts',  label: 'Prompts',       icon: '✏️' },
+    { id: 'docs',     label: 'Documentos',    icon: '📁' },
+    { id: 'activity', label: 'Actividad',     icon: '📋' },
+  ];
+
+  return (
+    <div className="admin-panel">
+      <style>{`
+        .admin-panel { display: flex; gap: 0; min-height: 85vh; background: var(--bg-card, #1a1d2e); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .admin-sidebar { width: 200px; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); padding: 24px 0; flex-shrink: 0; }
+        .admin-sidebar h2 { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.4); padding: 0 20px 12px; text-transform: uppercase; }
+        .admin-tab-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 20px; font-size: 13px; color: rgba(255,255,255,0.6); background: none; border: none; cursor: pointer; text-align: left; transition: all 0.2s; }
+        .admin-tab-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .admin-tab-btn.active { background: rgba(99,102,241,0.2); color: #818cf8; border-right: 3px solid #818cf8; font-weight: 600; }
+        .admin-content { flex: 1; padding: 32px; overflow-y: auto; max-height: 85vh; }
+        .admin-content h1 { font-size: 22px; font-weight: 700; color: #f0f4ff; margin-bottom: 24px; }
+        .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+        .stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center; }
+        .stat-card .num { font-size: 32px; font-weight: 800; color: #818cf8; }
+        .stat-card .lbl { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+        .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .admin-table th { text-align: left; padding: 10px 12px; color: rgba(255,255,255,0.4); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .admin-table td { padding: 10px 12px; color: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+        .admin-table tr:hover td { background: rgba(255,255,255,0.03); }
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .badge-green  { background: rgba(34,197,94,0.15); color: #4ade80; }
+        .badge-red    { background: rgba(239,68,68,0.15);  color: #f87171; }
+        .badge-yellow { background: rgba(234,179,8,0.15);  color: #facc15; }
+        .badge-blue   { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .btn-sm { padding: 5px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: #6366f1; color: #fff; }
+        .btn-primary:hover { background: #4f52d3; }
+        .btn-danger  { background: rgba(239,68,68,0.15); color: #f87171; }
+        .btn-danger:hover  { background: rgba(239,68,68,0.3); }
+        .btn-ghost   { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+        .btn-ghost:hover   { background: rgba(255,255,255,0.1); }
+        .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+        .form-group label { font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input, .form-group select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 8px 12px; color: #f0f4ff; font-size: 13px; outline: none; }
+        .form-group input:focus, .form-group select:focus { border-color: #6366f1; }
+        .form-group textarea { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 12px; color: #f0f4ff; font-size: 13px; outline: none; font-family: monospace; resize: vertical; min-height: 300px; width: 100%; }
+        .form-group textarea:focus { border-color: #6366f1; }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 9999; animation: slideIn 0.3s ease; }
+        .toast-ok  { background: rgba(34,197,94,0.9); color: #fff; }
+        .toast-err { background: rgba(239,68,68,0.9); color: #fff; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 24px 0; }
+        .provider-card { background: rgba(255,255,255,0.04); border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .provider-card.selected { border-color: #6366f1; background: rgba(99,102,241,0.12); }
+        .provider-card:hover { border-color: rgba(99,102,241,0.5); }
+        .prompt-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+        .prompt-item .prompt-label { font-weight: 600; color: #f0f4ff; font-size: 14px; margin-bottom: 4px; }
+        .prompt-item .prompt-meta  { font-size: 11px; color: rgba(255,255,255,0.4); }
+        .empty-state { text-align: center; padding: 48px; color: rgba(255,255,255,0.3); font-size: 14px; }
+      `}</style>
+
+      {/* Sidebar */}
+      <div className="admin-sidebar">
+        <h2>Admin Panel</h2>
+        {tabs.map(t => (
+          <button key={t.id} className={`admin-tab-btn ${activeTab === t.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(t.id)}>
+            <span>{t.icon}</span> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="admin-content">
+
+        {/* ── STATS ── */}
+        {activeTab === 'stats' && (
+          <>
+            <h1>📊 Estadísticas de la Plataforma</h1>
+            {stats ? (
+              <>
+                <div className="admin-grid">
+                  <div className="stat-card"><div className="num">{stats.totals.plannings}</div><div className="lbl">Planeaciones</div></div>
+                  <div className="stat-card"><div className="num">{stats.totals.paec}</div><div className="lbl">Proyectos PAEC</div></div>
+                  <div className="stat-card"><div className="num">{stats.totals.pmc}</div><div className="lbl">Planes PMC</div></div>
+                  <div className="stat-card"><div className="num">{stats.totals.teachers}</div><div className="lbl">Docentes</div></div>
+                  <div className="stat-card"><div className="num">{stats.totals.todayActivity}</div><div className="lbl">Acciones hoy</div></div>
+                </div>
+                {stats.providerStats.length > 0 && (
+                  <>
+                    <h3 style={{ color: '#818cf8', fontSize: 14, marginBottom: 12 }}>Uso por Proveedor</h3>
+                    <table className="admin-table" style={{ marginBottom: 24 }}>
+                      <thead><tr><th>Proveedor</th><th>Modelo</th><th>Usos</th><th>Exitosos</th><th>Errores</th></tr></thead>
+                      <tbody>
+                        {stats.providerStats.map((p, i) => (
+                          <tr key={i}>
+                            <td><span className="badge badge-blue">{p.provider_used}</span></td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.model_used}</td>
+                            <td>{p.count}</td>
+                            <td style={{ color: '#4ade80' }}>{p.successes}</td>
+                            <td style={{ color: '#f87171' }}>{p.failures}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+                {stats.topUsers.length > 0 && (
+                  <>
+                    <h3 style={{ color: '#818cf8', fontSize: 14, marginBottom: 12 }}>Top Docentes (últimos 30 días)</h3>
+                    <table className="admin-table">
+                      <thead><tr><th>#</th><th>Email</th><th>Acciones</th></tr></thead>
+                      <tbody>
+                        {stats.topUsers.map((u, i) => (
+                          <tr key={u.teacher_email}>
+                            <td style={{ color: '#818cf8' }}>#{i + 1}</td>
+                            <td>{u.teacher_email}</td>
+                            <td>{u.total_actions}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+                {stats.providerStats.length === 0 && stats.topUsers.length === 0 && (
+                  <div className="empty-state">🚀 Aún no hay actividad registrada.<br/>Las estadísticas aparecerán cuando los docentes empiecen a generar contenido.</div>
+                )}
+              </>
+            ) : <div className="empty-state">Cargando estadísticas...</div>}
+          </>
+        )}
+
+        {/* ── PROVIDER ── */}
+        {activeTab === 'provider' && (
+          <>
+            <h1>🤖 Proveedor de IA Activo</h1>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 24 }}>
+              Selecciona el proveedor y modelo que usará la plataforma para generar contenido.
+            </p>
+            {PROVIDERS.map(p => (
+              <div key={p} className={`provider-card ${config['active_provider'] === p ? 'selected' : ''}`}
+                onClick={() => saveConfig({ active_provider: p, active_model: MODELS[p][0] })}>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#f0f4ff', textTransform: 'capitalize' }}>{p}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                    {MODELS[p].join(' · ')}
+                  </div>
+                </div>
+                {config['active_provider'] === p && <span className="badge badge-green">✓ Activo</span>}
+              </div>
+            ))}
+            {config['active_provider'] && (
+              <>
+                <div className="divider" />
+                <div className="form-row">
+                  <div className="form-group" style={{ maxWidth: 340 }}>
+                    <label>Modelo activo para {config['active_provider']}</label>
+                    <select value={config['active_model'] || ''} onChange={e => saveConfig({ active_model: e.target.value })}>
+                      {(MODELS[config['active_provider']] || []).map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {testResult && <div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: 8, fontSize: 13, color: '#f0f4ff', marginTop: 16 }}>{testResult}</div>}
+                <button className="btn-sm btn-ghost" style={{ marginTop: 12 }} onClick={testConnection}>Probar conexión a BD</button>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── API KEYS ── */}
+        {activeTab === 'keys' && (
+          <>
+            <h1>🔑 Gestión de API Keys</h1>
+            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 24 }}>
+              🔐 Las API Keys se almacenan cifradas con AES-256. Nadie puede ver su valor real desde la interfaz.
+            </div>
+
+            {/* Add form */}
+            <h3 style={{ fontSize: 14, color: '#818cf8', marginBottom: 16 }}>Agregar Nueva Key</h3>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Etiqueta</label>
+                <input placeholder="Ej: Gemini cuenta 2 personal" value={newKey.label} onChange={e => setNewKey(k => ({ ...k, label: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ maxWidth: 140 }}>
+                <label>Proveedor</label>
+                <select value={newKey.provider} onChange={e => setNewKey(k => ({ ...k, provider: e.target.value }))}>
+                  {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>API Key</label>
+                <input type="password" placeholder="Pega tu API Key aquí" value={newKey.apiKey} onChange={e => setNewKey(k => ({ ...k, apiKey: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ maxWidth: 200 }}>
+                <label>Modelo por defecto (opcional)</label>
+                <select value={newKey.modelDefault} onChange={e => setNewKey(k => ({ ...k, modelDefault: e.target.value }))}>
+                  <option value="">— Usar modelo activo —</option>
+                  {(MODELS[newKey.provider] || []).map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <button className="btn-sm btn-primary" onClick={addKey} disabled={saving} style={{ height: 36, alignSelf: 'flex-end' }}>
+                {saving ? '...' : '+ Agregar'}
+              </button>
+            </div>
+
+            <div className="divider" />
+
+            {/* Keys table */}
+            {keys.length === 0 ? (
+              <div className="empty-state">No hay API Keys configuradas.<br/>Agrega tu primera key arriba.</div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Prioridad</th><th>Proveedor</th><th>Etiqueta</th><th>Key</th>
+                    <th>Estado</th><th>Usos</th><th>Errores</th><th>Último uso</th><th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...keys].sort((a, b) => a.priority - b.priority).map((k, idx) => (
+                    <tr key={k.id}>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="btn-sm btn-ghost" onClick={() => movePriority(k.id, 'up')} disabled={idx === 0}>↑</button>
+                          <span style={{ color: '#818cf8', fontWeight: 700 }}>#{k.priority}</span>
+                          <button className="btn-sm btn-ghost" onClick={() => movePriority(k.id, 'down')} disabled={idx === keys.length - 1}>↓</button>
+                        </div>
+                      </td>
+                      <td><span className="badge badge-blue">{k.provider}</span></td>
+                      <td>{k.label}</td>
+                      <td style={{ fontFamily: 'monospace', color: '#facc15' }}>{k.key_preview}</td>
+                      <td>
+                        <span className={`badge ${k.is_active ? 'badge-green' : 'badge-yellow'}`}>
+                          {k.is_active ? '✓ Activa' : '⏸ Inactiva'}
+                        </span>
+                      </td>
+                      <td>{k.usage_count}</td>
+                      <td style={{ color: k.error_count > 0 ? '#f87171' : 'inherit' }}>{k.error_count}</td>
+                      <td style={{ fontSize: 11 }}>{relativeTime(k.last_used_at)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn-sm btn-ghost" onClick={() => toggleKey(k.id, !k.is_active)}>
+                            {k.is_active ? 'Pausar' : 'Activar'}
+                          </button>
+                          <button className="btn-sm btn-danger" onClick={() => deleteKey(k.id)}>🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+        {/* ── CONFIG ── */}
+        {activeTab === 'config' && (
+          <>
+            <h1>⚙️ Configuración de la Plataforma</h1>
+            <div style={{ display: 'grid', gap: 20, maxWidth: 560 }}>
+              <div className="form-group">
+                <label>Ciclo Escolar Activo</label>
+                <input value={config['school_year'] || ''} onChange={e => setConfig(c => ({ ...c, school_year: e.target.value }))}
+                  onBlur={() => saveConfig({ school_year: config['school_year'] || '' })} placeholder="2026-2027" />
+              </div>
+              <div className="form-group">
+                <label>Máximo de Planeaciones por Docente por Día</label>
+                <input type="number" min="1" max="100" value={config['max_daily_plannings'] || '10'}
+                  onChange={e => setConfig(c => ({ ...c, max_daily_plannings: e.target.value }))}
+                  onBlur={() => saveConfig({ max_daily_plannings: config['max_daily_plannings'] || '10' })} />
+              </div>
+              <div className="form-group">
+                <label>Mensaje de bienvenida (visible en el dashboard del docente)</label>
+                <input value={config['welcome_message'] || ''}
+                  onChange={e => setConfig(c => ({ ...c, welcome_message: e.target.value }))}
+                  onBlur={() => saveConfig({ welcome_message: config['welcome_message'] || '' })}
+                  placeholder="Ej: ¡Bienvenido al ciclo 2026-2027!" />
+              </div>
+              <div className="divider" />
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  Modo Mantenimiento
+                  <div style={{ position: 'relative' }}>
+                    <input type="checkbox" id="maint" checked={config['maintenance_mode'] === 'true'}
+                      onChange={e => saveConfig({ maintenance_mode: e.target.checked ? 'true' : 'false' })}
+                      style={{ width: 20, height: 20, accentColor: '#6366f1' }} />
+                  </div>
+                  {config['maintenance_mode'] === 'true' && <span className="badge badge-yellow">⚠️ Activo</span>}
+                </label>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
+                  Cuando está activo, los docentes ven un mensaje de mantenimiento en lugar de la plataforma.
+                </p>
+              </div>
+              {config['maintenance_mode'] === 'true' && (
+                <div className="form-group">
+                  <label>Mensaje de mantenimiento</label>
+                  <input value={config['maintenance_message'] || ''}
+                    onChange={e => setConfig(c => ({ ...c, maintenance_message: e.target.value }))}
+                    onBlur={() => saveConfig({ maintenance_message: config['maintenance_message'] || '' })} />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── USERS ── */}
+        {activeTab === 'users' && (
+          <>
+            <h1>👥 Gestión de Docentes</h1>
+            {teachers.length === 0 ? (
+              <div className="empty-state">Cargando docentes...</div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Planes</th><th>PAEC</th><th>PMC</th><th>Docs</th><th>Última actividad</th><th>Estado</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                  {teachers.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ fontWeight: 600 }}>{t.name}</td>
+                      <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{t.email}</td>
+                      <td style={{ fontSize: 12 }}>{t.school_name || '—'}</td>
+                      <td><span className="badge badge-blue">{t.planning_count}</span></td>
+                      <td><span className="badge badge-blue">{t.paec_count}</span></td>
+                      <td><span className="badge badge-blue">{t.pmc_count}</span></td>
+                      <td>{t.doc_count}</td>
+                      <td style={{ fontSize: 11 }}>{relativeTime(t.last_active)}</td>
+                      <td><span className={`badge ${t.is_blocked ? 'badge-red' : 'badge-green'}`}>{t.is_blocked ? 'Bloqueado' : 'Activo'}</span></td>
+                      <td>
+                        <button className={`btn-sm ${t.is_blocked ? 'btn-primary' : 'btn-danger'}`}
+                          onClick={() => toggleUser(t.id, !t.is_blocked)}>
+                          {t.is_blocked ? 'Reactivar' : 'Bloquear'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+        {/* ── PROMPTS ── */}
+        {activeTab === 'prompts' && (
+          <>
+            <h1>✏️ Editor de Prompts del Sistema</h1>
+            <div style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 24 }}>
+              ⚠️ Modificar un prompt afecta TODAS las generaciones futuras. Edita con cuidado.
+            </div>
+            {editPromptId ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ color: '#818cf8', fontSize: 16 }}>
+                    Editando: {prompts.find(p => p.id === editPromptId)?.label}
+                  </h3>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-sm btn-ghost" onClick={() => setEditPromptId(null)}>Cancelar</button>
+                    <button className="btn-sm btn-primary" onClick={savePrompt} disabled={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <textarea value={editPromptContent} onChange={e => setEditPromptContent(e.target.value)} style={{ minHeight: 450 }} />
+                </div>
+              </div>
+            ) : (
+              prompts.length === 0 ? (
+                <div className="empty-state">No hay prompts registrados en la base de datos.<br/>
+                  Los prompts se agregan automáticamente al ejecutar la migración.</div>
+              ) : (
+                prompts.map(p => (
+                  <div key={p.id} className="prompt-item">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div className="prompt-label">{p.label}</div>
+                        <div className="prompt-meta">
+                          ID: {p.id} · {p.content.length.toLocaleString()} caracteres
+                          {p.updated_by && ` · Editado por ${p.updated_by}`}
+                          {p.updated_at && ` · ${new Date(p.updated_at).toLocaleDateString('es-MX')}`}
+                        </div>
+                      </div>
+                      <button className="btn-sm btn-ghost" onClick={() => { setEditPromptId(p.id); setEditPromptContent(p.content); }}>
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )
+            )}
+          </>
+        )}
+
+        {/* ── DOCUMENTS ── */}
+        {activeTab === 'docs' && (
+          <>
+            <h1>📁 Documentos de Usuarios</h1>
+            {adminDocs.length === 0 ? (
+              <div className="empty-state">No hay documentos guardados todavía.</div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Docente</th><th>Tipo</th><th>Etiqueta</th><th>UAC</th><th>Archivo</th><th>Usos</th><th>Guardado</th><th>Acción</th></tr>
+                </thead>
+                <tbody>
+                  {adminDocs.map(d => (
+                    <tr key={d.id}>
+                      <td style={{ fontSize: 12 }}>{d.teacher_email}</td>
+                      <td><span className="badge badge-blue">{d.doc_type}</span></td>
+                      <td>{d.label}</td>
+                      <td style={{ fontSize: 12 }}>{d.uac_name || '—'}</td>
+                      <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{d.file_name || '—'}</td>
+                      <td>{d.used_count}</td>
+                      <td style={{ fontSize: 11 }}>{new Date(d.created_at).toLocaleDateString('es-MX')}</td>
+                      <td><button className="btn-sm btn-danger" onClick={() => deleteDoc(d.id)}>🗑️</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+        {/* ── ACTIVITY ── */}
+        {activeTab === 'activity' && (
+          <>
+            <h1>📋 Registro de Actividad</h1>
+            {activity.length === 0 ? (
+              <div className="empty-state">No hay actividad registrada todavía.</div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Fecha</th><th>Docente</th><th>Acción</th><th>Proveedor</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  {activity.map(a => (
+                    <tr key={a.id}>
+                      <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{new Date(a.created_at).toLocaleString('es-MX')}</td>
+                      <td style={{ fontSize: 12 }}>{a.teacher_email}</td>
+                      <td><span className="badge badge-blue">{a.action}</span></td>
+                      <td style={{ fontSize: 12 }}>{a.provider_used ? `${a.provider_used} / ${a.model_used}` : '—'}</td>
+                      <td>
+                        {a.success
+                          ? <span className="badge badge-green">✓ Éxito</span>
+                          : <span className="badge badge-red" title={a.error_msg || ''}>✗ Error</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+      </div>
+
+      {/* Toast */}
+      {msg && <div className={`toast ${msg.ok ? 'toast-ok' : 'toast-err'}`}>{msg.text}</div>}
+    </div>
+  );
+}

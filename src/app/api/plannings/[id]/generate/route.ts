@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail, getPlanningById, updatePlanningContent } from '@/lib/db';
 import { generatePlanningStream } from '@/lib/gemini';
+import { logActivity } from '@/lib/ai-provider';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+export const maxDuration = 120;
 
 export async function POST(
   request: NextRequest,
@@ -49,9 +51,10 @@ export async function POST(
       planning.component as string
     );
 
+    const teacherEmail = session.user.email!;
     const encoder = new TextEncoder();
 
-    // ReadableStream configuration to feed Gemini chunks to the frontend
+    // ReadableStream: feed AI chunks to the frontend
     const stream = new ReadableStream({
       async start(controller) {
         let accumulatedText = '';
@@ -71,7 +74,15 @@ export async function POST(
               .trim();
             const parsedContent = JSON.parse(cleanJson);
             
-            await updatePlanningContent(id, teacher.id, parsedContent);
+          await updatePlanningContent(id, teacher.id, parsedContent);
+          // Log successful generation
+          await logActivity({
+            teacherEmail,
+            action: 'generate_planning',
+            entityType: 'planning',
+            entityId: id,
+            success: true,
+          });
           } catch (dbErr) {
             console.error('Failed to parse or save accumulated JSON stream to database:', dbErr);
           }
