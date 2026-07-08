@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail } from '@/lib/db';
+import path from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,11 +60,12 @@ export async function POST(request: NextRequest) {
 async function extractTextWithPdfjs(buffer: Buffer): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   
-  // Disable worker
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (pdfjsLib as any).GlobalWorkerOptions = (pdfjsLib as any).GlobalWorkerOptions || {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = '';
+  // Configure worker using a file:// URL scheme to satisfy Node.js ESM loader requirements
+  const workerPath = path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  const normalizedPath = workerPath.replace(/\\/g, '/');
+  const workerUrl = 'file://' + (normalizedPath.startsWith('/') ? normalizedPath : '/' + normalizedPath);
+  
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const uint8Array = new Uint8Array(buffer);
   const doc = await pdfjsLib.getDocument({

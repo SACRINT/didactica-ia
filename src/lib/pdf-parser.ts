@@ -1,5 +1,6 @@
 import type { PdfParseResult } from '@/types/pdf-extraction';
 import type { KeyActivity } from '@/types/planning';
+import path from 'path';
 
 /**
  * Two-step PDF extraction:
@@ -71,11 +72,12 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<string> {
   // Dynamically import to avoid Next.js build issues with pdfjs worker
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-  // Disable worker — required for Node.js / Vercel environment
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (pdfjsLib as any).GlobalWorkerOptions = (pdfjsLib as any).GlobalWorkerOptions || {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = '';
+  // Configure worker using a file:// URL scheme to satisfy Node.js ESM loader requirements
+  const workerPath = path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  const normalizedPath = workerPath.replace(/\\/g, '/');
+  const workerUrl = 'file://' + (normalizedPath.startsWith('/') ? normalizedPath : '/' + normalizedPath);
+  
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const uint8Array = new Uint8Array(buffer);
 
