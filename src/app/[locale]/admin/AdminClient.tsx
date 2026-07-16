@@ -21,6 +21,7 @@ interface Teacher {
   id: string; name: string; email: string; school_name: string;
   planning_count: number; paec_count: number; pmc_count: number;
   doc_count: number; last_active: string | null; is_blocked: boolean;
+  role: string;
 }
 interface Prompt { id: string; label: string; content: string; is_active: boolean; updated_at: string; updated_by: string | null; }
 interface UserDoc { id: string; teacher_email: string; doc_type: string; label: string; uac_name: string | null; file_name: string | null; used_count: number; created_at: string; }
@@ -50,7 +51,7 @@ function relativeTime(dateStr: string | null): string {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminClient({ locale, adminEmail }: { locale: string; adminEmail: string }) {
-  const [activeTab, setActiveTab] = useState<'provider' | 'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity'>('stats');
+  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity'>('stats');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -148,6 +149,11 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     loadTeachers(); showMsg(isBlocked ? 'Usuario bloqueado' : 'Usuario reactivado');
   }
 
+  async function changeUserRole(teacherId: string, role: string) {
+    await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacherId, role }) });
+    loadTeachers(); showMsg('Rol de usuario actualizado ✓');
+  }
+
   async function saveKeyLabel(id: string) {
     if (!editLabelValue.trim()) return;
     await fetch('/api/admin/api-keys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, label: editLabelValue.trim() }) });
@@ -198,13 +204,12 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
 
   const tabs: { id: typeof activeTab; label: string; icon: string }[] = [
     { id: 'stats',    label: 'Estadísticas',  icon: '📊' },
-    { id: 'provider', label: 'Proveedor IA',  icon: '🤖' },
-    { id: 'keys',     label: 'API Keys',      icon: '🔑' },
+    { id: 'keys',     label: 'API Keys & IA', icon: '🔑' },
     { id: 'config',   label: 'Configuración', icon: '⚙️' },
     { id: 'users',    label: 'Usuarios',      icon: '👥' },
     { id: 'prompts',  label: 'Prompts',       icon: '✏️' },
     { id: 'docs',     label: 'Documentos',    icon: '📁' },
-    { id: 'activity', label: 'Actividad',     icon: '📋' },
+    { id: 'activity', label: 'Actividad',     icon: '📜' },
   ];
 
   return (
@@ -331,78 +336,114 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
           </>
         )}
 
-        {/* ── PROVIDER ── */}
-        {activeTab === 'provider' && (
+        {/* ── API KEYS & IA ── */}
+        {activeTab === 'keys' && (
           <>
-            <h1>🤖 Proveedor de IA Activo</h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 24 }}>
-              Selecciona el proveedor y modelo que usará la plataforma para generar contenido.
-            </p>
-            {PROVIDERS.map(p => (
-              <div key={p} className={`provider-card ${config['active_provider'] === p ? 'selected' : ''}`}
-                onClick={() => saveConfig({ active_provider: p, active_model: MODELS[p][0] })}>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#f0f4ff', textTransform: 'capitalize' }}>{p}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                    {MODELS[p].join(' · ')}
-                  </div>
-                </div>
-                {config['active_provider'] === p && <span className="badge badge-green">✓ Activo</span>}
+            <h1>🔑 Gestión de API Keys y Proveedor de IA</h1>
+            
+            {/* IA Active Provider Section */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '20px', marginBottom: 24 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0f4ff', margin: '0 0 4px 0' }}>🤖 Proveedor de IA Activo</h3>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 16px 0' }}>
+                Selecciona el proveedor y modelo predeterminado que utilizará la plataforma.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+                {PROVIDERS.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => saveConfig({ active_provider: p, active_model: MODELS[p][0] })}
+                    style={{
+                      background: config['active_provider'] === p ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
+                      border: config['active_provider'] === p ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 8,
+                      padding: '8px 16px',
+                      color: config['active_provider'] === p ? '#a5b4fc' : '#d1d5db',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {p} {config['active_provider'] === p ? '✓' : ''}
+                  </button>
+                ))}
               </div>
-            ))}
-            {config['active_provider'] && (
-              <>
-                <div className="divider" />
-                <div className="form-row">
-                  <div className="form-group" style={{ maxWidth: 340 }}>
-                    <label>Modelo activo para {config['active_provider']}</label>
-                    <select value={config['active_model'] || ''} onChange={e => saveConfig({ active_model: e.target.value })}>
+              
+              {config['active_provider'] && (
+                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ margin: 0, minWidth: 260 }}>
+                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Modelo activo para {config['active_provider']}</label>
+                    <select
+                      value={config['active_model'] || ''}
+                      onChange={e => saveConfig({ active_model: e.target.value })}
+                      style={{
+                        background: '#131324',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        color: '#f0f4ff',
+                        fontSize: 13,
+                        outline: 'none',
+                        width: '100%',
+                      }}
+                    >
                       {(MODELS[config['active_provider']] || []).map(m => (
-                        <option key={m} value={m}>{m}</option>
+                        <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>{m}</option>
                       ))}
                     </select>
                   </div>
+                  {testResult && (
+                    <span style={{ fontSize: 12, color: testResult.includes('✅') ? '#4ade80' : '#f87171', paddingBottom: 8 }}>
+                      {testResult}
+                    </span>
+                  )}
+                  <button className="btn-sm btn-ghost" onClick={testConnection} style={{ border: '1px solid rgba(255,255,255,0.1)', height: 38 }}>
+                    Probar conexión a BD
+                  </button>
                 </div>
-                {testResult && <div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.05)', borderRadius: 8, fontSize: 13, color: '#f0f4ff', marginTop: 16 }}>{testResult}</div>}
-                <button className="btn-sm btn-ghost" style={{ marginTop: 12 }} onClick={testConnection}>Probar conexión a BD</button>
-              </>
-            )}
-          </>
-        )}
+              )}
+            </div>
 
-        {/* ── API KEYS ── */}
-        {activeTab === 'keys' && (
-          <>
-            <h1>🔑 Gestión de API Keys</h1>
             <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 24 }}>
               🔐 Las API Keys se almacenan cifradas con AES-256. Nadie puede ver su valor real desde la interfaz.
             </div>
 
             {/* Add form */}
             <h3 style={{ fontSize: 14, color: '#818cf8', marginBottom: 16 }}>Agregar Nueva Key</h3>
-            <div className="form-row">
-              <div className="form-group">
+            <div className="form-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ flex: 1, minWidth: 180 }}>
                 <label>Etiqueta</label>
-                <input placeholder="Ej: Gemini cuenta 2 personal" value={newKey.label} onChange={e => setNewKey(k => ({ ...k, label: e.target.value }))} />
+                <input placeholder="Ej: Gemini cuenta 2" value={newKey.label} onChange={e => setNewKey(k => ({ ...k, label: e.target.value }))} />
               </div>
-              <div className="form-group" style={{ maxWidth: 140 }}>
+              <div className="form-group" style={{ width: 140 }}>
                 <label>Proveedor</label>
-                <select value={newKey.provider} onChange={e => setNewKey(k => ({ ...k, provider: e.target.value }))}>
-                  {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
+                <select
+                  value={newKey.provider}
+                  onChange={e => setNewKey(k => ({ ...k, provider: e.target.value }))}
+                  style={{ background: '#131324', color: '#f0f4ff', border: '1px solid rgba(255,255,255,0.15)' }}
+                >
+                  {PROVIDERS.map(p => <option key={p} value={p} style={{ background: '#131324', color: '#f0f4ff' }}>{p}</option>)}
                 </select>
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ flex: 2, minWidth: 220 }}>
                 <label>API Key</label>
                 <input type="password" placeholder="Pega tu API Key aquí" value={newKey.apiKey} onChange={e => setNewKey(k => ({ ...k, apiKey: e.target.value }))} />
               </div>
-              <div className="form-group" style={{ maxWidth: 200 }}>
+              <div className="form-group" style={{ width: 200 }}>
                 <label>Modelo por defecto (opcional)</label>
-                <select value={newKey.modelDefault} onChange={e => setNewKey(k => ({ ...k, modelDefault: e.target.value }))}>
-                  <option value="">— Usar modelo activo —</option>
-                  {(MODELS[newKey.provider] || []).map(m => <option key={m} value={m}>{m}</option>)}
+                <select
+                  value={newKey.modelDefault}
+                  onChange={e => setNewKey(k => ({ ...k, modelDefault: e.target.value }))}
+                  style={{ background: '#131324', color: '#f0f4ff', border: '1px solid rgba(255,255,255,0.15)' }}
+                >
+                  <option value="" style={{ background: '#131324', color: '#f0f4ff' }}>— Usar modelo activo —</option>
+                  {(MODELS[newKey.provider] || []).map(m => (
+                    <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>{m}</option>
+                  ))}
                 </select>
               </div>
-              <button className="btn-sm btn-primary" onClick={addKey} disabled={saving} style={{ height: 36, alignSelf: 'flex-end' }}>
+              <button className="btn-sm btn-primary" onClick={addKey} disabled={saving} style={{ height: 38, alignSelf: 'flex-end', minWidth: 100 }}>
                 {saving ? '...' : '+ Agregar'}
               </button>
             </div>
@@ -544,7 +585,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
             ) : (
               <table className="admin-table">
                 <thead>
-                  <tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Planes</th><th>PAEC</th><th>PMC</th><th>Docs</th><th>Última actividad</th><th>Estado</th><th>Acción</th></tr>
+                  <tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Rol de Usuario</th><th>Planes</th><th>PAEC</th><th>PMC</th><th>Docs</th><th>Última actividad</th><th>Estado</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
                   {teachers.map(t => (
@@ -552,6 +593,27 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       <td style={{ fontWeight: 600 }}>{t.name}</td>
                       <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{t.email}</td>
                       <td style={{ fontSize: 12 }}>{t.school_name || '—'}</td>
+                      <td>
+                        <select
+                          value={t.role || 'docente'}
+                          onChange={e => changeUserRole(t.id, e.target.value)}
+                          style={{
+                            background: '#131324',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            color: '#f0f4ff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="administrador">Administrador</option>
+                          <option value="supervisor">Supervisor</option>
+                          <option value="atp">ATP</option>
+                          <option value="director">Director</option>
+                          <option value="docente">Docente</option>
+                        </select>
+                      </td>
                       <td><span className="badge badge-blue">{t.planning_count}</span></td>
                       <td><span className="badge badge-blue">{t.paec_count}</span></td>
                       <td><span className="badge badge-blue">{t.pmc_count}</span></td>

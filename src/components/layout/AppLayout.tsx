@@ -157,7 +157,7 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         </Link>
         <div className="sidebar-section-label">Menú</div>
         <Link href={`/${locale}/dashboard`} className={`sidebar-link ${activeSection === 'dashboard' ? 'active' : ''}`}>
-          <span className="sidebar-link-icon">📂</span>Mis planeaciones
+          <span className="sidebar-link-icon">📝</span>Mis planeaciones
         </Link>
         <Link href={`/${locale}/paec`} className={`sidebar-link ${activeSection === 'paec' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">🏫</span>Proyectos PAEC-PEC

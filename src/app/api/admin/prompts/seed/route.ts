@@ -21,6 +21,8 @@ Reglas:
 - Usa lenguaje institucional formal.
 - Contextualiza siempre al municipio y comunidad del plantel.`;
 
+import { PIPS_SYSTEM_PROMPT } from '@/lib/prompts/pips-chunks';
+
 export async function POST() {
   try {
     await requireAdmin();
@@ -46,6 +48,11 @@ export async function POST() {
         id: 'pmc_system',
         label: 'Plan de Mejora Continua (PMC) — Prompt de Sistema',
         content: PMC_SYSTEM_PROMPT,
+      },
+      {
+        id: 'pips_system',
+        label: 'Plan de Intervención Pedagógica de Supervisión (PIPS) — Prompt de Sistema',
+        content: PIPS_SYSTEM_PROMPT,
       },
     ];
 

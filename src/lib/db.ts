@@ -19,7 +19,7 @@ function sql(): NeonQueryFunction<false, false> {
 
 export async function getTeacherByEmail(email: string) {
   const rows = await sql()`
-    SELECT id, name, email, school_name, municipality, subsystem, custom_api_key, custom_api_provider, created_at
+    SELECT id, name, email, school_name, municipality, subsystem, custom_api_key, custom_api_provider, role, created_at
     FROM teachers
     WHERE email = ${email}
     LIMIT 1

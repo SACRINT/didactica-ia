@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS teachers (
   subsystem     TEXT,   -- 'bge' | 'digital' | 'emsad'
   custom_api_key TEXT,
   custom_api_provider TEXT,
+  role          TEXT NOT NULL DEFAULT 'docente', -- 'administrador' | 'supervisor' | 'atp' | 'director' | 'docente'
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

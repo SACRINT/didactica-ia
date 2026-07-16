@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       ? await sql`
           SELECT
             t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
-            COALESCE(t.is_blocked, false) AS is_blocked, t.created_at,
+            COALESCE(t.is_blocked, false) AS is_blocked, COALESCE(t.role, 'docente') AS role, t.created_at,
             (SELECT COUNT(*)::int FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
             (SELECT COUNT(*)::int FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
             (SELECT COUNT(*)::int FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       : await sql`
           SELECT
             t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
-            COALESCE(t.is_blocked, false) AS is_blocked, t.created_at,
+            COALESCE(t.is_blocked, false) AS is_blocked, COALESCE(t.role, 'docente') AS role, t.created_at,
             (SELECT COUNT(*)::int FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
             (SELECT COUNT(*)::int FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
             (SELECT COUNT(*)::int FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
@@ -51,15 +51,23 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// PUT /api/admin/users — block/unblock a user
+// PUT /api/admin/users — block/unblock or change role of a user
 export async function PUT(req: NextRequest) {
   try {
     await requireAdmin();
-    const { teacherId, isBlocked } = await req.json();
+    const { teacherId, isBlocked, role } = await req.json();
     const sql = getDb();
 
     await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
-    await sql`UPDATE teachers SET is_blocked = ${isBlocked} WHERE id = ${teacherId}`;
+    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'docente'`.catch(() => {});
+
+    if (isBlocked !== undefined) {
+      await sql`UPDATE teachers SET is_blocked = ${isBlocked} WHERE id = ${teacherId}`;
+    }
+    if (role !== undefined) {
+      await sql`UPDATE teachers SET role = ${role} WHERE id = ${teacherId}`;
+    }
+    
     return NextResponse.json({ success: true });
   } catch (e: any) {
     if (e.message === 'UNAUTHORIZED') return adminUnauthorized();

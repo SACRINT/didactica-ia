@@ -108,24 +108,35 @@ export default function CustomKeyCard({ locale }: Props) {
 
   return (
     <div style={{
-      background: 'rgba(255, 255, 255, 0.03)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      borderRadius: '16px',
-      padding: '20px',
+      background: 'var(--c-white)',
+      border: '1px solid var(--c-border-2)',
+      borderRadius: 'var(--r-lg)',
+      padding: '24px',
       marginTop: '32px',
       marginBottom: '16px',
       display: 'flex',
       flexDirection: 'column',
       gap: '16px',
-      transition: 'all 0.3s ease',
+      boxShadow: 'var(--shadow-sm)',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#f0f4ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--c-navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             🔑 Clave de API de IA Personal
-            {hasKey && <span style={{ fontSize: '11px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(52, 211, 153, 0.2)' }}>Activa ({provider})</span>}
+            {hasKey && (
+              <span style={{ 
+                fontSize: '11px', 
+                background: 'rgba(5, 150, 105, 0.1)', 
+                color: 'var(--c-success)', 
+                padding: '2px 8px', 
+                borderRadius: 'var(--r-full)', 
+                border: '1px solid rgba(5, 150, 105, 0.2)' 
+              }}>
+                Activa ({provider})
+              </span>
+            )}
           </h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.4' }}>
+          <p style={{ margin: '6px 0 0 0', fontSize: '13.5px', color: 'var(--c-text-muted)', lineHeight: '1.5' }}>
             {hasKey
               ? `Tu cuenta tiene configurada la clave personal ${keyPreview}. Las peticiones prioritarias la usarán.`
               : 'Opcional. Agrega tu clave gratuita de Google AI Studio (Gemini) para evitar límites de uso.'
@@ -139,9 +150,6 @@ export default function CustomKeyCard({ locale }: Props) {
             style={{
               padding: '6px 14px',
               fontSize: '12px',
-              border: '1px solid rgba(255,255,255,0.15)',
-              background: 'transparent',
-              color: '#f0f4ff',
             }}
           >
             {isOpen ? 'Cancelar' : hasKey ? 'Cambiar Clave' : 'Configurar'}
@@ -154,12 +162,9 @@ export default function CustomKeyCard({ locale }: Props) {
               style={{
                 padding: '6px 14px',
                 fontSize: '12px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
               }}
             >
-              🗑️ Quitar
+              Quitar
             </button>
           )}
         </div>
@@ -167,12 +172,12 @@ export default function CustomKeyCard({ locale }: Props) {
 
       {message && (
         <div style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          fontSize: '12px',
-          background: message.success ? 'rgba(52, 211, 153, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-          border: message.success ? '1px solid rgba(52, 211, 153, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)',
-          color: message.success ? '#34d399' : '#f87171',
+          padding: '10px 16px',
+          borderRadius: 'var(--r-sm)',
+          fontSize: '12.5px',
+          background: message.success ? '#ECFDF5' : '#FEE2E2',
+          border: message.success ? '1px solid #A7F3D0' : '1px solid #FECACA',
+          color: message.success ? '#065F46' : '#991B1B',
         }}>
           {message.text}
         </div>
@@ -182,25 +187,22 @@ export default function CustomKeyCard({ locale }: Props) {
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
-          padding: '16px',
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: '12px',
+          gap: '16px',
+          padding: '20px',
+          background: 'var(--c-surface)',
+          border: '1px solid var(--c-border-2)',
+          borderRadius: 'var(--r-md)',
           marginTop: '4px',
         }}>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '120px' }}>
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 550 }}>Proveedor</label>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '140px' }}>
+              <label className="form-label" style={{ fontSize: '11px', color: 'var(--c-text-muted)', fontWeight: 600 }}>Proveedor</label>
               <select
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
+                className="form-select"
                 style={{
-                  background: 'rgba(0,0,0,0.2)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  color: '#f0f4ff',
+                  padding: '8px 12px',
                   fontSize: '13px',
                 }}
               >
@@ -209,19 +211,16 @@ export default function CustomKeyCard({ locale }: Props) {
                 <option value="claude">Claude</option>
               </select>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '200px' }}>
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 550 }}>Clave de API (API Key)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '220px' }}>
+              <label className="form-label" style={{ fontSize: '11px', color: 'var(--c-text-muted)', fontWeight: 600 }}>Clave de API (API Key)</label>
               <input
                 type="password"
                 placeholder={hasKey ? 'Ingresa una nueva API Key para cambiar la actual' : 'AIzaSy... (Tu clave de API)'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                className="form-input"
                 style={{
-                  background: 'rgba(0,0,0,0.2)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
                   padding: '8px 12px',
-                  color: '#f0f4ff',
                   fontSize: '13px',
                 }}
               />
@@ -232,7 +231,7 @@ export default function CustomKeyCard({ locale }: Props) {
               onClick={handleSave}
               disabled={saving}
               className="btn btn-primary btn-sm"
-              style={{ padding: '6px 16px', fontSize: '12px' }}
+              style={{ padding: '8px 20px', fontSize: '13px' }}
             >
               {saving ? 'Guardando...' : 'Guardar Clave'}
             </button>
