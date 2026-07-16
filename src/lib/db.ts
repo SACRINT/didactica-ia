@@ -19,12 +19,24 @@ function sql(): NeonQueryFunction<false, false> {
 
 export async function getTeacherByEmail(email: string) {
   const rows = await sql()`
-    SELECT id, name, email, school_name, municipality, subsystem, created_at
+    SELECT id, name, email, school_name, municipality, subsystem, custom_api_key, custom_api_provider, created_at
     FROM teachers
     WHERE email = ${email}
     LIMIT 1
   `;
   return rows[0] || null;
+}
+
+export async function updateTeacherKey(teacherId: string, customApiKey: string | null, customApiProvider: string | null) {
+  const rows = await sql()`
+    UPDATE teachers
+    SET
+      custom_api_key = ${customApiKey},
+      custom_api_provider = ${customApiProvider}
+    WHERE id = ${teacherId}::uuid
+    RETURNING id, email, custom_api_provider
+  `;
+  return rows[0];
 }
 
 export async function createTeacher(data: {

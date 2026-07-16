@@ -4,6 +4,7 @@ import { getTeacherByEmail, getPlanningsByTeacher } from '@/lib/db';
 import AppLayout from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import DeletePlanningButton from '@/components/planeacion/DeletePlanningButton';
+import CustomKeyCard from '@/components/dashboard/CustomKeyCard';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -84,7 +85,7 @@ export default async function DashboardPage({
                 </Link>
                 {(p.status === 'generated' || p.status === 'downloaded') && (
                   <a href={`/api/docx/${p.id as string}`} className="btn btn-primary btn-sm">
-                    ↓ DOCX
+                     ↓ DOCX
                   </a>
                 )}
                 <DeletePlanningButton id={p.id as string} locale={locale} size="sm" />
@@ -93,6 +94,9 @@ export default async function DashboardPage({
           ))}
         </div>
       )}
+
+      {/* Tarjeta de configuración de API Key personal del Docente */}
+      <CustomKeyCard locale={locale} />
     </AppLayout>
   );
 }

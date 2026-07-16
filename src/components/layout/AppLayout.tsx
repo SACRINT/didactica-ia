@@ -165,12 +165,16 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         <Link href={`/${locale}/pmc`} className={`sidebar-link ${activeSection === 'pmc' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📈</span>Plan de Mejora (PMC)
         </Link>
+        <Link href={`/${locale}/pips`} className={`sidebar-link ${activeSection === 'pips' ? 'active' : ''}`}>
+          <span className="sidebar-link-icon">📋</span>PIPS Supervisión
+        </Link>
         <Link href={`/${locale}/mis-documentos`} className={`sidebar-link ${activeSection === 'mis-documentos' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📁</span>Mis Documentos
         </Link>
         <Link href={`/${locale}/mis-escuelas`} className={`sidebar-link ${activeSection === 'mis-escuelas' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">🏫</span>Mis Escuelas
         </Link>
+
 
         {/* Admin section — visible only for admins */}
         {isAdmin && (

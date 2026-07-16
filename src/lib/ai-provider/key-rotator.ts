@@ -1,24 +1,37 @@
 /**
- * Key rotation utility.
- * Selects the best available API key for a given provider,
- * handles 429 errors by rotating to the next available key,
- * and records usage/errors in the database.
+ * Key rotation utility — v2 (mejorado)
+ *
+ * Mejoras sobre v1:
+ * - Bug fix: rotación correcta por índice (indexOf con objetos siempre retorna -1)
+ * - Auto-desactivación: si error_count >= 5, la clave se marca is_active=false
+ * - Auto-reactivación: antes de cargar claves, reactiva las que llevan > 5 min sin error
+ * - Prioridad de clave de usuario: si se pasa un teacherId, se usa su clave primero
  */
 
-import { createDecipheriv } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import type { ApiKeyRecord } from './types';
 
-// ── Decryption ───────────────────────────────────────────────────────────────
+// ── Encryption / Decryption ──────────────────────────────────────────────────
+
+function getEncKey(): Buffer {
+  const key = process.env.ADMIN_ENCRYPTION_KEY;
+  if (!key || key.length !== 32) throw new Error('ADMIN_ENCRYPTION_KEY must be 32 characters');
+  return Buffer.from(key);
+}
+
+export function encryptKey(plain: string): string {
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-cbc', getEncKey(), iv);
+  let enc = cipher.update(plain, 'utf8', 'hex');
+  enc += cipher.final('hex');
+  return iv.toString('hex') + ':' + enc;
+}
 
 function decryptKey(encrypted: string): string {
-  const encKey = process.env.ADMIN_ENCRYPTION_KEY;
-  if (!encKey || encKey.length !== 32) {
-    throw new Error('ADMIN_ENCRYPTION_KEY is missing or not 32 characters');
-  }
   const [ivHex, data] = encrypted.split(':');
   const iv = Buffer.from(ivHex, 'hex');
-  const decipher = createDecipheriv('aes-256-cbc', Buffer.from(encKey), iv);
+  const decipher = createDecipheriv('aes-256-cbc', getEncKey(), iv);
   let decrypted = decipher.update(data, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;
@@ -31,38 +44,74 @@ function getDb() {
   return neon(process.env.DATABASE_URL);
 }
 
+/**
+ * Antes de cargar claves activas, reactiva automáticamente las que llevan
+ * más de COOLDOWN_MINUTES sin recibir un error. Esto permite que una clave
+ * bloqueada por límite de quota se recupere sola tras el enfriamiento.
+ */
+const COOLDOWN_MINUTES = 5;
+const MAX_ERRORS_BEFORE_DEACTIVATE = 5;
+
+async function reactivateCooledKeys(provider: string) {
+  try {
+    const sql = getDb();
+    await sql`
+      UPDATE api_keys
+      SET is_active = true, error_count = 0
+      WHERE provider   = ${provider}
+        AND is_active  = false
+        AND last_error_at IS NOT NULL
+        AND last_error_at < NOW() - INTERVAL '${COOLDOWN_MINUTES} minutes'
+    `;
+  } catch {
+    // Non-critical — don't fail if reactivation fails
+  }
+}
+
 async function getActiveKeys(provider: string): Promise<ApiKeyRecord[]> {
+  // First, try to reactivate cooled-down keys
+  await reactivateCooledKeys(provider);
+
   const sql = getDb();
   const rows = await sql`
     SELECT id, label, provider, model_default, key_encrypted, key_preview,
            is_active, priority, usage_count, error_count, last_used_at, last_error_at
     FROM api_keys
     WHERE provider = ${provider} AND is_active = true
-    ORDER BY priority ASC, usage_count ASC
+    ORDER BY priority ASC, error_count ASC
   `;
   return rows as ApiKeyRecord[];
 }
 
 async function recordUsage(keyId: string) {
-  const sql = getDb();
-  await sql`
-    UPDATE api_keys
-    SET usage_count = usage_count + 1, last_used_at = NOW()
-    WHERE id = ${keyId}
-  `;
+  try {
+    const sql = getDb();
+    await sql`
+      UPDATE api_keys
+      SET usage_count = usage_count + 1, last_used_at = NOW()
+      WHERE id = ${keyId}
+    `;
+  } catch { /* non-critical */ }
 }
 
-async function recordError(keyId: string, errorMsg: string) {
-  const sql = getDb();
-  await sql`
-    UPDATE api_keys
-    SET error_count = error_count + 1, last_error_at = NOW()
-    WHERE id = ${keyId}
-  `;
+async function recordError(keyId: string) {
+  try {
+    const sql = getDb();
+    // Increment error count and check if we should deactivate
+    await sql`
+      UPDATE api_keys
+      SET error_count   = error_count + 1,
+          last_error_at = NOW(),
+          is_active     = CASE
+            WHEN error_count + 1 >= ${MAX_ERRORS_BEFORE_DEACTIVATE} THEN false
+            ELSE is_active
+          END
+      WHERE id = ${keyId}
+    `;
+  } catch { /* non-critical */ }
 }
 
 // ── Fallback: read from env var directly ────────────────────────────────────
-// Used when DB has no keys yet (e.g. before first admin setup).
 
 function getFallbackKey(provider: string): string | null {
   if (provider === 'gemini') return process.env.GEMINI_API_KEY || null;
@@ -72,39 +121,70 @@ function getFallbackKey(provider: string): string | null {
   return null;
 }
 
-// ── Main export ──────────────────────────────────────────────────────────────
+// ── Get teacher's custom API key ─────────────────────────────────────────────
+
+async function getTeacherKey(teacherId: string, provider: string): Promise<string | null> {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT custom_api_key, custom_api_provider
+      FROM teachers
+      WHERE id = ${teacherId}::uuid
+        AND custom_api_key IS NOT NULL
+        AND custom_api_provider = ${provider}
+    `;
+    if (rows[0]?.custom_api_key) {
+      return rows[0].custom_api_key as string;
+    }
+  } catch { /* non-critical */ }
+  return null;
+}
+
+// ── Main exports ─────────────────────────────────────────────────────────────
 
 export interface ResolvedKey {
   apiKey: string;
-  keyId: string | null;  // null for env-var fallback
+  keyId: string | null;    // null for env-var or user fallback
   modelOverride: string | null;
+  source: 'user' | 'pool' | 'env';
 }
 
 /**
  * Resolves the best available API key for a given provider.
- * Tries keys in priority order, returns the first available.
- * Falls back to environment variables if no DB keys are configured.
+ * Priority: teacher's own key → pool → env fallback.
  */
-export async function resolveKey(provider: string): Promise<ResolvedKey> {
+export async function resolveKey(
+  provider: string,
+  teacherId?: string
+): Promise<ResolvedKey> {
+  // 1. Teacher's own key takes absolute priority
+  if (teacherId) {
+    const teacherKey = await getTeacherKey(teacherId, provider);
+    if (teacherKey) {
+      return { apiKey: teacherKey, keyId: null, modelOverride: null, source: 'user' };
+    }
+  }
+
+  // 2. Pool from DB
   try {
     const keys = await getActiveKeys(provider);
     if (keys.length > 0) {
-      // Return the highest-priority available key
       const key = keys[0];
       return {
         apiKey: decryptKey(key.key_encrypted),
         keyId: key.id,
         modelOverride: key.model_default || null,
+        source: 'pool',
       };
     }
   } catch (err) {
     console.warn('[key-rotator] DB lookup failed, using env fallback:', err);
   }
 
-  // Fallback to environment variable
+  // 3. Env var fallback
   const fallback = getFallbackKey(provider);
   if (fallback) {
-    return { apiKey: fallback, keyId: null, modelOverride: null };
+    return { apiKey: fallback, keyId: null, modelOverride: null, source: 'env' };
   }
 
   throw new Error(
@@ -116,61 +196,89 @@ export async function resolveKey(provider: string): Promise<ResolvedKey> {
 /**
  * Wraps an AI API call with automatic key rotation on 429 errors.
  * Tries each active key in priority order until one succeeds.
+ *
+ * BUG FIX v2: tracks position by index (not object reference) to properly rotate.
+ *
+ * @param provider  AI provider name ('gemini', 'claude', etc.)
+ * @param fn        Function that receives (apiKey, keyId) and calls the AI API
+ * @param teacherId Optional teacher ID — if set, their own key is tried first
  */
 export async function withKeyRotation<T>(
   provider: string,
-  fn: (apiKey: string, keyId: string | null) => Promise<T>
+  fn: (apiKey: string, keyId: string | null) => Promise<T>,
+  teacherId?: string
 ): Promise<T> {
-  let keys: ApiKeyRecord[] = [];
+  // ── Build the ordered list of keys to try ────────────────────────────────
+  const attempts: Array<{ apiKey: string; keyId: string | null; source: string }> = [];
 
+  // 1. Teacher's own key (highest priority)
+  if (teacherId) {
+    const teacherKey = await getTeacherKey(teacherId, provider);
+    if (teacherKey) {
+      attempts.push({ apiKey: teacherKey, keyId: null, source: 'user' });
+    }
+  }
+
+  // 2. Pool keys from DB (already sorted by priority ASC, error_count ASC)
+  let poolKeys: ApiKeyRecord[] = [];
   try {
-    keys = await getActiveKeys(provider);
-  } catch {
-    // DB unavailable — try env fallback directly
-  }
+    poolKeys = await getActiveKeys(provider);
+    for (const k of poolKeys) {
+      try {
+        attempts.push({ apiKey: decryptKey(k.key_encrypted), keyId: k.id, source: 'pool' });
+      } catch { /* skip unreadable */ }
+    }
+  } catch { /* DB unavailable */ }
 
-  // Build attempt list: DB keys first, then env var fallback
-  const attempts: Array<{ apiKey: string; keyId: string | null }> = [];
-
-  for (const k of keys) {
-    try {
-      attempts.push({ apiKey: decryptKey(k.key_encrypted), keyId: k.id });
-    } catch { /* skip unreadable keys */ }
-  }
-
+  // 3. Env var as last resort (only if pool is empty)
   const fallback = getFallbackKey(provider);
-  if (fallback && attempts.length === 0) {
-    attempts.push({ apiKey: fallback, keyId: null });
+  if (fallback && poolKeys.length === 0 && attempts.filter(a => a.source !== 'user').length === 0) {
+    attempts.push({ apiKey: fallback, keyId: null, source: 'env' });
   }
 
   if (attempts.length === 0) {
     throw new Error(
       `No API key configured for provider "${provider}". ` +
-      `Add one from the Admin Panel.`
+      `Add one from the Admin Panel or set the environment variable.`
     );
   }
 
+  // ── Try each key in order ─────────────────────────────────────────────────
   let lastError: Error | null = null;
 
-  for (const { apiKey, keyId } of attempts) {
+  for (let i = 0; i < attempts.length; i++) {
+    const { apiKey, keyId, source } = attempts[i];
     try {
       const result = await fn(apiKey, keyId);
-      if (keyId) await recordUsage(keyId).catch(() => {});
+      // On success: record usage and reset errors for pool keys
+      if (keyId && source === 'pool') {
+        await recordUsage(keyId);
+      }
       return result;
     } catch (err: any) {
       lastError = err;
-      const is429 = err?.status === 429
-        || err?.statusCode === 429
-        || (err?.message && (err.message.includes('429') || err.message.toLowerCase().includes('quota')));
 
-      if (keyId) await recordError(keyId, err?.message || 'unknown').catch(() => {});
+      const is429 =
+        err?.status === 429 ||
+        err?.statusCode === 429 ||
+        (typeof err?.message === 'string' &&
+          (err.message.includes('429') || err.message.toLowerCase().includes('quota')));
 
-      if (is429 && attempts.indexOf({ apiKey, keyId } as any) < attempts.length - 1) {
-        console.warn(`[key-rotator] Key ${keyId ?? 'env'} hit quota limit, rotating to next key...`);
+      // Record error in DB for pool keys
+      if (keyId && source === 'pool') {
+        await recordError(keyId);
+      }
+
+      if (is429 && i < attempts.length - 1) {
+        // Rotate to next key transparently
+        console.warn(
+          `[key-rotator] Key #${i + 1} (${source}:${keyId ?? 'env'}) hit quota. ` +
+          `Rotating to key #${i + 2}/${attempts.length}...`
+        );
         continue;
       }
 
-      // Not a 429 or no more keys — throw immediately
+      // Non-quota error or no more keys — throw immediately
       throw err;
     }
   }

@@ -74,20 +74,44 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     await requireAdmin();
-    const { id, isActive, priority, label, modelDefault } = await req.json();
+    const body = await req.json();
+    const { id } = body;
     if (!id) {
       return NextResponse.json({ error: 'El ID de la API Key es requerido' }, { status: 400 });
     }
     const sql = getDb();
 
-    await sql`
-      UPDATE api_keys SET
-        is_active     = COALESCE(${isActive ?? null}, is_active),
-        priority      = COALESCE(${priority ?? null}, priority),
-        label         = COALESCE(${label ?? null}, label),
-        model_default = COALESCE(${modelDefault ?? null}, model_default)
-      WHERE id = ${id}
-    `;
+    // Construcción dinámica de campos para evitar problemas de tipos de COALESCE con NULL en Neon
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (body.isActive !== undefined) {
+      updates.push(`is_active = $${paramIndex++}`);
+      params.push(body.isActive);
+    }
+    if (body.priority !== undefined) {
+      updates.push(`priority = $${paramIndex++}`);
+      params.push(body.priority);
+    }
+    if (body.label !== undefined) {
+      updates.push(`label = $${paramIndex++}`);
+      params.push(body.label);
+    }
+    if (body.modelDefault !== undefined) {
+      updates.push(`model_default = $${paramIndex++}`);
+      params.push(body.modelDefault);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No se especificaron campos para actualizar' }, { status: 400 });
+    }
+
+    params.push(id); // ID como último parámetro
+    const query = `UPDATE api_keys SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+    
+    await sql.query(query, params);
+    
     return NextResponse.json({ success: true });
   } catch (e: any) {
     if (e.message === 'UNAUTHORIZED') return adminUnauthorized();

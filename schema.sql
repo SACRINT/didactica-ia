@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS teachers (
   school_name   TEXT,
   municipality  TEXT,
   subsystem     TEXT,   -- 'bge' | 'digital' | 'emsad'
+  custom_api_key TEXT,
+  custom_api_provider TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

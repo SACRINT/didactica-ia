@@ -81,18 +81,19 @@ export async function getAIProvider(): Promise<AIProvider> {
 
 /**
  * Generates text with automatic key rotation on quota errors.
- * Convenience wrapper around getAIProvider().
+ * If teacherId is provided, the teacher's own API key (if configured) is used first.
  */
 export async function generateWithRotation(
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  teacherId?: string
 ): Promise<string> {
   const { provider, model } = await getActiveConfig();
 
   return withKeyRotation(provider, async (apiKey) => {
     const ai = buildProvider(provider, model, apiKey);
     return ai.generate(systemPrompt, userPrompt);
-  });
+  }, teacherId);
 }
 
 /**
@@ -101,11 +102,12 @@ export async function generateWithRotation(
  */
 export async function* generateStreamWithRotation(
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  teacherId?: string
 ): AsyncGenerator<string> {
   const { provider, model } = await getActiveConfig();
   const { resolveKey } = await import('./key-rotator');
-  const resolved = await resolveKey(provider);
+  const resolved = await resolveKey(provider, teacherId);
   const finalModel = resolved.modelOverride || model;
   const ai = buildProvider(provider, finalModel, resolved.apiKey);
   yield* ai.generateStream(systemPrompt, userPrompt);
