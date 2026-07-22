@@ -30,26 +30,58 @@ interface ActivityEntry { id: string; teacher_email: string; action: string; pro
 const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral'];
 
 // Modelos disponibles por proveedor para USO ESTÁNDAR (cuota gratuita masiva 500 RPD / 15 RPM)
-const STANDARD_MODELS: Record<string, string[]> = {
-  gemini:  ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'],
-  claude:  ['claude-haiku-4-5'],
-  openai:  ['gpt-4o-mini', 'gpt-3.5-turbo'],
-  nvidia:  ['meta/llama-3.1-70b-instruct', 'microsoft/phi-3-mini-4k-instruct'],
-  qwen:    ['qwen-turbo'],
-  mistral: ['mistral-small-latest'],
+const STANDARD_MODELS: Record<string, { id: string; label: string }[]> = {
+  gemini:  [
+    { id: 'gemini-3.5-flash-lite', label: 'gemini-3.5-flash-lite — 500 RPD / 15 RPM ✓' },
+    { id: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite — 500 RPD / 15 RPM ✓' },
+  ],
+  claude:  [{ id: 'claude-haiku-4-5', label: 'claude-haiku-4-5 — 50 RPD (free tier)' }],
+  openai:  [
+    { id: 'gpt-4o-mini', label: 'gpt-4o-mini — Free tier limitado' },
+    { id: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo — Free tier limitado' },
+  ],
+  nvidia:  [
+    { id: 'meta/llama-3.1-70b-instruct', label: 'llama-3.1-70b — 40 RPM / 1000 RPD (free)' },
+    { id: 'microsoft/phi-3-mini-4k-instruct', label: 'phi-3-mini — 40 RPM / 1000 RPD (free)' },
+  ],
+  qwen:    [{ id: 'qwen-turbo', label: 'qwen-turbo — Free tier' }],
+  mistral: [{ id: 'mistral-small-latest', label: 'mistral-small-latest — Free tier' }],
 };
 
 // Modelos disponibles por proveedor para USO PREMIUM (APIs de paga / avanzadas)
-const PREMIUM_MODELS: Record<string, string[]> = {
-  gemini:  ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.1-flash'],
-  claude:  ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4-5'],
-  openai:  ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
-  nvidia:  ['meta/llama-3.1-70b-instruct', 'microsoft/phi-3-mini-4k-instruct'],
-  qwen:    ['qwen-plus', 'qwen-max', 'qwen-turbo'],
-  mistral: ['mistral-small-latest', 'mistral-large-latest'],
+const PREMIUM_MODELS: Record<string, { id: string; label: string }[]> = {
+  gemini: [
+    { id: 'gemini-3.5-flash-lite', label: 'gemini-3.5-flash-lite — 500 RPD / 15 RPM (Gratuito)' },
+    { id: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite — 500 RPD / 15 RPM (Gratuito)' },
+    { id: 'gemini-3.5-flash',      label: 'gemini-3.5-flash — 1000 RPD / 15 RPM (Pago recomendado)' },
+    { id: 'gemini-3.1-flash',      label: 'gemini-3.1-flash — 1000 RPD / 15 RPM (Pago)' },
+  ],
+  claude: [
+    { id: 'claude-haiku-4-5',   label: 'claude-haiku-4-5 — 50 RPD (free) / ∞ con API key' },
+    { id: 'claude-sonnet-4-5',  label: 'claude-sonnet-4-5 — API de paga' },
+    { id: 'claude-opus-4-5',    label: 'claude-opus-4-5 — API de paga (más capaz)' },
+  ],
+  openai: [
+    { id: 'gpt-4o-mini', label: 'gpt-4o-mini — API de paga (económico)' },
+    { id: 'gpt-4o',      label: 'gpt-4o — API de paga (avanzado)' },
+    { id: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo — API de paga (rápido)' },
+  ],
+  nvidia: [
+    { id: 'meta/llama-3.1-70b-instruct',       label: 'llama-3.1-70b — 40 RPM / 1000 RPD (free)' },
+    { id: 'microsoft/phi-3-mini-4k-instruct',  label: 'phi-3-mini — 40 RPM / 1000 RPD (free)' },
+  ],
+  qwen: [
+    { id: 'qwen-turbo', label: 'qwen-turbo — Free tier' },
+    { id: 'qwen-plus',  label: 'qwen-plus — API de paga' },
+    { id: 'qwen-max',   label: 'qwen-max — API de paga (más capaz)' },
+  ],
+  mistral: [
+    { id: 'mistral-small-latest', label: 'mistral-small-latest — Free tier' },
+    { id: 'mistral-large-latest', label: 'mistral-large-latest — API de paga' },
+  ],
 };
 
-// Alias legacy para formulario de agregar key (usa premium para máxima flexibilidad)
+// Alias para formulario de agregar key
 const MODELS = PREMIUM_MODELS;
 
 // ── Helper ───────────────────────────────────────────────────────────────────
@@ -383,7 +415,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     <label>Proveedor</label>
                     <select
                       value={config['active_provider'] || 'gemini'}
-                      onChange={e => setConfig(c => ({ ...c, active_provider: e.target.value, active_model: (STANDARD_MODELS[e.target.value] || [])[0] || '' }))}
+                      onChange={e => setConfig(c => ({ ...c, active_provider: e.target.value, active_model: (STANDARD_MODELS[e.target.value] || [])[0]?.id || '' }))}
                       style={{ background: '#131324', color: '#f0f4ff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
                     >
                       {PROVIDERS.map(p => <option key={p} value={p} style={{ background: '#131324', color: '#f0f4ff' }}>{p}</option>)}
@@ -397,8 +429,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       style={{ background: '#131324', color: '#f0f4ff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
                     >
                       {(STANDARD_MODELS[config['active_provider'] || 'gemini'] || []).map(m => (
-                        <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>
-                          {m}{m.includes('lite') ? ' — 500 RPD / 15 RPM ✓' : ''}
+                        <option key={m.id} value={m.id} style={{ background: '#131324', color: '#f0f4ff' }}>
+                          {m.label}
                         </option>
                       ))}
                     </select>
@@ -418,7 +450,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     <label>Proveedor</label>
                     <select
                       value={config['admin_provider'] || 'gemini'}
-                      onChange={e => setConfig(c => ({ ...c, admin_provider: e.target.value, admin_model: (PREMIUM_MODELS[e.target.value] || [])[0] || '' }))}
+                      onChange={e => setConfig(c => ({ ...c, admin_provider: e.target.value, admin_model: (PREMIUM_MODELS[e.target.value] || [])[0]?.id || '' }))}
                       style={{ background: '#131324', color: '#fde68a', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
                     >
                       {PROVIDERS.map(p => <option key={p} value={p} style={{ background: '#131324', color: '#f0f4ff' }}>{p}</option>)}
@@ -432,7 +464,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       style={{ background: '#131324', color: '#fde68a', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
                     >
                       {(PREMIUM_MODELS[config['admin_provider'] || 'gemini'] || []).map(m => (
-                        <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>{m}</option>
+                        <option key={m.id} value={m.id} style={{ background: '#131324', color: '#f0f4ff' }}>{m.label}</option>
                       ))}
                     </select>
                   </div>
@@ -499,7 +531,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                 >
                   <option value="" style={{ background: '#131324', color: '#f0f4ff' }}>— Usar modelo activo —</option>
                   {(MODELS[newKey.provider] || []).map(m => (
-                    <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>{m}</option>
+                    <option key={m.id} value={m.id} style={{ background: '#131324', color: '#f0f4ff' }}>{m.label}</option>
                   ))}
                 </select>
               </div>

@@ -16,6 +16,7 @@ import {
   buildPrompt6Anexos,
 } from '@/lib/prompts/paec-prompts';
 import { getAIProvider, logActivity } from '@/lib/ai-provider';
+import { callGeminiPool } from '@/lib/gemini';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -137,10 +138,9 @@ export async function POST(
       }
     }
 
-    // Call AI Provider (reads active provider + key from DB)
-    console.log(`Generating PAEC Step ${step} using AI Provider...`);
-    const ai = await getAIProvider();
-    const text = await ai.generate(PAEC_SYSTEM_PROMPT, userPrompt);
+    // Call AI via pool engine (reads active model from platform_config)
+    console.log(`Generating PAEC Step ${step} using callGeminiPool...`);
+    const text = await callGeminiPool(PAEC_SYSTEM_PROMPT, userPrompt, teacher.id);
 
     if (!text) {
       throw new Error('Respuesta vacía del proveedor de IA');

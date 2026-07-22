@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail } from '@/lib/db';
 import { neon } from '@neondatabase/serverless';
-import { getAIProvider, logActivity } from '@/lib/ai-provider';
+import { logActivity } from '@/lib/ai-provider';
+import { callGeminiPool } from '@/lib/gemini';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -223,10 +224,10 @@ Genera el apartado de DIAGNÓSTICO del PMC con:
 
 Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO inventes datos no proporcionados.`;
 
-      const ai = await getAIProvider();
-      const rawText = await ai.generate(
+      const rawText = await callGeminiPool(
         'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado.',
-        prompt
+        prompt,
+        teacher.id
       );
       if (!rawText) {
         throw new Error('Respuesta vacía del proveedor de IA');
@@ -384,10 +385,10 @@ Responde con JSON con esta estructura EXACTA:
   ]
 }`;
 
-      const ai2 = await getAIProvider();
-      const rawText = await ai2.generate(
+      const rawText = await callGeminiPool(
         'Eres un asistente experto en planeación educativa para el BGE de Puebla. Responde siempre con JSON válido y bien formado. Nunca omitas metas institucionales para los temas indicados.',
-        prompt
+        prompt,
+        teacher.id
       );
       if (!rawText) {
         throw new Error('Respuesta vacía del proveedor de IA');
