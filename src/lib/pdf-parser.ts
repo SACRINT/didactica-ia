@@ -1,6 +1,7 @@
 import type { PdfParseResult } from '@/types/pdf-extraction';
 import type { KeyActivity } from '@/types/planning';
 import path from 'path';
+import { callGeminiPool } from '@/lib/gemini';
 
 // Polyfills for browser-only globals required by pdfjs-dist v6 under Node/Vercel environments
 if (typeof globalThis.DOMMatrix === 'undefined') {
@@ -45,17 +46,7 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
     };
   }
 
-  // ── STEP 2: Use Gemini text API to structure the extracted text ───────────
-  if (!process.env.GEMINI_API_KEY) {
-    return {
-      success: false,
-      confidence: 'failed',
-      data: buildEmptyData(),
-      rawText,
-      errors: ['Error de configuración del servidor (falta GEMINI_API_KEY). Contacta al administrador.'],
-    };
-  }
-
+  // ── STEP 2: Use callGeminiPool to structure the extracted text ──────────────
   try {
     const structured = await structureWithGemini(rawText);
     return structured;
@@ -118,15 +109,12 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<string> {
 // ─── Gemini text structuring ─────────────────────────────────────────────────
 
 async function structureWithGemini(rawText: string): Promise<PdfParseResult> {
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
   // Truncate text to ~6000 chars (first pages have the important info)
   const excerpt = rawText.slice(0, 6000);
 
-  const prompt = `Eres un experto en programas de estudio del bachillerato de la Nueva Escuela Mexicana en Puebla (MCCEMS/DBEPA).
+  const systemInstruction = `Eres un experto en programas de estudio del bachillerato de la Nueva Escuela Mexicana en Puebla (MCCEMS/DBEPA). Responde exclusivamente con JSON válido, sin markdown ni explicaciones.`;
 
-Analiza el siguiente texto extraído de un programa de estudios oficial y extrae los datos en formato JSON exacto:
+  const prompt = `Analiza el siguiente texto extraído de un programa de estudios oficial y extrae los datos en formato JSON exacto:
 
 {
   "uacName": "Nombre completo de la UAC (Unidad de Aprendizaje Curricular) tal como aparece literalmente en el documento",
@@ -159,23 +147,8 @@ REGLAS ABSOLUTAS DE EXTRACCIÓN Y CALIDAD:
 TEXTO DEL PROGRAMA:
 ${excerpt}`;
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
-  });
-
-  const response = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  });
-
-  const text = response.response.text();
-  if (!text) {
-    throw new Error('Empty response from Gemini API');
-  }
-
-  const cleanJson = text
+  const rawJsonText = await callGeminiPool(systemInstruction, prompt);
+  const cleanJson = rawJsonText
     .replace(/^```(?:json)?\n?/m, '')
     .replace(/\n?```$/m, '')
     .trim();

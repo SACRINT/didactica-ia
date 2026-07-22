@@ -1,24 +1,272 @@
 /**
- * gemini.ts — Backward-compatible wrapper around the AI Provider layer.
+ * gemini.ts — Pool de API Keys con Rotación Determinista Round-Robin
  *
- * This file preserves the original API so existing callers don't break.
- * Internally it delegates to getAIProvider() which reads the active
- * provider + API key from the database (with fallback to env vars).
+ * Motor de IA de DidactecaIA con:
+ * - Rotación secuencial (Round-Robin) de API Keys para generaciones granulares
+ * - Soporte de perfil Estándar (gemini-3.5-flash-lite / gemini-3.1-flash-lite)
+ * - Soporte de perfil Premium (modelo configurado por el Administrador en /es/admin)
+ * - Fallback transparente solo ante error 404 (modelo descontinuado) hacia gemini-3.5-flash-lite
+ * - Auto-reactivación de llaves bloqueadas tras 60 minutos de enfriamiento
  *
- * All new code should import from '@/lib/ai-provider' directly.
+ * ⚠️  Modelos eliminados: gemini-1.5-flash, gemini-2.0-flash, gemini-2.5-flash
  */
 
+import { neon } from '@neondatabase/serverless';
 import { SYSTEM_PROMPT } from './prompts/system-prompt';
-import { getAIProvider, generateStreamWithRotation } from './ai-provider';
+import { generateStreamWithRotation, resolveUserIsPremium } from './ai-provider';
 import type { GeneratedPlanningContent } from '@/types/planning';
 
-// ── Planning (non-streaming) ──────────────────────────────────────────────────
+// ── Puntero global de Round-Robin ─────────────────────────────────────────────
+// Avanza en cada llamada a callGeminiPool para garantizar que las generaciones
+// granulares (sesión 1, sesión 2, rúbrica, diagnóstico PMC, etc.) usen llaves distintas.
+let globalKeyPointerIndex = 0;
+
+// ── Cadena de fallback por modelo ─────────────────────────────────────────────
+// Solo se activa si el modelo solicitado devuelve HTTP 404 (descontinuado).
+const FALLBACK_CHAIN_STANDARD = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+const FALLBACK_CHAIN_PREMIUM  = ['gemini-3.5-flash', 'gemini-3.1-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+
+function buildModelChain(requestedModel: string, isPremium: boolean): string[] {
+  const chain = isPremium ? FALLBACK_CHAIN_PREMIUM : FALLBACK_CHAIN_STANDARD;
+  // Pon el modelo solicitado primero (si no está ya en la cadena)
+  if (chain[0] === requestedModel) return chain;
+  return [requestedModel, ...chain.filter(m => m !== requestedModel)];
+}
+
+// ── Motor principal: callGeminiPool ───────────────────────────────────────────
+
+/**
+ * Llama a la API de Gemini con rotación Round-Robin sobre el pool de llaves.
+ * Lee la configuración de modelo activo desde platform_config según el perfil del usuario.
+ *
+ * @param systemInstruction  Instrucción de sistema
+ * @param prompt             Prompt del usuario / contenido
+ * @param teacherId          ID del docente (para resolver si es Premium)
+ * @param responseSchema     Esquema JSON opcional para structured output
+ */
+export async function callGeminiPool(
+  systemInstruction: string,
+  prompt: string,
+  teacherId?: string,
+  responseSchema?: object
+): Promise<string> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('[didacteca-ia] DATABASE_URL no configurada.');
+  }
+
+  const sql = neon(process.env.DATABASE_URL);
+
+  // 1. Resolver perfil del usuario (Standard vs Premium)
+  const isPremium = await resolveUserIsPremium(teacherId);
+
+  // 2. Leer modelo activo desde platform_config según perfil
+  const configKeys = isPremium
+    ? ['admin_provider', 'admin_model']
+    : ['active_provider', 'active_model'];
+  const rows = await sql`
+    SELECT key, value FROM platform_config
+    WHERE key = ANY(${configKeys})
+  `;
+  const map: Record<string, string> = {};
+  for (const row of rows) map[row.key] = row.value;
+
+  const modelToUse = isPremium
+    ? (map['admin_model']    || 'gemini-3.5-flash-lite')
+    : (map['active_model']   || 'gemini-3.5-flash-lite');
+
+  // 3. Auto-reactivar llaves bloqueadas hace más de 60 min
+  const cooldownTime = new Date(Date.now() - 60 * 60 * 1000);
+  await sql`
+    UPDATE api_keys
+    SET is_active = true, error_count = 0
+    WHERE is_active = false
+      AND error_count >= 5
+      AND last_error_at IS NOT NULL
+      AND last_error_at <= ${cooldownTime.toISOString()}
+  `.catch(err => console.error('[didacteca-ia] Error reactivando llaves:', err));
+
+  // 4. Cargar llaves activas del pool (Gemini)
+  const keys = await sql`
+    SELECT id, label, key_encrypted
+    FROM api_keys
+    WHERE provider = 'gemini' AND is_active = true
+    ORDER BY priority ASC, error_count ASC
+  `;
+
+  if (keys.length === 0) {
+    throw new Error('[didacteca-ia] No hay API Keys de Gemini activas en el pool.');
+  }
+
+  // 5. Descifrar llaves
+  const { createDecipheriv } = await import('crypto');
+  function decryptKey(encrypted: string): string {
+    const encKeyStr = process.env.ADMIN_ENCRYPTION_KEY;
+    if (!encKeyStr || encKeyStr.length !== 32) throw new Error('ADMIN_ENCRYPTION_KEY inválida');
+    const encKey = Buffer.from(encKeyStr);
+    const [ivHex, data] = encrypted.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = createDecipheriv('aes-256-cbc', encKey, iv);
+    let decrypted = decipher.update(data, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  }
+
+  const decryptedKeys = keys.map((k: any) => ({
+    id: k.id as string,
+    label: k.label as string,
+    apiKey: decryptKey(k.key_encrypted as string),
+  }));
+
+  // 6. Rotación Round-Robin determinista
+  const startIndex = globalKeyPointerIndex % decryptedKeys.length;
+  globalKeyPointerIndex = (globalKeyPointerIndex + 1) % decryptedKeys.length;
+  const rotatedKeys = [
+    ...decryptedKeys.slice(startIndex),
+    ...decryptedKeys.slice(0, startIndex),
+  ];
+
+  console.log(
+    `[didacteca-ia] 🔄 Generando con Llave: "${rotatedKeys[0].label}" ` +
+    `(Índice: ${startIndex + 1}/${decryptedKeys.length}) - Modelo: ${modelToUse} ` +
+    `[${isPremium ? '⭐ Premium' : '⚡ Estándar'}]`
+  );
+
+  // 7. Intentar cada llave en orden rotado
+  const modelChain = buildModelChain(modelToUse, isPremium);
+
+  for (const keyRecord of rotatedKeys) {
+    try {
+      const result = await executeWithModelFallback(
+        keyRecord.apiKey,
+        modelChain,
+        systemInstruction,
+        prompt,
+        responseSchema
+      );
+
+      // Registrar éxito
+      await sql`
+        UPDATE api_keys
+        SET error_count = 0,
+            usage_count = usage_count + 1,
+            last_used_at = NOW()
+        WHERE id = ${keyRecord.id}
+      `.catch(() => {});
+
+      return result;
+    } catch (err: any) {
+      console.warn(`[didacteca-ia] Advertencia en llave "${keyRecord.label}": ${err.message}`);
+
+      const is429 =
+        err.message?.includes('429') ||
+        err.message?.includes('RESOURCE_EXHAUSTED') ||
+        err.message?.toLowerCase().includes('quota');
+
+      if (!is429) {
+        // Error grave (credencial inválida): incrementar errorCount
+        await sql`
+          UPDATE api_keys
+          SET error_count = error_count + 1,
+              last_error_at = NOW(),
+              is_active = CASE WHEN error_count + 1 >= 5 THEN false ELSE is_active END
+          WHERE id = ${keyRecord.id}
+        `.catch(() => {});
+      }
+      // 429 → no penalizar la llave, pasar a la siguiente del pool
+    }
+  }
+
+  throw new Error('[didacteca-ia] Todas las API Keys del pool fallaron o alcanzaron su cuota.');
+}
+
+// ── Ejecutor con cadena de modelos (fallback ante 404) ────────────────────────
+
+async function executeWithModelFallback(
+  apiKey: string,
+  modelChain: string[],
+  systemInstruction: string,
+  prompt: string,
+  responseSchema?: object
+): Promise<string> {
+  let lastError: any = null;
+
+  for (const currentModel of modelChain) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+      const payload: any = {
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: {
+          temperature: 0.4,
+          topP: 0.95,
+          responseMimeType: responseSchema ? 'application/json' : 'text/plain',
+        },
+      };
+
+      if (responseSchema) {
+        payload.generationConfig.responseSchema = responseSchema;
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(45000),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        // 404 = modelo descontinuado → intentar el siguiente de la cadena
+        if (res.status === 404 || errText.toLowerCase().includes('not found')) {
+          console.warn(`[didacteca-ia] Modelo "${currentModel}" no encontrado (404), probando siguiente...`);
+          continue;
+        }
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Respuesta vacía de Gemini API');
+      return text;
+    } catch (e: any) {
+      if (e.message?.includes('404') || e.message?.toLowerCase().includes('not found')) {
+        lastError = e;
+        continue; // Intentar siguiente modelo
+      }
+      throw e; // Propagar errores no-404
+    }
+  }
+
+  throw lastError || new Error('[didacteca-ia] Todos los modelos de la cadena fallaron.');
+}
+
+// ── Planning (streaming) ──────────────────────────────────────────────────────
+
+export async function* generatePlanningStream(
+  userPrompt: string,
+  teacherId?: string
+): AsyncGenerator<string> {
+  const isPremium = await resolveUserIsPremium(teacherId);
+  yield* generateStreamWithRotation(SYSTEM_PROMPT, userPrompt, teacherId, isPremium);
+}
+
+// ── Extra resources (rubric, material, lesson plan) ──────────────────────────
+
+export async function generateExtraText(
+  systemPrompt: string,
+  userPrompt: string,
+  teacherId?: string
+): Promise<string> {
+  return callGeminiPool(systemPrompt, userPrompt, teacherId);
+}
+
+// ── Planning (non-streaming, JSON) ────────────────────────────────────────────
 
 export async function generatePlanning(
-  userPrompt: string
+  userPrompt: string,
+  teacherId?: string
 ): Promise<GeneratedPlanningContent> {
-  const ai = await getAIProvider();
-  const text = await ai.generate(SYSTEM_PROMPT, userPrompt);
+  const text = await callGeminiPool(SYSTEM_PROMPT, userPrompt, teacherId);
 
   let parsed: GeneratedPlanningContent;
   try {
@@ -33,22 +281,4 @@ export async function generatePlanning(
   }
 
   return parsed;
-}
-
-// ── Planning (streaming) ──────────────────────────────────────────────────────
-
-export async function* generatePlanningStream(
-  userPrompt: string
-): AsyncGenerator<string> {
-  yield* generateStreamWithRotation(SYSTEM_PROMPT, userPrompt);
-}
-
-// ── Extra resources (rubric, material, lesson plan) ──────────────────────────
-
-export async function generateExtraText(
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const ai = await getAIProvider();
-  return ai.generate(systemPrompt, userPrompt);
 }

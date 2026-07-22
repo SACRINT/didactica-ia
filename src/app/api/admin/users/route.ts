@@ -12,14 +12,18 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('q') || '';
 
-    // Ensure is_blocked column exists (safe migration)
+    // Ensure is_blocked and is_premium columns exist (safe migrations)
     await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
+    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE`.catch(() => {});
 
     const teachers = search
       ? await sql`
           SELECT
             t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
-            COALESCE(t.is_blocked, false) AS is_blocked, COALESCE(t.role, 'docente') AS role, t.created_at,
+            COALESCE(t.is_blocked, false) AS is_blocked,
+            COALESCE(t.role, 'docente') AS role,
+            COALESCE(t.is_premium, false) AS is_premium,
+            t.created_at,
             (SELECT COUNT(*)::int FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
             (SELECT COUNT(*)::int FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
             (SELECT COUNT(*)::int FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
@@ -32,7 +36,10 @@ export async function GET(req: NextRequest) {
       : await sql`
           SELECT
             t.id, t.name, t.email, t.school_name, t.municipality, t.subsystem,
-            COALESCE(t.is_blocked, false) AS is_blocked, COALESCE(t.role, 'docente') AS role, t.created_at,
+            COALESCE(t.is_blocked, false) AS is_blocked,
+            COALESCE(t.role, 'docente') AS role,
+            COALESCE(t.is_premium, false) AS is_premium,
+            t.created_at,
             (SELECT COUNT(*)::int FROM plannings p WHERE p.teacher_id = t.id) AS planning_count,
             (SELECT COUNT(*)::int FROM paec_projects pa WHERE pa.teacher_id = t.id) AS paec_count,
             (SELECT COUNT(*)::int FROM pmc_projects pm WHERE pm.teacher_id = t.id) AS pmc_count,
@@ -55,17 +62,21 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     await requireAdmin();
-    const { teacherId, isBlocked, role } = await req.json();
+    const { teacherId, isBlocked, role, isPremium } = await req.json();
     const sql = getDb();
 
-    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
+  await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
     await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'docente'`.catch(() => {});
+    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE`.catch(() => {});
 
     if (isBlocked !== undefined) {
       await sql`UPDATE teachers SET is_blocked = ${isBlocked} WHERE id = ${teacherId}`;
     }
     if (role !== undefined) {
       await sql`UPDATE teachers SET role = ${role} WHERE id = ${teacherId}`;
+    }
+    if (isPremium !== undefined) {
+      await sql`UPDATE teachers SET is_premium = ${isPremium} WHERE id = ${teacherId}`;
     }
     
     return NextResponse.json({ success: true });

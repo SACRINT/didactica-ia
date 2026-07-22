@@ -21,21 +21,36 @@ interface Teacher {
   id: string; name: string; email: string; school_name: string;
   planning_count: number; paec_count: number; pmc_count: number;
   doc_count: number; last_active: string | null; is_blocked: boolean;
-  role: string;
+  role: string; is_premium: boolean;
 }
 interface Prompt { id: string; label: string; content: string; is_active: boolean; updated_at: string; updated_by: string | null; }
 interface UserDoc { id: string; teacher_email: string; doc_type: string; label: string; uac_name: string | null; file_name: string | null; used_count: number; created_at: string; }
 interface ActivityEntry { id: string; teacher_email: string; action: string; provider_used: string | null; model_used: string | null; success: boolean; error_msg: string | null; created_at: string; }
 
 const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral'];
-const MODELS: Record<string, string[]> = {
-  gemini:  ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'],
+
+// Modelos disponibles por proveedor para USO ESTÁNDAR (cuota gratuita masiva 500 RPD / 15 RPM)
+const STANDARD_MODELS: Record<string, string[]> = {
+  gemini:  ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'],
+  claude:  ['claude-haiku-4-5'],
+  openai:  ['gpt-4o-mini', 'gpt-3.5-turbo'],
+  nvidia:  ['meta/llama-3.1-70b-instruct', 'microsoft/phi-3-mini-4k-instruct'],
+  qwen:    ['qwen-turbo'],
+  mistral: ['mistral-small-latest'],
+};
+
+// Modelos disponibles por proveedor para USO PREMIUM (APIs de paga / avanzadas)
+const PREMIUM_MODELS: Record<string, string[]> = {
+  gemini:  ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.1-flash'],
   claude:  ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4-5'],
   openai:  ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
   nvidia:  ['meta/llama-3.1-70b-instruct', 'microsoft/phi-3-mini-4k-instruct'],
   qwen:    ['qwen-plus', 'qwen-max', 'qwen-turbo'],
   mistral: ['mistral-small-latest', 'mistral-large-latest'],
 };
+
+// Alias legacy para formulario de agregar key (usa premium para máxima flexibilidad)
+const MODELS = PREMIUM_MODELS;
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
@@ -107,6 +122,11 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     setSaving(false);
     if (r.ok) { setConfig(c => ({ ...c, ...updates })); showMsg('Configuración guardada ✓'); }
     else showMsg('Error al guardar', false);
+  }
+
+  async function toggleUserPremium(teacherId: string, isPremium: boolean) {
+    await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacherId, isPremium }) });
+    loadTeachers(); showMsg(isPremium ? '⭐ Acceso Premium activado' : '⚡ Revertido a Estándar');
   }
 
   async function addKey() {
@@ -341,68 +361,108 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
           <>
             <h1>🔑 Gestión de API Keys y Proveedor de IA</h1>
             
-            {/* IA Active Provider Section */}
+            {/* ── Modelos Activos por Perfil ── */}
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '20px', marginBottom: 24 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0f4ff', margin: '0 0 4px 0' }}>🤖 Proveedor de IA Activo</h3>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 16px 0' }}>
-                Selecciona el proveedor y modelo predeterminado que utilizará la plataforma.
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0f4ff', margin: '0 0 4px 0' }}>🎛️ Modelos Activos por Perfil</h3>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 20px 0' }}>
+                Configura el proveedor y modelo para cada perfil de usuario. Los cambios aplican inmediatamente a todas las generaciones.
               </p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-                {PROVIDERS.map(p => (
-                  <button
-                    key={p}
-                    onClick={() => saveConfig({ active_provider: p, active_model: MODELS[p][0] })}
-                    style={{
-                      background: config['active_provider'] === p ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
-                      border: config['active_provider'] === p ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 8,
-                      padding: '8px 16px',
-                      color: config['active_provider'] === p ? '#a5b4fc' : '#d1d5db',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {p} {config['active_provider'] === p ? '✓' : ''}
-                  </button>
-                ))}
-              </div>
-              
-              {config['active_provider'] && (
-                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ margin: 0, minWidth: 260 }}>
-                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Modelo activo para {config['active_provider']}</label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
+
+                {/* Tarjeta Estándar */}
+                <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 20 }}>⚡</span>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#c7d2fe', fontSize: 13 }}>Uso Estándar (Docentes)</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Cuota gratuita · 500 RPD / 15 RPM</div>
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ margin: '0 0 10px 0' }}>
+                    <label>Proveedor</label>
                     <select
-                      value={config['active_model'] || ''}
-                      onChange={e => saveConfig({ active_model: e.target.value })}
-                      style={{
-                        background: '#131324',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: 8,
-                        padding: '8px 12px',
-                        color: '#f0f4ff',
-                        fontSize: 13,
-                        outline: 'none',
-                        width: '100%',
-                      }}
+                      value={config['active_provider'] || 'gemini'}
+                      onChange={e => setConfig(c => ({ ...c, active_provider: e.target.value, active_model: (STANDARD_MODELS[e.target.value] || [])[0] || '' }))}
+                      style={{ background: '#131324', color: '#f0f4ff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
                     >
-                      {(MODELS[config['active_provider']] || []).map(m => (
+                      {PROVIDERS.map(p => <option key={p} value={p} style={{ background: '#131324', color: '#f0f4ff' }}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Modelo</label>
+                    <select
+                      value={config['active_model'] || 'gemini-3.5-flash-lite'}
+                      onChange={e => setConfig(c => ({ ...c, active_model: e.target.value }))}
+                      style={{ background: '#131324', color: '#f0f4ff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
+                    >
+                      {(STANDARD_MODELS[config['active_provider'] || 'gemini'] || []).map(m => (
+                        <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>
+                          {m}{m.includes('lite') ? ' — 500 RPD / 15 RPM ✓' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tarjeta Premium */}
+                <div style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 20 }}>⭐</span>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#fde68a', fontSize: 13 }}>Uso Premium (Admin + Usuarios Autorizados)</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Modelos avanzados / APIs de paga</div>
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ margin: '0 0 10px 0' }}>
+                    <label>Proveedor</label>
+                    <select
+                      value={config['admin_provider'] || 'gemini'}
+                      onChange={e => setConfig(c => ({ ...c, admin_provider: e.target.value, admin_model: (PREMIUM_MODELS[e.target.value] || [])[0] || '' }))}
+                      style={{ background: '#131324', color: '#fde68a', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
+                    >
+                      {PROVIDERS.map(p => <option key={p} value={p} style={{ background: '#131324', color: '#f0f4ff' }}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label>Modelo</label>
+                    <select
+                      value={config['admin_model'] || 'gemini-3.5-flash-lite'}
+                      onChange={e => setConfig(c => ({ ...c, admin_model: e.target.value }))}
+                      style={{ background: '#131324', color: '#fde68a', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', width: '100%' }}
+                    >
+                      {(PREMIUM_MODELS[config['admin_provider'] || 'gemini'] || []).map(m => (
                         <option key={m} value={m} style={{ background: '#131324', color: '#f0f4ff' }}>{m}</option>
                       ))}
                     </select>
                   </div>
-                  {testResult && (
-                    <span style={{ fontSize: 12, color: testResult.includes('✅') ? '#4ade80' : '#f87171', paddingBottom: 8 }}>
-                      {testResult}
-                    </span>
-                  )}
-                  <button className="btn-sm btn-ghost" onClick={testConnection} style={{ border: '1px solid rgba(255,255,255,0.1)', height: 38 }}>
-                    Probar conexión a BD
-                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* Guardar Configuración */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
+                {testResult && (
+                  <span style={{ fontSize: 12, color: testResult.includes('✅') ? '#4ade80' : '#f87171' }}>
+                    {testResult}
+                  </span>
+                )}
+                <button className="btn-sm btn-ghost" onClick={testConnection} style={{ border: '1px solid rgba(255,255,255,0.1)', height: 38 }}>
+                  Probar conexión a BD
+                </button>
+                <button
+                  className="btn-sm btn-primary"
+                  disabled={saving}
+                  style={{ height: 38, padding: '0 20px', fontWeight: 700 }}
+                  onClick={() => saveConfig({
+                    active_provider: config['active_provider'] || 'gemini',
+                    active_model:    config['active_model']    || 'gemini-3.5-flash-lite',
+                    admin_provider:  config['admin_provider']  || 'gemini',
+                    admin_model:     config['admin_model']     || 'gemini-3.5-flash-lite',
+                  })}
+                >
+                  {saving ? 'Guardando...' : '💾 Guardar Configuración de Modelos'}
+                </button>
+              </div>
             </div>
 
             <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 24 }}>
@@ -585,7 +645,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
             ) : (
               <table className="admin-table">
                 <thead>
-                  <tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Rol de Usuario</th><th>Planes</th><th>PAEC</th><th>PMC</th><th>Docs</th><th>Última actividad</th><th>Estado</th><th>Acción</th></tr>
+                  <tr><th>Nombre</th><th>Email</th><th>Escuela</th><th>Rol</th><th>Acceso IA</th><th>Planes</th><th>PAEC</th><th>PMC</th><th>Docs</th><th>Última actividad</th><th>Estado</th><th>Acción</th></tr>
                 </thead>
                 <tbody>
                   {teachers.map(t => (
@@ -597,15 +657,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         <select
                           value={t.role || 'docente'}
                           onChange={e => changeUserRole(t.id, e.target.value)}
-                          style={{
-                            background: '#131324',
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            color: '#f0f4ff',
-                            fontSize: '12px',
-                            outline: 'none',
-                          }}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', padding: '4px 8px', color: '#f0f4ff', fontSize: '12px', outline: 'none' }}
                         >
                           <option value="administrador">Administrador</option>
                           <option value="supervisor">Supervisor</option>
@@ -613,6 +665,21 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                           <option value="director">Director</option>
                           <option value="docente">Docente</option>
                         </select>
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => toggleUserPremium(t.id, !t.is_premium)}
+                          title={t.is_premium ? 'Haz clic para revertir a Estándar' : 'Haz clic para dar acceso Premium'}
+                          style={{
+                            background: t.is_premium ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.05)',
+                            border: t.is_premium ? '1px solid rgba(234,179,8,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+                            color: t.is_premium ? '#fde68a' : 'rgba(255,255,255,0.5)',
+                            fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {t.is_premium ? '⭐ Premium' : '⚡ Estándar'}
+                        </button>
                       </td>
                       <td><span className="badge badge-blue">{t.planning_count}</span></td>
                       <td><span className="badge badge-blue">{t.paec_count}</span></td>

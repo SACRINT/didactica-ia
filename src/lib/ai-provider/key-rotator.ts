@@ -1,8 +1,8 @@
 /**
- * Key rotation utility — v2 (mejorado)
+ * Key rotation utility — v3 (actualizado para gemini-3.x)
  *
- * Mejoras sobre v1:
- * - Bug fix: rotación correcta por índice (indexOf con objetos siempre retorna -1)
+ * Mejoras sobre v2:
+ * - Eliminados todos los defaults y referencias a modelos legados (gemini-1.5, 2.0, 2.5)
  * - Auto-desactivación: si error_count >= 5, la clave se marca is_active=false
  * - Auto-reactivación: antes de cargar claves, reactiva las que llevan > 5 min sin error
  * - Prioridad de clave de usuario: si se pasa un teacherId, se usa su clave primero

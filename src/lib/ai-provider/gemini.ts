@@ -10,7 +10,7 @@ export class GeminiProvider implements AIProvider {
   modelId: string;
   private apiKey: string;
 
-  constructor(apiKey: string, modelId = 'gemini-2.5-flash') {
+  constructor(apiKey: string, modelId = 'gemini-3.5-flash-lite') {
     this.apiKey = apiKey;
     this.modelId = modelId;
   }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail } from '@/lib/db';
 import path from 'path';
+import { callGeminiPool } from '@/lib/gemini';
 
 // Polyfills for browser-only globals required by pdfjs-dist v6 under Node/Vercel environments
 if (typeof globalThis.DOMMatrix === 'undefined') {
@@ -103,19 +104,12 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<string> {
 
 // ─── Gemini PAEC structuring ──────────────────────────────────────────────────
 async function structurePaecWithGemini(rawText: string) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('No GEMINI_API_KEY');
-  }
-
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
   // Excerpt first 8000 characters
   const excerpt = rawText.slice(0, 8000);
 
-  const prompt = `Eres un experto en el programa Aula Escuela Comunidad (PAEC) y el Proyecto Escolar Comunitario (PEC) de la Nueva Escuela Mexicana.
-  
-  Analiza el siguiente texto de un documento PAEC/PEC de un bachillerato en Puebla y extrae en formato JSON:
+  const systemInstruction = `Eres un experto en el programa Aula Escuela Comunidad (PAEC) y el Proyecto Escolar Comunitario (PEC) de la Nueva Escuela Mexicana. Responde exclusivamente con JSON válido, sin markdown ni explicaciones.`;
+
+  const prompt = `Analiza el siguiente texto de un documento PAEC/PEC de un bachillerato en Puebla y extrae en formato JSON:
   
   {
     "projectName": "Nombre del Proyecto Escolar Comunitario (PEC)",
@@ -132,23 +126,8 @@ async function structurePaecWithGemini(rawText: string) {
   TEXTO DEL DOCUMENTO:
   ${excerpt}`;
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
-  });
-
-  const response = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  });
-
-  const text = response.response.text();
-  if (!text) {
-    throw new Error('Empty response from Gemini API');
-  }
-
-  const cleanJson = text
+  const rawJsonText = await callGeminiPool(systemInstruction, prompt);
+  const cleanJson = rawJsonText
     .replace(/^```(?:json)?\n?/m, '')
     .replace(/\n?```$/m, '')
     .trim();
