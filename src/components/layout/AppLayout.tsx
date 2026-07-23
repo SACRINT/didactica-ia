@@ -52,57 +52,46 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
     getMaintenanceStatus(),
   ]);
 
-  // ── Maintenance gate — admins bypass it ──────────────────────────────────────
+  // ── Maintenance gate — admins bypass it ────────────────────────────────────────────
   if (maintenance.active && !isAdmin) {
     return (
       <div style={{
         minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
-        padding: '24px',
-        fontFamily: 'Inter, sans-serif',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(160deg, #0d1530 0%, #080c18 60%, #020408 100%)',
+        backgroundAttachment: 'fixed',
+        padding: '24px', fontFamily: 'Inter, sans-serif',
       }}>
         <div style={{
-          maxWidth: 480,
-          textAlign: 'center',
+          maxWidth: 480, textAlign: 'center',
           background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 20,
-          padding: '48px 40px',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 20, padding: '48px 40px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
         }}>
           <div style={{ fontSize: 64, marginBottom: 24 }}>🔧</div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#f0f4ff', marginBottom: 12 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#f0f4ff', marginBottom: 12, letterSpacing: '-0.5px' }}>
             Plataforma en Mantenimiento
           </h1>
-          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, marginBottom: 32 }}>
+          <p style={{ fontSize: 15, color: 'rgba(240,244,255,0.55)', lineHeight: 1.7, marginBottom: 32 }}>
             {maintenance.message}
           </p>
           <div style={{
             background: 'rgba(99,102,241,0.1)',
             border: '1px solid rgba(99,102,241,0.3)',
-            borderRadius: 10,
-            padding: '12px 20px',
-            fontSize: 13,
-            color: '#818cf8',
+            borderRadius: 10, padding: '12px 20px',
+            fontSize: 13, color: '#818cf8',
           }}>
             📚 DidácticaIA · DBEPA Puebla 2026-2027
           </div>
-          {/* Sign-out button so users can log in with admin account if needed */}
           <form action={signOutPlain} style={{ marginTop: 24 }}>
             <button type="submit" style={{
               background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: 'rgba(255,255,255,0.4)',
-              borderRadius: 8,
-              padding: '8px 20px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}>
-              Cerrar sesión
-            </button>
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.35)',
+              borderRadius: 8, padding: '8px 20px',
+              fontSize: 12, cursor: 'pointer',
+            }}>Cerrar sesión</button>
           </form>
         </div>
       </div>
@@ -128,7 +117,7 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
                 : initials
               }
             </div>
-            <span>{user.name?.split(' ')[0] || user.email}</span>
+            <span style={{ fontWeight: 500 }}>{user.name?.split(' ')[0] || user.email}</span>
           </div>
           <SignOutButton locale={locale} signOutAction={signOutAction} />
         </div>
@@ -139,22 +128,24 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         {/* Maintenance banner for admins */}
         {maintenance.active && isAdmin && (
           <div style={{
-            background: 'rgba(234,179,8,0.15)',
-            border: '1px solid rgba(234,179,8,0.3)',
+            background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.25)',
             borderRadius: 8,
             padding: '8px 12px',
-            margin: '8px 0',
+            margin: '0 12px 8px',
             fontSize: 11,
-            color: '#facc15',
+            color: '#fcd34d',
             textAlign: 'center',
           }}>
             ⚠️ Modo mantenimiento activo<br/>
             <span style={{ opacity: 0.7 }}>Solo tú puedes ver la plataforma</span>
           </div>
         )}
+
         <Link href={`/${locale}/nueva-planeacion`} className="sidebar-new-btn">
           + Nueva planeación
         </Link>
+
         <div className="sidebar-section-label">Menú</div>
         <Link href={`/${locale}/dashboard`} className={`sidebar-link ${activeSection === 'dashboard' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📝</span>Mis planeaciones
@@ -175,12 +166,14 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
           <span className="sidebar-link-icon">🏫</span>Mis Escuelas
         </Link>
 
-
         {/* Admin section — visible only for admins */}
         {isAdmin && (
           <>
             <div className="sidebar-section-label" style={{ marginTop: 16 }}>Administrador</div>
-            <Link href={`/${locale}/admin`} className={`sidebar-link ${activeSection === 'admin' ? 'active' : ''}`} style={{ color: '#818cf8' }}>
+            <Link
+              href={`/${locale}/admin`}
+              className={`sidebar-link ${activeSection === 'admin' ? 'active' : ''}`}
+            >
               <span className="sidebar-link-icon">⚙️</span>Panel de Admin
             </Link>
           </>

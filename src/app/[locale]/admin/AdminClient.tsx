@@ -267,54 +267,60 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   return (
     <div className="admin-panel">
       <style>{`
-        .admin-panel { display: flex; gap: 0; min-height: 85vh; background: var(--bg-card, #1a1d2e); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-        .admin-sidebar { width: 200px; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); padding: 24px 0; flex-shrink: 0; }
-        .admin-sidebar h2 { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.4); padding: 0 20px 12px; text-transform: uppercase; }
-        .admin-tab-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 20px; font-size: 13px; color: rgba(255,255,255,0.6); background: none; border: none; cursor: pointer; text-align: left; transition: all 0.2s; }
-        .admin-tab-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
-        .admin-tab-btn.active { background: rgba(99,102,241,0.2); color: #818cf8; border-right: 3px solid #818cf8; font-weight: 600; }
+        .admin-panel { display: flex; gap: 0; min-height: 85vh; background: rgba(8,12,24,0.7); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04) inset; backdrop-filter: blur(12px); }
+        .admin-sidebar { width: 200px; flex-shrink: 0; background: rgba(255,255,255,0.025); border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 0; }
+        .admin-sidebar h2 { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: rgba(240,244,255,0.3); padding: 0 20px 16px; text-transform: uppercase; }
+        .admin-tab-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 20px; font-size: 13px; color: rgba(240,244,255,0.5); background: none; border: none; border-left: 3px solid transparent; cursor: pointer; text-align: left; transition: all 0.18s ease; }
+        .admin-tab-btn:hover { background: rgba(255,255,255,0.05); color: rgba(240,244,255,0.85); transform: translateX(2px); }
+        .admin-tab-btn.active { background: rgba(99,102,241,0.12); color: #818cf8; border-left-color: #6366f1; font-weight: 600; }
         .admin-content { flex: 1; padding: 32px; overflow-y: auto; max-height: 85vh; }
-        .admin-content h1 { font-size: 22px; font-weight: 700; color: #f0f4ff; margin-bottom: 24px; }
-        .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
-        .stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center; }
-        .stat-card .num { font-size: 32px; font-weight: 800; color: #818cf8; }
-        .stat-card .lbl { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+        .admin-content h1 { font-size: 20px; font-weight: 800; color: #f0f4ff; margin-bottom: 24px; letter-spacing: -0.4px; display: flex; align-items: center; gap: 10px; }
+        .admin-content h1::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(99,102,241,0.3), transparent); }
+        .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+        .stat-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 20px 16px; text-align: center; position: relative; overflow: hidden; transition: all 0.2s ease; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(99,102,241,0.6), transparent); }
+        .stat-card:hover { border-color: rgba(99,102,241,0.25); transform: translateY(-2px); background: rgba(99,102,241,0.06); }
+        .stat-card .num { font-size: 30px; font-weight: 800; color: #818cf8; letter-spacing: -1px; }
+        .stat-card .lbl { font-size: 11px; color: rgba(240,244,255,0.4); margin-top: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
         .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .admin-table th { text-align: left; padding: 10px 12px; color: rgba(255,255,255,0.4); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .admin-table td { padding: 10px 12px; color: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-        .admin-table tr:hover td { background: rgba(255,255,255,0.03); }
+        .admin-table th { text-align: left; padding: 10px 12px; color: rgba(240,244,255,0.35); font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .admin-table td { padding: 10px 12px; color: rgba(240,244,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+        .admin-table tr:hover td { background: rgba(255,255,255,0.025); }
         .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .badge-green  { background: rgba(34,197,94,0.15); color: #4ade80; }
-        .badge-red    { background: rgba(239,68,68,0.15);  color: #f87171; }
-        .badge-yellow { background: rgba(234,179,8,0.15);  color: #facc15; }
-        .badge-blue   { background: rgba(99,102,241,0.15); color: #818cf8; }
-        .btn-sm { padding: 5px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
-        .btn-primary { background: #6366f1; color: #fff; }
-        .btn-primary:hover { background: #4f52d3; }
-        .btn-danger  { background: rgba(239,68,68,0.15); color: #f87171; }
-        .btn-danger:hover  { background: rgba(239,68,68,0.3); }
-        .btn-ghost   { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
-        .btn-ghost:hover   { background: rgba(255,255,255,0.1); }
+        .badge-green  { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
+        .badge-red    { background: rgba(244,63,94,0.12);  color: #fb7185; border: 1px solid rgba(244,63,94,0.2); }
+        .badge-yellow { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.2); }
+        .badge-blue   { background: rgba(99,102,241,0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.2); padding: 2px 8px; }
+        .btn-sm { padding: 5px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.18s ease; }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,0.35); }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-danger  { background: rgba(244,63,94,0.12); color: #fb7185; border: 1px solid rgba(244,63,94,0.2); }
+        .btn-danger:hover  { background: rgba(244,63,94,0.22); }
+        .btn-ghost   { background: rgba(255,255,255,0.05); color: rgba(240,244,255,0.6); border: 1px solid rgba(255,255,255,0.08); }
+        .btn-ghost:hover   { background: rgba(255,255,255,0.09); color: rgba(240,244,255,0.9); }
         .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
         .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
-        .form-group label { font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .form-group input, .form-group select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 8px 12px; color: #f0f4ff; font-size: 13px; outline: none; }
-        .form-group input:focus, .form-group select:focus { border-color: #6366f1; }
-        .form-group textarea { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 12px; color: #f0f4ff; font-size: 13px; outline: none; font-family: monospace; resize: vertical; min-height: 300px; width: 100%; }
+        .form-group label { font-size: 10px; color: rgba(240,244,255,0.4); font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+        .form-group input, .form-group select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #f0f4ff; font-size: 13px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        .form-group input:focus, .form-group select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
+        .form-group textarea { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: #f0f4ff; font-size: 13px; outline: none; font-family: monospace; resize: vertical; min-height: 300px; width: 100%; transition: border-color 0.2s; }
         .form-group textarea:focus { border-color: #6366f1; }
-        .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 9999; animation: slideIn 0.3s ease; }
-        .toast-ok  { background: rgba(34,197,94,0.9); color: #fff; }
-        .toast-err { background: rgba(239,68,68,0.9); color: #fff; }
-        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; z-index: 9999; animation: toastIn 0.3s ease; backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .toast-ok  { background: rgba(16,185,129,0.9); color: #fff; border: 1px solid rgba(16,185,129,0.4); }
+        .toast-err { background: rgba(244,63,94,0.9);  color: #fff; border: 1px solid rgba(244,63,94,0.4); }
+        @keyframes toastIn { from { transform: translateY(16px) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 24px 0; }
-        .provider-card { background: rgba(255,255,255,0.04); border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .provider-card.selected { border-color: #6366f1; background: rgba(99,102,241,0.12); }
-        .provider-card:hover { border-color: rgba(99,102,241,0.5); }
-        .prompt-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+        .provider-card { background: rgba(255,255,255,0.03); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .provider-card.selected { border-color: #6366f1; background: rgba(99,102,241,0.1); }
+        .provider-card:hover { border-color: rgba(99,102,241,0.4); }
+        .prompt-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; transition: border-color 0.2s; }
+        .prompt-item:hover { border-color: rgba(99,102,241,0.25); }
         .prompt-item .prompt-label { font-weight: 600; color: #f0f4ff; font-size: 14px; margin-bottom: 4px; }
-        .prompt-item .prompt-meta  { font-size: 11px; color: rgba(255,255,255,0.4); }
-        .empty-state { text-align: center; padding: 48px; color: rgba(255,255,255,0.3); font-size: 14px; }
+        .prompt-item .prompt-meta  { font-size: 11px; color: rgba(255,255,255,0.35); }
+        .empty-state { text-align: center; padding: 48px; color: rgba(240,244,255,0.25); font-size: 14px; }
+        @keyframes adminFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .admin-content > * { animation: adminFadeIn 0.25s ease forwards; }
       `}</style>
 
       {/* Sidebar */}
