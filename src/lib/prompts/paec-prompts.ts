@@ -1,9 +1,17 @@
-export const PAEC_SYSTEM_PROMPT = `Actúa consistentemente como un consorcio experto en Educación Media Superior de la Nueva Escuela Mexicana (NEM) integrado por: un Formador Pedagógico NEM, un Arquitecto de Estructuras Educativas y un Estratega Curricular Transversal. Tu objetivo es diseñar un Proyecto Escolar Comunitario (PEC) robusto, profesional y contextualizado.
+export const PAEC_SYSTEM_PROMPT = `Actúa consistentemente como un consorcio experto en Educación Media Superior de la Nueva Escuela Mexicana (NEM) integrado por: un Formador Pedagógico NEM, un Arquitecto de Estructuras Educativas y un Estratega Curricular Transversal de Proyectos Escolares Comunitarios (PAEC-PEC 2026-2027). Tu objetivo es diseñar un Proyecto Escolar Comunitario (PEC) de nivel EXCELENCIA alineado al 100% con la Rúbrica PAEC 2026-2027.
 
 Reglas Críticas de Operación:
-1. Fidelidad Estructural: Conserva de forma estricta los títulos y encabezados de las tablas solicitadas. Jamás modifiques las columnas a menos que se te pida explícitamente.
-2. Autonomía Operativa de las UACs: No agrupes asignaturas ni semestres. Cada Unidad de Aprendizaje Curricular (UAC) debe poseer su propia fila independiente con su docente responsable para evitar confusiones de asignación en el plantel.
-3. Respeto a la Estructura de Bloques Semestrales (Modelo de Relevos): En los bachilleratos, las asignaturas se cursan de forma alternada. En el Semestre A (Septiembre-Enero) participan los estudiantes de 3° y 5° semestre. En el Semestre B (Febrero-Junio) participan los estudiantes de 4° y 6° semestre. Las actividades curriculares de las tablas y el Plan Operativo deben segmentarse rigurosamente respetando esta división temporal del ciclo escolar.
+1. Fidelidad Estructural: Conserva de forma estricta los títulos, estructuras y claves del JSON solicitado.
+2. Autonomía Operativa de las UACs: No agrupes asignaturas ni semestres. Cada Unidad de Aprendizaje Curricular (UAC) debe poseer su propia representación clara en la transversalidad.
+3. Nomenclatura Curricular Estricta (Normativa Ciclos 2026-2027 y 2027-2028):
+   • Ciclo Escolar 2026-2027: Para 1.º, 2.º, 3.º y 4.º semestre DEBES usar exclusivamente "PROPÓSITOS FORMATIVOS" y "CONTENIDOS". (Está ESTRICTAMENTE PROHIBIDO usar la palabra "Progresiones" para estos semestres). Únicamente 5.º y 6.º semestre usan "PROGRESIONES DE APRENDIZAJE".
+   • Ciclo Escolar 2027-2028 y posteriores: TODOS los semestres (1.º a 6.º) usarán exclusivamente "PROPÓSITOS FORMATIVOS" y "CONTENIDOS", quedando completamente eliminado el uso de progresiones.
+4. Transversalidad Real (Cadena de Valor Pedagógica):
+   • Evita la multidisciplinariedad superficial (materias haciendo tareas aisladas en paralelo).
+   • Diseña una cadena de valor donde el producto de una asignatura sea el insumo indispensable para la siguiente (Ej. Matemáticas calcula la estadística que Lenguaje usa en su debate argumentativo, y Química analiza las muestras que Ciencias Sociales recolectó).
+5. Cero Simulación y Protagonismo Estudiantil:
+   • Evita actividades decorativas o eventos aislados sin fondo (ej. "hacer un cartel" o "barrer" sin análisis reflexivo). Cada actividad debe desarrollar un aprendizaje cognitivo complejo y tener un producto/evidencia evaluable con instrumentos técnicos.
+   • El estudiante es el agente activo de transformación social y el docente actúa como facilitador.
 
 Debes responder ÚNICAMENTE con un objeto JSON válido que contenga la información del paso actual. No incluyas explicaciones de texto fuera del JSON. No agregues bloques de código markdown (\`\`\`json).`;
 
@@ -12,46 +20,47 @@ export function buildPrompt1Diagnostico(
   schoolContext: string,
   problem: string
 ): string {
-  return `Genera la Fase I: Diagnóstico Colectivo del PAEC en base a la información proporcionada.
-  
+  return `Genera la FASE I: Diagnóstico Colectivo y Metodología de Análisis del PAEC-PEC (Ciclo Escolar 2026-2027).
+
 Problemática seleccionada por el plantel:
 "${problem}"
 
-Información de la Comunidad proporcionada:
+Información de la Comunidad:
 ${communityContext}
 
-Información del Plantel proporcionada:
+Información del Plantel:
 ${schoolContext}
 
 Debes retornar un objeto JSON con la siguiente estructura exacta:
 {
   "tabla1": [
-    { "col1": "Ubicación geográfica", "col2": "..." },
-    { "col1": "Situación demográfica", "col2": "..." },
-    { "col1": "Situación socioeconómica", "col2": "..." },
-    { "col1": "Situación sociocultural", "col2": "..." },
-    { "col1": "Seguridad", "col2": "..." },
-    { "col1": "Situación medioambiental", "col2": "..." }
+    { "col1": "Ubicación geográfica", "col2": "Coordenadas, entorno y características del terreno..." },
+    { "col1": "Situación demográfica", "col2": "Población total, distribución por edad y género..." },
+    { "col1": "Situación socioeconómica", "col2": "Principales actividades económicas, nivel de ingresos y empleo..." },
+    { "col1": "Situación sociocultural", "col2": "Tradiciones, lengua, costumbres y capital cultural..." },
+    { "col1": "Seguridad y convivencia", "col2": "Nivel de seguridad, factores de riesgo y cohesión social..." },
+    { "col1": "Participación comunitaria", "col2": "Organizaciones locales, comités y redes de apoyo..." },
+    { "col1": "Recursos y servicios", "col2": "Acceso a agua, luz, drenaje, internet y servicios de salud..." },
+    { "col1": "Situación medioambiental", "col2": "Problemáticas ecológicas, manejo de residuos y recursos naturales..." }
   ],
   "tabla2": [
-    { "col1": "Cobertura de la educación", "col2": "..." },
-    { "col1": "Contexto familiar", "col2": "..." },
-    { "col1": "Características del estudiantado", "col2": "..." },
-    { "col1": "Características del plantel", "col2": "..." },
-    { "col1": "Indicadores educativos del plantel", "col2": "..." },
-    { "col1": "Programas o proyectos previos", "col2": "..." },
-    { "col1": "Instalaciones y equipamiento", "col2": "..." }
+    { "col1": "Cobertura educativa", "col2": "Matrícula total y nivel de cobertura en la localidad..." },
+    { "col1": "Contexto familiar", "col2": "Estructura familiar, nivel educativo de los padres y apoyo..." },
+    { "col1": "Características del estudiantado", "col2": "Intereses, estilos de aprendizaje y necesidades..." },
+    { "col1": "Características del plantel", "col2": "Infraestructura, aulas, equipamiento y personal docente..." },
+    { "col1": "Indicadores educativos", "col2": "Tasas de aprobación, reprobación, abandono y eficiencia terminal..." },
+    { "col1": "Programas vigentes", "col2": "Programas institucionales o proyectos comunitarios previos..." }
   ],
   "tabla3": [
     { "aspect": "Fortalezas (F)", "analysis": "Cruza las fortalezas internas del plantel con las oportunidades externas para el proyecto..." },
-    { "aspect": "Oportunidades (O)", "analysis": "Analiza las oportunidades del entorno para fortalecer la educación..." },
-    { "aspect": "Debilidades (D)", "analysis": "Cruza las debilidades del plantel para mitigar riesgos..." },
-    { "aspect": "Amenazas (A)", "analysis": "Identifica las amenazas externas y plantea la Estrategia Maestra del proyecto..." }
+    { "aspect": "Oportunidades (O)", "analysis": "Analiza las oportunidades del entorno comunitario para potenciar los aprendizajes..." },
+    { "aspect": "Debilidades (D)", "analysis": "Identifica áreas de oportunidad internas y cómo el proyecto las mitiga..." },
+    { "aspect": "Amenazas (A)", "analysis": "Identifica riesgos externos y plantea la estrategia preventiva del proyecto..." }
   ],
   "tabla4": [
-    { "col1": "Recuperación de información", "col2": "Describir el proceso técnico y recopilación de datos comunitarios y escolares..." },
-    { "col1": "Sistematización y análisis", "col2": "Describir cómo se procesó la información para identificar carencias y fortalezas..." },
-    { "col1": "Selección del problema para el PEC", "col2": "Justificar la selección específica de la problemática planteada para este PEC..." }
+    { "col1": "Recuperación de información", "col2": "Describir el proceso técnico y metodológico de levantamiento de datos comunitarios y escolares..." },
+    { "col1": "Sistematización y análisis", "col2": "Explicar cómo se procesó la información para identificar la problemática central..." },
+    { "col1": "Selección del problema para el PEC", "col2": "Justificar la pertinencia de la problemática elegida como objeto de transformación situacional..." }
   ]
 }`;
 }
@@ -61,47 +70,47 @@ export function buildPrompt2Justificacion(
   projectName: string,
   problem: string
 ): string {
-  return `Redacta los apartados formales de la Fase II: Justificación y Alcance del PEC en base a la Fase I (Diagnóstico Colectivo) aprobada.
+  return `Redacta la FASE II: Definición, Justificación y Diseño General del PEC conforme al Criterio 7 de la Rúbrica PAEC (Ciclo 2026-2027).
 
-Nombre preliminar del proyecto: "${projectName}"
+Nombre del proyecto: "${projectName}"
 Problemática asociada: "${problem}"
 
-Resumen del Diagnóstico de la Fase I:
+Diagnóstico de la Fase I:
 ${diagnosticoSummary}
 
 Genera un objeto JSON con la siguiente estructura exacta:
 {
-  "projectName": "Nombre definitivo y formal del proyecto",
-  "introduction": "Redacta una justificación completa explicando detalladamente cómo el diagnóstico comunitario llevó a la selección de este proyecto.",
+  "projectName": "${projectName}",
+  "introduction": "Redacta la Justificación Técnica obligatoria con los 4 sub-apartados del Criterio 7: 1. MAGNITUD (dimensión del problema y población afectada), 2. INTERÉS (por qué apasiona a alumnos y comunidad), 3. FACTIBILIDAD (viabilidad con recursos actuales), 4. OPORTUNIDAD (por qué es el momento adecuado).",
   "pilares": [
-    "Conexión Directa con Necesidades del Plantel: (Explicar viabilidad y alineación con la infraestructura escolar)",
-    "Desarrollo de Competencias Profesionales Avanzadas: (Explicar las competencias transversales y laborales que adquieren)",
-    "Oportunidad de Innovación y Emprendimiento: (Describir qué solución tangible o idea productiva aporta el proyecto)",
-    "Sinergia Comunitaria: (Cómo vincula a familias, comercios o dependencias públicas locales)",
-    "Alineación Curricular Estratégica: (Cómo se integran las disciplinas curriculares de la NEM)"
+    "Conexión Directa con Necesidades del Plantel: Viabilidad e infraestructura escolar",
+    "Desarrollo de Competencias Transversales: Habilidades sociocognitivas y socioemocionales de la NEM",
+    "Oportunidad de Innovación y Emprendimiento Social: Solución tangible y sostenible",
+    "Sinergia Comunitaria: Vinculación activa de familias y actores locales",
+    "Alineación Curricular Estratégica: Integración de los recursos del MCCEMS"
   ],
   "proposito": {
-    "educativo": "Propósito educativo del PEC: Qué aprenderán los estudiantes.",
-    "social": "Propósito social/ambiental del PEC: Qué beneficio traerá al entorno comunitario.",
-    "funcional": "Propósito funcional: Cuál es el objetivo material, producto o servicio concreto que se generará."
+    "educativo": "Propósito educativo: Qué aprendizajes y competencias desarrollarán los estudiantes.",
+    "social": "Propósito social/comunitario: Qué impacto positivo real se generará en el entorno.",
+    "funcional": "Propósito funcional: Cuál es el producto material, prototipo o servicio concreto resultado del PEC."
   },
   "alcance": {
     "metas": [
-      "Meta 1 (Gestión/Alcance): Porcentaje cuantitativo de cobertura escolar o comunitaria.",
-      "Meta 2 (Producción/Mejora): Meta física medible del producto o servicio generado.",
+      "Meta 1 (Gestión/Alcance): Porcentaje cuantitativo de cobertura o beneficiarios.",
+      "Meta 2 (Producción/Solución): Meta física medible del producto o servicio generado.",
       "Meta 3 (Participación Comunitaria): Meta cuantitativa de involucramiento de familias o aliados.",
-      "Meta 4 (Desarrollo de Competencias): Nivel cuantitativo de logro en competencias o acreditación."
+      "Meta 4 (Desarrollo Curricular): Nivel de logro en los propósitos formativos o progresiones."
     ],
     "participantes": [
-      "Estudiantes: (Rol de los grupos y semestres)",
-      "Docentes: (Rol de coordinación)",
-      "Familias: (Rol de apoyo y co-evaluación)",
-      "Autoridades: (Rol de gestión y vinculación)"
+      "Estudiantes: Rol activo, reflexivo y de liderazgo colaborativo",
+      "Docentes: Rol de facilitación y articulación curricular transversal",
+      "Familias: Rol de apoyo, acompañamiento y co-evaluación",
+      "Autoridades y Comunidad: Rol de gestión, asesoría y vinculación externa"
     ],
     "recursos": [
-      "Recursos Materiales e Instalaciones necesarias...",
-      "Recursos Tecnológicos requeridos...",
-      "Recursos Financieros o donativos comunitarios necesarios..."
+      "Recursos Materiales e Infraestructura escolar...",
+      "Recursos Tecnológicos y de Información...",
+      "Recursos Financieros o insumos comunitarios acordados..."
     ]
   }
 }`;
@@ -115,23 +124,26 @@ export function buildPrompt3Mapeo(
     .map((u) => `- Semestre ${u.semester}: ${u.uac_name}`)
     .join('\n');
 
-  return `Basado en la Justificación del proyecto y problemática seleccionada, debes realizar el análisis transversal de la matriz "Vinculación Multidisciplinaria del PEC" para las siguientes materias activas.
+  return `Realiza la Matriz de Mapeo Curricular y Transversalidad del PEC para las siguientes asignaturas activas en el Ciclo Escolar 2026-2027.
 
 Información del Proyecto:
 ${justificacionText}
 
-Asignaturas a mapear (Debes generar una fila exclusiva para cada una de ellas, no las omitas ni las agrupes):
+Asignaturas a mapear (Genera una fila exclusiva para cada una):
 ${listText}
+
+REGLA DE NOMENCLATURA NORMATIVA (Ciclo Escolar 2026-2027):
+- Para Semestres 1, 2, 3 y 4: Utiliza EXCLUSIVAMENTE el término "PROPÓSITO FORMATIVO" y "CONTENIDOS" (Está PROHIBIDO usar "Progresiones" para 1°, 2°, 3° y 4° semestre).
+- Para Semestres 5 y 6: Utiliza el término "PROGRESIÓN DE APRENDIZAJE".
 
 Debes retornar un arreglo JSON de objetos con la siguiente estructura exacta:
 [
   {
-    "semester": 3,
+    "semester": 1,
     "uacName": "Nombre de la Asignatura",
-    "topic": "Tema o actividad específica y práctica del estudiante relacionada con el proyecto",
-    "linking": "Vinculación curricular detallada: Cómo la asignatura aporta al proyecto y qué aprendizajes del programa se movilizan"
-  },
-  ...
+    "topic": "Tema o contenido específico y situado que abordará el estudiante",
+    "linking": "Vinculación curricular detallada: Cita el Propósito Formativo (1°-4°) o la Progresión (5°-6°) correspondiente y explica cómo aporta a la cadena de valor del proyecto."
+  }
 ]`;
 }
 
@@ -141,38 +153,37 @@ export function buildPrompt4Cronograma(
 ): string {
   let relevosText = '';
   if (cycleType === 'A') {
-    relevosText = `Fases 1, 2 y 3 corresponden al Semestre A (Septiembre a Enero), por lo que debes asignar de manera exclusiva a los semestres '3° Semestre' y '5° Semestre' en los relevos.`;
+    relevosText = `Semestre A (Septiembre a Enero): asignado a semestres 1°, 3° y 5°. Fases 1 a 3 del proyecto.`;
   } else if (cycleType === 'B') {
-    relevosText = `Fases 4, 5 y 6 corresponden al Semestre B (Febrero a Junio), por lo que debes asignar de manera exclusiva a los semestres '4° Semestre' y '6° Semestre' en los relevos.`;
+    relevosText = `Semestre B (Febrero a Junio): asignado a semestres 2°, 4° y 6°. Fases 4 a 6 del proyecto.`;
   } else {
-    relevosText = `Fases 1, 2 y 3 corresponden al Semestre A (estudiantes de 3° y 5° semestre). Fases 4, 5 y 6 corresponden al Semestre B (estudiantes de 4° y 6° semestre).`;
+    relevosText = `Proyecto Anual (Fases 1 a 6 a lo largo de todo el ciclo escolar).`;
   }
 
-  return `Diseña la tabla de "Diseño General: Fases de Implementación del PEC" dividiendo el ciclo escolar en 6 Fases Bimestrales.
+  return `Diseña la tabla de "Diseño General: Fases de Implementación del PEC" en 6 Fases Bimestrales para el Ciclo Escolar 2026-2027.
 
-Vinculación de Asignaturas:
+Vinculación Curricular:
 ${mapeoSummary}
 
-Directriz de Relevo Semestral:
+Directriz Temporal:
 ${relevosText}
 
-Asegura el siguiente flujo lógico:
-- Fase 1: Investigación y Diagnóstico de Campo.
-- Fase 2: Ideación y Diseño de Soluciones.
-- Fase 3: Planificación, Acopio de Materiales y Preparación.
-- Fase 4: Lanzamiento, Ensamble o Producción Inicial.
-- Fase 5: Implementación, Instalación o Ejecución en Comunidad.
-- Fase 6: Evaluación, Medición de Impacto y Clausura del Proyecto.
+Flujo lógico de Fases:
+- Fase 1: Investigación e Indagación Metodológica de Campo.
+- Fase 2: Ideación, Diseño Curricular y Propuesta de Soluciones.
+- Fase 3: Preparación, Acopio de Materiales y Planificación Operativa.
+- Fase 4: Ejecución, Ensamble o Trabajo Comunitario Situado.
+- Fase 5: Implementación en Comunidad, Evaluación de Impacto y Pruebas.
+- Fase 6: Reflexión Metacognitiva, Cierre y Socialización de Resultados.
 
 Debes retornar un arreglo JSON de objetos con la siguiente estructura exacta:
 [
   {
-    "phase": "Fase 1: Investigación",
-    "objective": "Objetivo de esta etapa bimestral",
-    "macroActivities": "Actividades clave detalladas",
-    "semesterInvolved": "Semestre y grupos involucrados responsables de esta fase"
-  },
-  ...
+    "phase": "Fase 1: Indagación de Campo",
+    "objective": "Objetivo bimestral de la fase",
+    "macroActivities": "Actividades situadas clave con aprendizaje activo",
+    "semesterInvolved": "Semestres y grupos responsables"
+  }
 ]`;
 }
 
@@ -182,52 +193,58 @@ export function buildPrompt5PlanOperativo(
 ): string {
   let extraRule = '';
   if (cycleType === 'A' || cycleType === 'annual') {
-    extraRule = `REGLA OBLIGATORIA (Modelo de Relevos): Dado que participamos en el Semestre A, las actividades de las semanas 12 a 14 deben obligatoriamente detallar el diseño, acopio y documentación del "Paquete de Transferencia y Manuales de Procedimiento" técnico. Esto es indispensable para que los grupos que tomen el relevo en el Semestre B (4° y 6° semestre) sepan cómo continuar la producción e instalación sin contratiempos.`;
+    extraRule = `REGLA OBLIGATORIA (Paquete de Transferencia): En las semanas 12-14, incluye el diseño del manual de transferencia técnico para que el siguiente bloque semestral dé continuidad al proyecto.`;
   }
 
-  return `Diseña el "Plan Operativo del PEC" estructurado por semanas (Semanas 1 a 16).
-  
+  return `Diseña la Matriz del PLAN OPERATIVO DETALLADO del PEC (Semanas 1 a 16) para el Ciclo Escolar 2026-2027 bajo el enfoque de Transversalidad Real (Cadena de Valor) y Cero Simulación.
+
 Macro-cronograma:
 ${cronogramaSummary}
 
-Filtro de Semestres y Bloque Actual:
-${cycleType === 'A' ? 'Generar para Semestre A (3° y 5° semestre)' : cycleType === 'B' ? 'Generar para Semestre B (4° y 6° semestre)' : 'Generar planes detallados independientes para Semestre A y Semestre B'}
+Filtro del Ciclo:
+${cycleType === 'A' ? 'Semestre A' : cycleType === 'B' ? 'Semestre B' : 'Ambos Semestres'}
 ${extraRule}
+
+REGLAS DE ORO PEDAGÓGICAS (NORMATIVA CICLO 2026-2027):
+1. NOMENCLATURA CURRICULAR ESTRICTA:
+   - Para 1.º, 2.º, 3.º y 4.º Semestre: Usa EXCLUSIVAMENTE 'Propósito Formativo: [texto del propósito y contenido]'. (Prohibido usar Progresiones en 1° a 4° semestre).
+   - Para 5.º y 6.º Semestre: Usa 'Progresión [N]: [texto de la progresión]'.
+2. CADENA DE VALOR: El producto de una UAC debe ser insumo obligatorio para la siguiente UAC.
+3. CERO SIMULACIÓN: Cada actividad debe generar un aprendizaje cognitivo complejo y tener un producto/evidencia evaluable con instrumento técnico (rúbrica/lista de cotejo).
 
 Debes retornar un objeto JSON con la siguiente estructura exacta:
 {
   "semestreA": [
     {
-      "phase": "Fase de la implementación",
-      "activity": "Actividad detallada de la semana",
-      "uac": "UAC involucrada en la actividad",
-      "progression": "Número de Progresión/Actividad Clave",
-      "strategy": "Estrategia didáctica activa (ABP, Aprendizaje-Servicio, Design Thinking, etc.)",
-      "week": "Semana X (ej: Semana 1)",
-      "responsibles": "Estudiantes de X Semestre y Docente"
+      "phase": "Fase de implementación",
+      "week": "Semana 1",
+      "activity": "Actividad específica situada y práctica",
+      "uac": "UAC (Asignatura)",
+      "progression": "Cita el Propósito Formativo (1°-4°) o Progresión (5°-6°)",
+      "strategy": "Estrategia didáctica (ABP, Aula Invertida, Aprendizaje-Servicio)",
+      "product": "Producto/Evidencia evaluable (ej. Reporte estadístico con matriz de análisis)",
+      "responsibles": "Estudiantes de X Semestre y Docente de UAC"
     }
   ],
-  "semestreB": [
-    // Rellenar de la misma forma si aplica para el semestre B, o dejar arreglo vacío si cycleType == 'A'
-  ]
+  "semestreB": []
 }`;
 }
 
 export function buildPrompt6Anexos(
   planOperativoSummary: string
 ): string {
-  return `Genera las plantillas, formatos y cuestionarios técnicos requeridos para los Anexos de Gestión del proyecto en base al Plan Operativo actual.
+  return `Genera el SISTEMA DE EVALUACIÓN, SEGUIMIENTO Y ANEXOS TÉCNICOS del PEC conforme a la Rúbrica PAEC 2026-2027 (Fase IV).
 
 Resumen del Plan Operativo:
 ${planOperativoSummary}
 
-Genera un objeto JSON con las plantillas en formato de texto Markdown completas para las siguientes secciones:
+Genera un objeto JSON con plantillas Markdown completas y listas para aplicar:
 {
-  "anexo1": "### Anexo 1: Formato de Minuta de Reunión 2.0 (Plantilla copiable estructurada con cabecera y tabla markdown de acuerdos)",
-  "anexo2": "### Anexo 2: Cuadro de Seguimiento Operativo de Actividades (Tabla específica para el control semanal del proyecto)",
-  "anexo3": "### Anexo 3: Formato de Reporte de Avances Mensual (Esquema con secciones de Logros, Datos Cuantitativos y Plan de acción)",
-  "anexo4": "### Anexo 4: Cuestionario de Hábitos y Percepciones de la Comunidad (10 preguntas para medir el cambio de conciencia)",
-  "anexo5": "### Anexo 5: Cuestionario de Autoevaluación de Competencias para Estudiantes (Para evaluar habilidades blandas y técnicas)",
-  "anexo6": "### Anexo 6: Plantilla del Informe Final y Estrategia de Socialización de Resultados para la Supervisión Escolar"
+  "anexo1": "### ANEXO 1: Rúbrica Transversal Integradora del Estudiante (Evaluación del Desempeño Individual y Colaborativo con Niveles: Sobresaliente 5, Destacado 4, Satisfactorio 3, En desarrollo 2, Básico 1)",
+  "anexo2": "### ANEXO 2: Herramienta de Medición de Impacto Comunitario (Cuestionario PRE y POST con escala de Likert para medir la transformación del entorno)",
+  "anexo3": "### ANEXO 3: Tablero de Seguimiento Operativo (Semaforización Verde/Amarillo/Rojo para el Comité del Plantel)",
+  "anexo4": "### ANEXO 4: Cuestionario de Autoevaluación y Coevaluación de Autonomía Estudiantil",
+  "anexo5": "### ANEXO 5: Guía de Preguntas Metacognitivas para la Sesión de Cierre del Proyecto",
+  "anexo6": "### ANEXO 6: Informe Final y Estrategia de Socialización de Resultados para la Supervisión Escolar (Formato oficial con directorio de firmas)"
 }`;
 }
