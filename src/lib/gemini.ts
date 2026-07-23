@@ -117,8 +117,9 @@ export async function callGeminiPool(
     apiKey: decryptKey(k.key_encrypted as string),
   }));
 
-  // 6. Rotación Round-Robin determinista
-  const startIndex = globalKeyPointerIndex % decryptedKeys.length;
+  // 6. Rotación Round-Robin determinista con balanceo para serverless (cold starts)
+  const randomOffset = Math.floor(Math.random() * decryptedKeys.length);
+  const startIndex = (globalKeyPointerIndex + randomOffset) % decryptedKeys.length;
   globalKeyPointerIndex = (globalKeyPointerIndex + 1) % decryptedKeys.length;
   const rotatedKeys = [
     ...decryptedKeys.slice(startIndex),

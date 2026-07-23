@@ -307,7 +307,7 @@ Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO in
         ? staffData.map((s) => `- ${s.nombre ?? 'N/D'} — ${s.cargo ?? 'N/D'}`).join('\n')
         : 'No especificado';
 
-      const prompt = `Eres un experto en planeación de Mejora Continua para planteles BGE de Puebla bajo los LINEAMIENTOS DBEPA 2025-2026.
+      const prompt = `Eres un evaluador y planeador experto en la Mejora Continua para planteles BGE/TBC de Puebla bajo los LINEAMIENTOS DBEPA 2025-2026.
 
 CONTEXTO DEL PLANTEL:
 - Nombre: ${safeStr(project.school_name)} | CCT: ${safeStr(project.school_cct)} | Ciclo: ${safeStr(project.ciclo_escolar)}
@@ -317,7 +317,7 @@ CONTEXTO DEL PLANTEL:
 DIAGNÓSTICO GENERADO:
 ${diagnosticoResumen}
 
-INDICADORES:
+INDICADORES OFICIALES:
 - Abandono: ${indic.abandono_ant ?? 'N/D'}% → Meta: ${indic.abandono_meta ?? 'N/D'}%
 - Aprobación: ${indic.aprobacion_ant ?? 'N/D'}% → Meta: ${indic.aprobacion_meta ?? 'N/D'}%
 - Eficiencia terminal: ${indic.et_ant ?? 'N/D'}% → Meta: ${indic.et_meta ?? 'N/D'}%
@@ -329,32 +329,28 @@ PERSONAL DEL PLANTEL (${project.total_staff ?? 0} trabajadores):
 ${staffList}
 
 ═══════════════════════════════════════════
-INSTRUCCIONES OBLIGATORIAS:
+CRITERIOS DE EXCELENCIA DE LA SUPERVISIÓN (DBEPA):
 ═══════════════════════════════════════════
 
-METAS INSTITUCIONALES:
-• Genera EXACTAMENTE UNA (1) meta institucional por cada TEMA (subcategoría) seleccionado.
-  - Total de temas seleccionados: ${totalTemas}. Debe haber ${totalTemas} metas institucionales.
-• CADA meta debe seguir la estructura de la Figura 2 (Lineamientos DBEPA):
-  - diagnostico_meta: Describe la problemática o necesidad detectada en el diagnóstico que justifica esta meta (2-3 oraciones)
-  - meta: Redacta la meta SMART siguiendo: VERBO DE ACCIÓN + QUÉ + INDICADOR CUANTITATIVO + PLAZO. Ejemplo: "Incrementar el porcentaje de aprobación del 72% al 82% al término del semestre B (junio 2026), mediante el seguimiento tutoral mensual de alumnos en riesgo."
-  - estrategia: Lista de 3-5 acciones concretas que implementará el plantel para alcanzar la meta.
-  - entregable (Producto): Documento o evidencia tangible que demuestran el resultado. NUNCA solo fotografías. Deben ser informes, reportes, rúbricas, actas, bitácoras, etc.
-  - periodo_inicio y periodo_fin: Fechas específicas en formato MM/YYYY (NO "permanente")
-  - personal_designado: Nombre y cargo del responsable principal
-  - linea_base: Valor actual medible del indicador
+1. COHERENCIA MATEMÁTICA Y ESTADÍSTICA:
+   - La 'linea_base' de cada meta DEBE coincidir exactamente con los valores porcentuales del diagnóstico anterior.
+   - El objetivo planteado en 'meta' DEBE guardar una proporción matemática lógica con la línea base (ej. si la aprobación es del 78%, la meta debe ser incrementarla al 85%, no poner números incongruentes).
 
-METODOLOGÍA SMART OBLIGATORIA para cada meta:
-  ✓ Específica: delimitada con qué, quién, dónde, cuándo y por qué
-  ✓ Medible: con indicador numérico o porcentual
-  ✓ Alcanzable: realista con los recursos disponibles
-  ✓ Relevante: vinculada al diagnóstico y a las necesidades del plantel
-  ✓ Temporal: con fecha de inicio y fin definidas
+2. VINCULACIÓN EXPLÍCITA DEL FODA:
+   - En 'diagnostico_meta' y en 'estrategia', menciona explícitamente qué Fortaleza, Oportunidad, Debilidad o Amenaza específica detectada en el FODA se está atendiendo.
 
-METAS PERSONALES:
-• Genera UNA meta personal para CADA trabajador del personal listado.
-• Cada meta personal debe ser congruente con el cargo de la persona y con al menos una categoría priorizada.
-• Aplicar también metodología SMART.
+3. ENTREGABLES TÉCNICOS CUALITATIVOS (NO EVIDENCIAS SUPERFICIALES):
+   - Cada 'entregable' DEBE ser un instrumento técnico con análisis cualitativo. Ejemplos válidos: "Informe bimestral de seguimiento con análisis cualitativo de causas raíz de reprobación", "Bitácora de acompañamiento tutoral con matriz de riesgo", "Convenio formal de colaboración institucional con plan de trabajo". NUNCA solo "listas de asistencia" ni "fotografías".
+
+4. HITOS DE EVALUACIÓN PARCIAL Y ALERTAS TEMPRANAS:
+   - Incluye dentro de las estrategias puntos de corte o reportes de alertas tempranas (ej. en la semana 6 y 12 del semestre) antes de los periodos críticos de evaluación.
+
+5. METAS SMART ESTRUCTURADAS (1 POR CADA TEMA PRIORIZADO):
+   - Genera EXACTAMENTE UNA meta institucional por cada TEMA seleccionado (Total: ${totalTemas} metas institucionales).
+   - Estructura SMART: Verbo de acción en infinitivo + objeto/área de enfoque + indicador porcentual o numérico exacto + plazo definido + medio o estrategia clave.
+
+6. METAS INDIVIDUALES POR CARGO:
+   - Una meta individual SMART por cada uno de los ${project.total_staff ?? 0} trabajadores listados, acorde a su función específica (Director, Docente, Orientador, etc.) y con su entregable cualitativo correspondiente.
 
 Responde con JSON con esta estructura EXACTA:
 {
@@ -363,12 +359,12 @@ Responde con JSON con esta estructura EXACTA:
       "categoria": "1",
       "nombre_categoria": "Categoría 1: Desarrollo académico y aprendizaje",
       "tema": "Nombre exacto del tema seleccionado",
-      "diagnostico_meta": "Problemática detectada en el diagnóstico que justifica esta meta...",
-      "meta": "Verbo + qué + indicador cuantitativo + plazo. Ej: Reducir el abandono escolar del 12% al 7% al cierre del ciclo 2025-2026 mediante estrategias de tutoría intensiva.",
-      "estrategia": "1. Acción concreta. 2. Acción concreta. 3. Acción concreta.",
-      "linea_base": "Valor actual del indicador (fuente)",
+      "diagnostico_meta": "Problemática y hallazgo FODA específico que justifica esta meta...",
+      "meta": "Verbo en infinitivo + qué + indicador cuantitativo exacto + plazo. Ej: Reducir la reprobación del 15% al 8% al término del ciclo 2025-2026 mediante tutorías focalizadas en semanas 6 y 12.",
+      "estrategia": "1. Acción concreta con hito de alerta temprana. 2. Acción vinculada a debilidad FODA. 3. Acción de evaluación cualitativa.",
+      "linea_base": "Valor actual del indicador (% o cifra exacta coincidente con el diagnóstico)",
       "personal_designado": "Nombre — Cargo",
-      "entregable": "Nombre del documento o evidencia documental tangible",
+      "entregable": "Documento técnico cualitativo de evidencia (ej. Informe de seguimiento con análisis de causas raíz)",
       "periodo_inicio": "08/2025",
       "periodo_fin": "06/2026"
     }
@@ -377,9 +373,9 @@ Responde con JSON con esta estructura EXACTA:
     {
       "nombre": "Nombre del trabajador",
       "cargo": "Cargo exacto",
-      "meta_individual": "Meta SMART específica para este cargo, con verbo + indicador + plazo",
-      "estrategia": "Acciones concretas que realizará esta persona",
-      "entregable": "Evidencia documental que aportará esta persona",
+      "meta_individual": "Meta SMART específica para su función con verbo + indicador + plazo",
+      "estrategia": "Acciones concretas que ejecutará este trabajador",
+      "entregable": "Documento o informe cualitativo de evidencia que entregará",
       "periodo": "agosto 2025 - junio 2026"
     }
   ]
