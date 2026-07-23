@@ -369,49 +369,49 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
     return (
       <div style={{ maxWidth: '880px', margin: '0 auto', paddingBottom: '40px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-          <Link href={`/${locale}/paec`} className="btn btn-ghost" style={{ padding: '8px 12px' }}>
+          <Link href={`/${locale}/paec`} className="btn btn-ghost" style={{ padding: '8px 12px', color: 'rgba(240,244,255,0.7)' }}>
             ← Volver
           </Link>
           <div>
-            <h1 style={{ fontSize: '28px', color: 'var(--c-navy)', margin: 0, fontWeight: 700 }}>Nuevo Proyecto PAEC-PEC</h1>
-            <p style={{ color: 'var(--c-text-muted)', margin: '4px 0 0' }}>Completa los datos iniciales de tu plantel y comunidad para comenzar</p>
+            <h1 style={{ fontSize: '28px', color: '#f0f4ff', margin: 0, fontWeight: 800, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", letterSpacing: '-0.5px' }}>Nuevo Proyecto PAEC-PEC</h1>
+            <p style={{ color: 'rgba(240,244,255,0.6)', margin: '4px 0 0' }}>Completa los datos iniciales de tu plantel y comunidad para comenzar</p>
           </div>
         </div>
 
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* Datos del Proyecto */}
-          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>1. Identificación del Proyecto</h2>
+          <div className="card" style={{ padding: '24px', background: 'rgba(13,21,48,0.75)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ fontSize: '18px', color: '#818cf8', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 700 }}>1. Identificación del Proyecto</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Nombre Preliminar del Proyecto Escolar Comunitario *</label>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '13px', color: 'rgba(240,244,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nombre Preliminar del Proyecto Escolar Comunitario *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej: Transformando el PET en Soluciones Comunitarias Ecológicas"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: '#f0f4ff' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Problemática o Necesidad seleccionada por el Comité del Plantel *</label>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '13px', color: 'rgba(240,244,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Problemática o Necesidad seleccionada por el Comité del Plantel *</label>
                 <textarea
                   required
                   rows={3}
                   placeholder="Ej: Alto índice de contaminación por residuos plásticos en los alrededores del plantel y falta de cultura de reciclaje en la comunidad."
                   value={problemStatement}
                   onChange={(e) => setProblemStatement(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)', resize: 'vertical' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: '#f0f4ff', resize: 'vertical' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Ciclo Semestral / Bloque de Relevo *</label>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '13px', color: 'rgba(240,244,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ciclo Semestral / Bloque de Relevo *</label>
                 <select
                   value={cycleType}
                   onChange={(e) => setCycleType(e.target.value as any)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--c-border)', background: '#fff' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: '#f0f4ff' }}
                 >
                   <option value="A">Semestre A (1° y 3° Semestre - Septiembre-Enero)</option>
                   <option value="B">Semestre B (2° y 4° Semestre - Febrero-Junio)</option>
@@ -422,11 +422,11 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
           </div>
 
           {/* Contexto Comunitario */}
-          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>2. Ficha de Datos de la Comunidad (INEGI/Entorno)</h2>
-            <p style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'var(--c-text-muted)' }}>
+          <div className="card" style={{ padding: '24px', background: 'rgba(13,21,48,0.75)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ fontSize: '18px', color: '#818cf8', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 700 }}>2. Ficha de Datos de la Comunidad (INEGI/Entorno)</h2>
+            <p style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'rgba(240,244,255,0.6)' }}>
               Puedes consultar y obtener los datos demográficos y socioeconómicos de tu localidad en el buscador oficial de INEGI:{' '}
-              <a href="https://www.inegi.org.mx/app/areasgeograficas/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-blue-mid)', fontWeight: 600, textDecoration: 'underline' }}>
+              <a href="https://www.inegi.org.mx/app/areasgeograficas/" target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8', fontWeight: 600, textDecoration: 'underline' }}>
                 Sistema de Áreas Geográficas de INEGI 🔗
               </a>
             </p>
@@ -552,9 +552,9 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
           </div>
 
           {/* Estructura de Grupos, Capacitaciones y FFE */}
-          <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-            <h2 style={{ fontSize: '18px', color: 'var(--c-navy-light)', borderBottom: '1px solid var(--c-border)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 600 }}>4. Estructura de Grupos y Materias Específicas</h2>
-            <p style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'var(--c-text-muted)' }}>
+          <div className="card" style={{ padding: '24px', background: 'rgba(13,21,48,0.75)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+            <h2 style={{ fontSize: '18px', color: '#818cf8', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', marginBottom: '16px', fontWeight: 700 }}>4. Estructura de Grupos y Materias Específicas</h2>
+            <p style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'rgba(240,244,255,0.6)' }}>
               Configura los grupos y selecciona las capacitaciones o asignaturas del componente laboral y FFE activas en tu plantel.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -597,21 +597,20 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 </p>
 
                 {laboralCatalog.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>Cargando catálogo laboral...</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(240,244,255,0.5)', fontStyle: 'italic' }}>Cargando catálogo laboral...</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '420px', overflowY: 'auto', padding: '12px', border: '1px solid var(--c-border)', borderRadius: '8px', background: '#fafafa' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '420px', overflowY: 'auto', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', background: 'rgba(8,12,24,0.5)' }}>
                     {Object.keys(CAPACITACION_TITLES).map((capKey) => {
                       const title = CAPACITACION_TITLES[capKey];
                       const semGroups = groupedLaboral[capKey] || {};
                       
-                      // Check if all UACs in this capacitación are selected
                       const capUacs = Object.values(semGroups).flat();
                       const allSelected = capUacs.length > 0 && capUacs.every(u => selectedLaboral.includes(u.uac_name));
 
                       return (
-                        <div key={capKey} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px', background: '#fff' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #edf2f7', paddingBottom: '8px', marginBottom: '10px' }}>
-                            <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--c-navy-light)' }}>{title}</span>
+                        <div key={capKey} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '12px', background: 'rgba(255,255,255,0.03)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px', marginBottom: '10px' }}>
+                            <span style={{ fontWeight: 600, fontSize: '14px', color: '#818cf8' }}>{title}</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -622,7 +621,7 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                                   setSelectedLaboral(prev => Array.from(new Set([...prev, ...names])));
                                 }
                               }}
-                              style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontWeight: 500 }}
+                              style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', cursor: 'pointer', fontWeight: 600 }}
                             >
                               {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
                             </button>
@@ -633,8 +632,8 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                               const uacs = semGroups[sem] || [];
                               if (uacs.length === 0) return null;
                               return (
-                                <div key={sem} style={{ background: '#f8fafc', padding: '8px', borderRadius: '4px' }}>
-                                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--c-blue-mid)', marginBottom: '6px' }}>{sem}° Semestre</div>
+                                <div key={sem} style={{ background: 'rgba(255,255,255,0.04)', padding: '8px', borderRadius: '4px' }}>
+                                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#818cf8', marginBottom: '6px' }}>{sem}° Semestre</div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     {uacs.map((u) => {
                                       const isChecked = selectedLaboral.includes(u.uac_name);
@@ -678,17 +677,17 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
                 </p>
 
                 {ffeCatalog.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', fontStyle: 'italic' }}>Cargando catálogo FFE...</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(240,244,255,0.5)', fontStyle: 'italic' }}>Cargando catálogo FFE...</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto', padding: '12px', border: '1px solid var(--c-border)', borderRadius: '8px', background: '#fafafa' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', background: 'rgba(8,12,24,0.5)' }}>
                     {FFE_PAIRS.map((pair) => {
                       const isChecked5 = selectedFfe.includes(pair.name5);
                       const isChecked6 = selectedFfe.includes(pair.name6);
 
                       return (
-                        <div key={pair.label} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '6px', background: '#fff', gap: '10px' }}>
+                        <div key={pair.label} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '10px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', background: 'rgba(255,255,255,0.03)', gap: '10px' }}>
                           <div style={{ minWidth: '220px', flex: '1' }}>
-                            <strong style={{ fontSize: '13px', color: 'var(--c-navy-light)' }}>{pair.label}</strong>
+                            <strong style={{ fontSize: '13px', color: '#818cf8' }}>{pair.label}</strong>
                           </div>
                           
                           <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -818,10 +817,10 @@ export default function PaecWizardClient({ locale, initialId }: Props) {
       </div>
 
       {/* Main Panel Content */}
-      <div className="card" style={{ padding: '24px', background: '#fff', borderRadius: '12px', border: '1px solid var(--c-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+      <div className="card" style={{ padding: '24px', background: 'rgba(13,21,48,0.75)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         
         {error && (
-          <div style={{ backgroundColor: '#f8d7da', color: '#842029', border: '1px solid #f5c2c7', padding: '16px', borderRadius: '6px', marginBottom: '20px' }}>
+          <div style={{ backgroundColor: 'rgba(244,63,94,0.12)', color: '#fb7185', border: '1px solid rgba(244,63,94,0.25)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
             <strong>Error:</strong> {error}
           </div>
         )}

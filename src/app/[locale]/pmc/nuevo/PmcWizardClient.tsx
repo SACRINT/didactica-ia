@@ -444,43 +444,50 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 12px', borderRadius: '6px',
-    border: '1px solid var(--c-border)', fontSize: '14px',
-    fontFamily: 'inherit', background: '#fff',
+    border: '1px solid rgba(255,255,255,0.14)', fontSize: '14px',
+    fontFamily: 'inherit',
+    background: 'rgba(255,255,255,0.07)',
+    color: '#f0f4ff',
   };
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontWeight: 600, fontSize: '13px',
-    color: 'var(--c-text)', marginBottom: '4px',
+    display: 'block', fontWeight: 600, fontSize: '12px',
+    color: 'rgba(240,244,255,0.6)', marginBottom: '4px',
+    textTransform: 'uppercase', letterSpacing: '0.5px',
   };
   const sectionCard: React.CSSProperties = {
-    background: '#fff', borderRadius: '10px', border: '1px solid var(--c-border)',
+    background: 'rgba(13,21,48,0.7)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '12px',
     padding: '20px', marginBottom: '16px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--c-bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #0d1530 0%, #080c18 60%, #020408 100%)', backgroundAttachment: 'fixed', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* Header */}
-      <header style={{ background: 'var(--c-navy)', color: '#fff', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <header style={{ background: 'rgba(6,10,20,0.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#f0f4ff', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>📈</span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '15px' }}>Plan de Mejora Continua</div>
-            <div style={{ fontSize: '12px', opacity: 0.7 }}>Lineamientos DBEPA {cicloEscolar}</div>
+            <div style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '-0.3px', background: 'linear-gradient(135deg,#e0e7ff,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Plan de Mejora Continua</div>
+            <div style={{ fontSize: '12px', color: 'rgba(240,244,255,0.5)' }}>Lineamientos DBEPA {cicloEscolar}</div>
           </div>
         </div>
-        <Link href={`/${locale}/pmc`} style={{ color: '#fff', textDecoration: 'none', fontSize: '13px', opacity: 0.8 }}>
+        <Link href={`/${locale}/pmc`} style={{ color: 'rgba(240,244,255,0.6)', textDecoration: 'none', fontSize: '13px', fontWeight: 500 }}>
           ← Volver
         </Link>
       </header>
 
       {/* Progress steps */}
-      <div style={{ background: '#fff', borderBottom: '1px solid var(--c-border)', padding: '0 24px' }}>
+      <div style={{ background: 'rgba(8,12,24,0.98)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '0 24px' }}>
         <div style={{ display: 'flex', gap: 0, maxWidth: '900px', margin: '0 auto' }}>
           {STEPS.map(step => (
             <div key={step.n} style={{
               flex: 1, padding: '14px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 600,
-              borderBottom: `3px solid ${activeStep === step.n ? 'var(--c-amber)' : activeStep > step.n ? 'var(--c-green)' : 'transparent'}`,
-              color: activeStep === step.n ? 'var(--c-navy)' : activeStep > step.n ? 'var(--c-green)' : 'var(--c-text-muted)',
+              borderBottom: `3px solid ${activeStep === step.n ? '#6366f1' : activeStep > step.n ? '#10b981' : 'transparent'}`,
+              color: activeStep === step.n ? '#818cf8' : activeStep > step.n ? '#34d399' : 'rgba(240,244,255,0.4)',
               cursor: activeStep > step.n ? 'pointer' : 'default',
+              transition: 'all 0.2s',
             }} onClick={() => activeStep > step.n && setActiveStep(step.n)}>
               <div style={{ fontSize: '18px', marginBottom: '2px' }}>
                 {activeStep > step.n ? '✓' : step.n}
@@ -496,7 +503,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
 
         {/* Error banner */}
         {error && (
-          <div style={{ background: '#f8d7da', color: '#721c24', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', border: '1px solid #f5c6cb' }}>
+          <div style={{ background: 'rgba(244,63,94,0.12)', color: '#fb7185', padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', fontSize: '14px', border: '1px solid rgba(244,63,94,0.25)' }}>
             ⚠️ {error}
           </div>
         )}
@@ -504,15 +511,15 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         {/* ── STEP 1: Datos Institucionales ─────────────────────────── */}
         {activeStep === 1 && (
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-navy)', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f0f4ff', marginBottom: '8px', letterSpacing: '-0.4px', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
               Paso 1: Datos Institucionales
             </h2>
-            <p style={{ fontSize: '14px', color: 'var(--c-text-muted)', marginBottom: '20px' }}>
+            <p style={{ fontSize: '14px', color: 'rgba(240,244,255,0.6)', marginBottom: '20px' }}>
               Ingresa los datos generales del plantel educativo. Esta información aparecerá en la portada del PMC.
             </p>
 
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '16px' }}>🏫 Datos del Plantel</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '16px' }}>🏫 Datos del Plantel</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Nombre oficial del plantel *</label>
@@ -549,7 +556,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
             </div>
 
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '16px' }}>👤 Autoridades</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '16px' }}>👤 Autoridades</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <label style={labelStyle}>Nombre del Director(a) *</label>
@@ -567,10 +574,10 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         {/* ── STEP 2: Personal ────────────────────────────────────────── */}
         {activeStep === 2 && (
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-navy)', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f0f4ff', marginBottom: '8px', letterSpacing: '-0.4px', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
               Paso 2: Personal del Plantel
             </h2>
-            <p style={{ fontSize: '14px', color: 'var(--c-text-muted)', marginBottom: '20px' }}>
+            <p style={{ fontSize: '14px', color: 'rgba(240,244,255,0.6)', marginBottom: '20px' }}>
               Registra a <strong>todo el personal</strong> del plantel. Cada persona debe participar en el PMC
               con una meta individual. Si no defines su meta ahora, la IA generará una acorde a su cargo.
             </p>
@@ -581,12 +588,12 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                   <label style={labelStyle}>Número total de trabajadores en el plantel</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button onClick={() => adjustStaffCount(totalStaff - 1)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--c-border)', cursor: 'pointer', fontSize: '16px' }}>−</button>
-                    <span style={{ fontSize: '24px', fontWeight: 700, minWidth: '40px', textAlign: 'center', color: 'var(--c-navy)' }}>{totalStaff}</span>
-                    <button onClick={() => adjustStaffCount(totalStaff + 1)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--c-border)', cursor: 'pointer', fontSize: '16px' }}>+</button>
-                    <span style={{ fontSize: '13px', color: 'var(--c-text-muted)', marginLeft: '8px' }}>personas</span>
+                    <span style={{ fontSize: '24px', fontWeight: 700, minWidth: '40px', textAlign: 'center', color: '#818cf8' }}>{totalStaff}</span>
+                    <button onClick={() => adjustStaffCount(totalStaff + 1)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', fontSize: '16px', background: 'rgba(255,255,255,0.06)', color: '#f0f4ff' }}>+</button>
+                    <span style={{ fontSize: '13px', color: 'rgba(240,244,255,0.5)', marginLeft: '8px' }}>personas</span>
                   </div>
                 </div>
-                <div style={{ flex: 1, padding: '12px', background: 'var(--c-blue-pale)', borderRadius: '8px', fontSize: '13px', color: 'var(--c-navy)' }}>
+                <div style={{ flex: 1, padding: '12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '8px', fontSize: '13px', color: '#a5b4fc' }}>
                   💡 Incluye: director, docentes, orientador, prefectos, administrativos, intendentes, etc. Todos deben tener una meta en el PMC.
                 </div>
               </div>
@@ -594,10 +601,10 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
               {staffData.map((member, idx) => (
                 <div key={idx} style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--c-border)', paddingTop: idx === 0 ? 0 : '16px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--c-navy)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
                       {idx + 1}
                     </div>
-                    <strong style={{ fontSize: '14px', color: 'var(--c-navy)' }}>
+                    <strong style={{ fontSize: '14px', color: '#818cf8' }}>
                       {member.nombre || `Trabajador ${idx + 1}`}
                     </strong>
                   </div>
@@ -652,17 +659,17 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         {/* ── STEP 3: Diagnóstico ─────────────────────────────────────── */}
         {activeStep === 3 && (
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-navy)', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f0f4ff', marginBottom: '8px', letterSpacing: '-0.4px', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
               Paso 3: Diagnóstico Socioeducativo
             </h2>
-            <p style={{ fontSize: '14px', color: 'var(--c-text-muted)', marginBottom: '20px' }}>
+            <p style={{ fontSize: '14px', color: 'rgba(240,244,255,0.6)', marginBottom: '20px' }}>
               Proporciona los datos del contexto comunitario, los indicadores académicos del ciclo anterior
               y el análisis FODA. La IA usará esta información para redactar el diagnóstico oficial.
             </p>
 
             {/* Contexto Comunitario */}
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '12px' }}>🌍 Contexto de la Comunidad</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '12px' }}>🌍 Contexto de la Comunidad</h3>
               <label style={labelStyle}>Descripción del contexto socioeducativo de la comunidad *</label>
               <textarea
                 style={{ ...inputStyle, minHeight: '140px', resize: 'vertical' }}
@@ -677,7 +684,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
 
             {/* Indicadores académicos */}
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '12px' }}>📊 Indicadores Académicos</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '12px' }}>📊 Indicadores Académicos</h3>
               <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', marginBottom: '16px' }}>
                 Ingresa los datos del ciclo anterior y tus metas para el ciclo {cicloEscolar}. Estos datos son obligatorios para el diagnóstico cuantitativo.
               </p>
@@ -685,7 +692,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
-                    <tr style={{ background: 'var(--c-navy)', color: '#fff' }}>
+                    <tr style={{ background: 'rgba(99,102,241,0.25)', color: '#f0f4ff' }}>
                       <th style={{ padding: '10px 12px', textAlign: 'left', width: '30%' }}>Indicador</th>
                       <th style={{ padding: '10px 12px', textAlign: 'center' }}>% Ciclo Anterior</th>
                       <th style={{ padding: '10px 12px', textAlign: 'center' }}>% Meta {cicloEscolar}</th>
@@ -698,7 +705,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                       { label: 'Abandono escolar / Deserción', antKey: 'abandono_ant' as const, metaKey: 'abandono_meta' as const },
                       { label: 'Eficiencia terminal', antKey: 'et_ant' as const, metaKey: 'et_meta' as const },
                     ].map((row, i) => (
-                      <tr key={row.label} style={{ background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)' }}>
+                      <tr key={row.label} style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.025)' : 'rgba(99,102,241,0.06)' }}>
                         <td style={{ padding: '8px 12px', fontWeight: 600 }}>{row.label}</td>
                         <td style={{ padding: '8px 12px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
@@ -716,7 +723,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                             <input
                               type="number" min={0} max={100} step={0.1}
-                              style={{ width: '70px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--c-border)', textAlign: 'center', background: '#f0f7ff' }}
+                              style={{ width: '70px', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(99,102,241,0.3)', textAlign: 'center', background: 'rgba(99,102,241,0.1)', color: '#f0f4ff' }}
                               value={indicadores[row.metaKey] ?? ''}
                               onChange={e => setIndicadores(p => ({ ...p, [row.metaKey]: parseFloat(e.target.value) || undefined }))}
                               placeholder="0"
@@ -743,22 +750,22 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
 
             {/* FODA */}
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '12px' }}>📋 Análisis FODA del Plantel</h3>
-              <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '12px' }}>📋 Análisis FODA del Plantel</h3>
+              <p style={{ fontSize: '13px', color: 'rgba(240,244,255,0.55)', marginBottom: '16px' }}>
                 Realizado de manera colegiada con todo el personal del plantel.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {[
-                  { key: 'fortalezas' as const, label: '💪 Fortalezas', hint: 'Recursos, capacidades y ventajas internas del plantel', color: '#d4edda' },
-                  { key: 'oportunidades' as const, label: '🌟 Oportunidades', hint: 'Factores externos favorables que puede aprovechar el plantel', color: '#d1ecf1' },
-                  { key: 'debilidades' as const, label: '⚠️ Debilidades', hint: 'Limitaciones internas y áreas de oportunidad del plantel', color: '#fff3cd' },
-                  { key: 'amenazas' as const, label: '🔴 Amenazas', hint: 'Factores externos que pueden afectar negativamente al plantel', color: '#f8d7da' },
+                  { key: 'fortalezas' as const, label: '💪 Fortalezas', hint: 'Recursos, capacidades y ventajas internas del plantel', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)', color: '#34d399' },
+                  { key: 'oportunidades' as const, label: '🌟 Oportunidades', hint: 'Factores externos favorables que puede aprovechar el plantel', bg: 'rgba(14,165,233,0.1)', border: 'rgba(14,165,233,0.25)', color: '#38bdf8' },
+                  { key: 'debilidades' as const, label: '⚠️ Debilidades', hint: 'Limitaciones internas y áreas de oportunidad del plantel', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', color: '#fcd34d' },
+                  { key: 'amenazas' as const, label: '🔴 Amenazas', hint: 'Factores externos que pueden afectar negativamente al plantel', bg: 'rgba(244,63,94,0.1)', border: 'rgba(244,63,94,0.25)', color: '#fb7185' },
                 ].map(field => (
                   <div key={field.key}>
-                    <label style={{ ...labelStyle, color: 'var(--c-navy)' }}>{field.label}</label>
-                    <small style={{ display: 'block', color: 'var(--c-text-muted)', fontSize: '11px', marginBottom: '6px' }}>{field.hint}</small>
+                    <label style={{ ...labelStyle, color: field.color }}>{field.label}</label>
+                    <small style={{ display: 'block', color: 'rgba(240,244,255,0.45)', fontSize: '11px', marginBottom: '6px' }}>{field.hint}</small>
                     <textarea
-                      style={{ ...inputStyle, minHeight: '100px', background: field.color, resize: 'vertical' }}
+                      style={{ ...inputStyle, minHeight: '100px', background: field.bg, border: `1px solid ${field.border}`, resize: 'vertical' }}
                       value={foda[field.key]}
                       onChange={e => setFoda(p => ({ ...p, [field.key]: e.target.value }))}
                       placeholder={`Lista los principales ${field.label.split(' ')[1].toLowerCase()}...`}
@@ -770,12 +777,11 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
 
             {/* Categorías y Temas Priorizados */}
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '4px' }}>🎯 Categorías y Temas a Priorizar *</h3>
-              <p style={{ fontSize: '13px', color: 'var(--c-text-muted)', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '4px' }}>🎯 Categorías y Temas a Priorizar *</h3>
+              <p style={{ fontSize: '13px', color: 'rgba(240,244,255,0.55)', marginBottom: '8px' }}>
                 Según los <strong>Lineamientos DBEPA 2025-2026</strong>, el PMC se organiza en <strong>3 categorías oficiales</strong>. Selecciona la(s) categoría(s) y marca los <strong>temas específicos</strong> que tu plantel abordará. La IA generará metas SMART (con Diagnóstico → Meta → Estrategia → Producto) para cada tema seleccionado.
               </p>
-              {/* Nota metodológica SMART */}
-              <div style={{ background: '#f0f7ff', border: '1px solid #c8dff5', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#1a4a7a' }}>
+              <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#a5b4fc' }}>
                 <strong>📐 Metodología SMART:</strong> Cada meta que genere la IA será: <em>Específica · Medible · Alcanzable · Relevante · Temporal</em> — siguiendo la estructura: <strong>Diagnóstico → Meta → Estrategia → Producto</strong>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -783,9 +789,8 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                   const selected = isCatSelected(cat.id);
                   const temasSeleccionados = categoriasPriorizadas.find(c => c.id === cat.id)?.temas ?? [];
                   return (
-                    <div key={cat.id} style={{ border: `2px solid ${selected ? cat.color : 'var(--c-border)'}`, borderRadius: '10px', overflow: 'hidden', transition: 'all 0.2s' }}>
-                      {/* Categoría header */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', background: selected ? `${cat.color}18` : '#fafafa', userSelect: 'none' }}>
+                    <div key={cat.id} style={{ border: `2px solid ${selected ? cat.color : 'rgba(255,255,255,0.1)'}`, borderRadius: '10px', overflow: 'hidden', transition: 'all 0.2s' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', background: selected ? `${cat.color}22` : 'rgba(255,255,255,0.03)', userSelect: 'none' }}>
                         <input
                           type="checkbox"
                           checked={selected}
@@ -793,7 +798,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                           style={{ width: '18px', height: '18px', accentColor: cat.color, flexShrink: 0 }}
                         />
                         <div style={{ flex: 1 }}>
-                          <span style={{ fontSize: '14px', fontWeight: 700, color: selected ? cat.color : 'var(--c-text)' }}>{cat.nombre}</span>
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: selected ? cat.color : '#f0f4ff' }}>{cat.nombre}</span>
                           {selected && temasSeleccionados.length > 0 && (
                             <span style={{ marginLeft: '10px', fontSize: '11px', background: cat.color, color: '#fff', borderRadius: '20px', padding: '2px 8px' }}>
                               {temasSeleccionados.length} tema(s)
@@ -801,15 +806,14 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                           )}
                         </div>
                       </label>
-                      {/* Temas (subcategorías) — solo visibles si la categoría está seleccionada */}
                       {selected && (
-                        <div style={{ padding: '8px 16px 14px 48px', background: '#fff', borderTop: `1px solid ${cat.color}30` }}>
-                          <p style={{ fontSize: '11px', color: 'var(--c-text-muted)', marginBottom: '8px', fontStyle: 'italic' }}>
+                        <div style={{ padding: '8px 16px 14px 48px', background: 'rgba(8,12,24,0.6)', borderTop: `1px solid ${cat.color}40` }}>
+                          <p style={{ fontSize: '11px', color: 'rgba(240,244,255,0.4)', marginBottom: '8px', fontStyle: 'italic' }}>
                             Selecciona los temas específicos que trabajará tu plantel en esta categoría:
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             {cat.temas.map(tema => (
-                              <label key={tema} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: isTemaSelected(cat.id, tema) ? cat.color : 'var(--c-text)', fontWeight: isTemaSelected(cat.id, tema) ? 600 : 400 }}>
+                              <label key={tema} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: isTemaSelected(cat.id, tema) ? cat.color : 'rgba(240,244,255,0.75)', fontWeight: isTemaSelected(cat.id, tema) ? 600 : 400 }}>
                                 <input
                                   type="checkbox"
                                   checked={isTemaSelected(cat.id, tema)}
@@ -826,9 +830,8 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                   );
                 })}
               </div>
-              {/* Resumen */}
               {totalTemasSeleccionados > 0 && (
-                <div style={{ marginTop: '14px', padding: '10px 14px', background: '#e8f4e8', borderRadius: '8px', fontSize: '13px', color: '#2d6a2d', fontWeight: 600 }}>
+                <div style={{ marginTop: '14px', padding: '10px 14px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '8px', fontSize: '13px', color: '#34d399', fontWeight: 600 }}>
                   ✅ {categoriasPriorizadas.length} categoría(s) · {totalTemasSeleccionados} tema(s) seleccionado(s) — la IA generará una meta SMART por cada tema
                 </div>
               )}
@@ -839,10 +842,10 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         {/* ── STEP 4: Generación IA ───────────────────────────────────── */}
         {activeStep === 4 && (
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-navy)', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f0f4ff', marginBottom: '8px', letterSpacing: '-0.4px', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
               Paso 4: Generación con Inteligencia Artificial
             </h2>
-            <p style={{ fontSize: '14px', color: 'var(--c-text-muted)', marginBottom: '20px' }}>
+            <p style={{ fontSize: '14px', color: 'rgba(240,244,255,0.6)', marginBottom: '20px' }}>
               La IA redactará el diagnóstico oficial y el plan de acción con metas SMART para tu plantel.
               Puedes editar cualquier sección después de generarla.
             </p>
@@ -851,56 +854,56 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
             <div style={sectionCard}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', margin: 0 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', margin: 0 }}>
                     📄 Diagnóstico Socioeducativo
-                    {diagnosticoGenerado && <span style={{ marginLeft: '8px', color: '#28a745', fontSize: '13px' }}>✓ Generado</span>}
+                    {diagnosticoGenerado && <span style={{ marginLeft: '8px', color: '#34d399', fontSize: '13px' }}>✓ Generado</span>}
                   </h3>
-                  <p style={{ fontSize: '12px', color: 'var(--c-text-muted)', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12px', color: 'rgba(240,244,255,0.5)', margin: '4px 0 0' }}>
                     Presentación, contexto, análisis de indicadores, FODA y priorización de categorías
                   </p>
                 </div>
                 <button
                   onClick={() => generateStep('diagnostico')}
                   disabled={generating !== null}
-                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: generating === 'diagnostico' ? '#ccc' : 'var(--c-navy)', color: '#fff', fontWeight: 600, cursor: generating !== null ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: generating === 'diagnostico' ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', fontWeight: 600, cursor: generating !== null ? 'not-allowed' : 'pointer', fontSize: '13px', boxShadow: '0 2px 8px rgba(99,102,241,0.4)' }}
                 >
                   {generating === 'diagnostico' ? '⏳ Generando...' : diagnosticoGenerado ? '🔄 Regenerar' : '✨ Generar Diagnóstico'}
                 </button>
               </div>
               {diagnosticoGenerado && (
-                <div style={{ background: 'var(--c-gray)', borderRadius: '8px', padding: '16px', fontSize: '13px' }}>
+                <div style={{ background: 'rgba(8,12,24,0.5)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '16px', fontSize: '13px', color: '#f0f4ff', lineHeight: 1.7 }}>
                   <div style={{ marginBottom: '12px' }}>
-                    <strong style={{ color: 'var(--c-navy)' }}>Presentación:</strong>
-                    <p style={{ marginTop: '4px', lineHeight: '1.6', color: 'var(--c-text)' }}>{diagnosticoGenerado.presentacion}</p>
+                    <strong style={{ color: '#818cf8' }}>Presentación:</strong>
+                    <p style={{ marginTop: '4px', lineHeight: '1.6', color: 'rgba(240,244,255,0.85)' }}>{diagnosticoGenerado.presentacion}</p>
                   </div>
                   <div style={{ marginBottom: '12px' }}>
-                    <strong style={{ color: 'var(--c-navy)' }}>Contexto Socioeducativo:</strong>
+                    <strong style={{ color: '#818cf8' }}>Contexto Socioeducativo:</strong>
                     <p style={{ marginTop: '4px', lineHeight: '1.6' }}>{diagnosticoGenerado.contexto}</p>
                   </div>
                   <div style={{ marginBottom: '12px' }}>
-                    <strong style={{ color: 'var(--c-navy)' }}>Análisis de Indicadores Académicos:</strong>
+                    <strong style={{ color: '#818cf8' }}>Análisis de Indicadores Académicos:</strong>
                     <p style={{ marginTop: '4px', lineHeight: '1.6' }}>{diagnosticoGenerado.analisis_indicadores}</p>
                   </div>
                   <div style={{ marginBottom: '12px' }}>
-                    <strong style={{ color: 'var(--c-navy)' }}>Síntesis FODA:</strong>
+                    <strong style={{ color: '#818cf8' }}>Síntesis FODA:</strong>
                     <p style={{ marginTop: '4px', lineHeight: '1.6' }}>{diagnosticoGenerado.sintesis_foda}</p>
                   </div>
                   <div>
-                    <strong style={{ color: 'var(--c-navy)' }}>Priorización de Categorías:</strong>
+                    <strong style={{ color: '#818cf8' }}>Priorización de Categorías:</strong>
                     <p style={{ marginTop: '4px', lineHeight: '1.6' }}>{diagnosticoGenerado.priorizacion}</p>
                   </div>
                 </div>
               )}
               {!diagnosticoGenerado && generating !== 'diagnostico' && (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--c-text-muted)', background: 'var(--c-gray)', borderRadius: '8px', fontSize: '13px' }}>
+                <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(240,244,255,0.45)', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '13px' }}>
                   Haz clic en "Generar Diagnóstico" para que la IA redacte el diagnóstico oficial del PMC
                 </div>
               )}
               {generating === 'diagnostico' && (
-                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--c-blue-pale)', borderRadius: '8px' }}>
+                <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
-                  <p style={{ fontWeight: 600, color: 'var(--c-navy)' }}>Generando diagnóstico...</p>
-                  <p style={{ fontSize: '13px', color: 'var(--c-text-muted)' }}>La IA está analizando el contexto y los indicadores del plantel</p>
+                  <p style={{ fontWeight: 600, color: '#818cf8' }}>Generando diagnóstico...</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(240,244,255,0.5)' }}>La IA está analizando el contexto y los indicadores del plantel</p>
                 </div>
               )}
             </div>
@@ -909,33 +912,33 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
             <div style={sectionCard}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', margin: 0 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', margin: 0 }}>
                     🎯 Plan de Acción con Metas SMART
-                    {planAccion && <span style={{ marginLeft: '8px', color: '#28a745', fontSize: '13px' }}>✓ Generado</span>}
+                    {planAccion && <span style={{ marginLeft: '8px', color: '#34d399', fontSize: '13px' }}>✓ Generado</span>}
                   </h3>
-                  <p style={{ fontSize: '12px', color: 'var(--c-text-muted)', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '12px', color: 'rgba(240,244,255,0.5)', margin: '4px 0 0' }}>
                     Metas institucionales por categoría + metas individuales para los {totalStaff} trabajadores
                   </p>
                 </div>
                 <button
                   onClick={() => generateStep('plan_accion')}
                   disabled={generating !== null || !diagnosticoGenerado}
-                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: generating === 'plan_accion' ? '#ccc' : !diagnosticoGenerado ? '#999' : 'var(--c-amber)', color: '#fff', fontWeight: 600, cursor: (generating !== null || !diagnosticoGenerado) ? 'not-allowed' : 'pointer', fontSize: '13px' }}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: generating === 'plan_accion' ? 'rgba(255,255,255,0.1)' : !diagnosticoGenerado ? 'rgba(255,255,255,0.07)' : 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', fontWeight: 600, cursor: (generating !== null || !diagnosticoGenerado) ? 'not-allowed' : 'pointer', fontSize: '13px', opacity: !diagnosticoGenerado ? 0.5 : 1 }}
                 >
                   {generating === 'plan_accion' ? '⏳ Generando...' : planAccion ? '🔄 Regenerar' : '✨ Generar Plan de Acción'}
                 </button>
               </div>
-              {!diagnosticoGenerado && <p style={{ fontSize: '12px', color: '#856404', background: '#fff3cd', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px' }}>⚠️ Primero genera el diagnóstico para poder generar el plan de acción.</p>}
+              {!diagnosticoGenerado && <p style={{ fontSize: '12px', color: '#fcd34d', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px' }}>⚠️ Primero genera el diagnóstico para poder generar el plan de acción.</p>}
 
               {planAccion && (
                 <div>
                   {/* Metas institucionales */}
-                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-navy)', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#818cf8', marginBottom: '12px' }}>
                     Metas Institucionales ({planAccion.metas_institucionales.length})
                   </h4>
                   {planAccion.metas_institucionales.map((meta, i) => (
-                    <div key={i} style={{ marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--c-border)', overflow: 'hidden' }}>
-                      <div style={{ background: 'var(--c-navy)', color: '#fff', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={i} style={{ marginBottom: '12px', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.25)', overflow: 'hidden' }}>
+                      <div style={{ background: 'rgba(99,102,241,0.25)', color: '#f0f4ff', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 700, fontSize: '13px' }}>
                           {meta.nombre_categoria} — {meta.tema}
                         </span>
@@ -946,7 +949,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                           {editingMeta === i ? 'Cerrar' : '✏️ Editar'}
                         </button>
                       </div>
-                      <div style={{ padding: '12px 14px', background: '#fff', fontSize: '13px' }}>
+                      <div style={{ padding: '12px 14px', background: 'rgba(8,12,24,0.5)', fontSize: '13px', color: '#f0f4ff', lineHeight: 1.6 }}>
                         {editingMeta === i ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {[
@@ -1001,15 +1004,15 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                   ))}
 
                   {/* Metas personales */}
-                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-navy)', margin: '20px 0 12px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#818cf8', margin: '20px 0 12px' }}>
                     Metas Individuales del Personal ({planAccion.metas_personales.length} personas)
                   </h4>
                   <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     {planAccion.metas_personales.map((mp, i) => (
-                      <div key={i} style={{ display: 'flex', gap: '12px', marginBottom: '10px', padding: '10px', background: i % 2 === 0 ? '#fff' : 'var(--c-blue-pale)', borderRadius: '6px', border: '1px solid var(--c-border)', flexWrap: 'wrap' }}>
+                      <div key={i} style={{ display: 'flex', gap: '12px', marginBottom: '10px', padding: '10px', background: i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(99,102,241,0.07)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' }}>
                         <div style={{ minWidth: '200px' }}>
-                          <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--c-navy)' }}>{mp.nombre}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--c-text-muted)' }}>{mp.cargo}</div>
+                          <div style={{ fontWeight: 700, fontSize: '13px', color: '#818cf8' }}>{mp.nombre}</div>
+                          <div style={{ fontSize: '12px', color: 'rgba(240,244,255,0.5)' }}>{mp.cargo}</div>
                         </div>
                         <div style={{ flex: 1, fontSize: '12px' }}>
                           {editingPersonal === i ? (
@@ -1045,7 +1048,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                         </div>
                         <button
                           onClick={() => setEditingPersonal(editingPersonal === i ? null : i)}
-                          style={{ background: 'var(--c-navy)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', alignSelf: 'flex-start', flexShrink: 0 }}
+                          style={{ background: 'rgba(99,102,241,0.3)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', alignSelf: 'flex-start', flexShrink: 0 }}
                         >
                           {editingPersonal === i ? '✓ OK' : '✏️'}
                         </button>
@@ -1064,7 +1067,7 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                       });
                       setSaving(false);
                     }}
-                    style={{ marginTop: '12px', padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#28a745', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+                    style={{ marginTop: '12px', padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
                     disabled={saving}
                   >
                     {saving ? 'Guardando...' : '💾 Guardar cambios del plan'}
@@ -1072,10 +1075,10 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                 </div>
               )}
               {generating === 'plan_accion' && (
-                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--c-blue-pale)', borderRadius: '8px' }}>
+                <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
-                  <p style={{ fontWeight: 600, color: 'var(--c-navy)' }}>Generando plan de acción...</p>
-                  <p style={{ fontSize: '13px', color: 'var(--c-text-muted)' }}>La IA está creando metas SMART para {totalStaff} trabajadores y {categoriasPriorizadas.length} categorías</p>
+                  <p style={{ fontWeight: 600, color: '#818cf8' }}>Generando plan de acción...</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(240,244,255,0.5)' }}>La IA está creando metas SMART para {totalStaff} trabajadores y {categoriasPriorizadas.length} categorías</p>
                 </div>
               )}
             </div>
@@ -1085,15 +1088,15 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
         {/* ── STEP 5: Revisión y exportar ───────────────────────────── */}
         {activeStep === 5 && (
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--c-navy)', marginBottom: '8px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#f0f4ff', marginBottom: '8px', letterSpacing: '-0.4px', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
               Paso 5: Revisión Final y Exportación
             </h2>
-            <p style={{ fontSize: '14px', color: 'var(--c-text-muted)', marginBottom: '20px' }}>
+            <p style={{ fontSize: '14px', color: 'rgba(240,244,255,0.6)', marginBottom: '20px' }}>
               Tu PMC está completo. Descarga los documentos oficiales para su entrega a la supervisión.
             </p>
 
             {/* Summary card */}
-            <div style={{ ...sectionCard, background: 'linear-gradient(135deg, var(--c-navy) 0%, #2d5a87 100%)', color: '#fff', border: 'none' }}>
+            <div style={{ ...sectionCard, background: 'linear-gradient(135deg, rgba(99,102,241,0.25) 0%, rgba(79,70,229,0.2) 100%)', border: '1px solid rgba(99,102,241,0.3)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px' }}>✅ PMC Completado</h3>
               <p style={{ fontSize: '14px', opacity: 0.85, margin: '0 0 16px' }}>
                 {schoolName} · CCT: {schoolCct} · Ciclo {cicloEscolar}
@@ -1114,12 +1117,12 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
 
             {/* Download buttons */}
             <div style={sectionCard}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--c-navy-light)', marginBottom: '16px' }}>📥 Documentos para descargar</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#818cf8', marginBottom: '16px' }}>📥 Documentos para descargar</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'var(--c-blue-pale)', borderRadius: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '8px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: 'var(--c-navy)', marginBottom: '4px' }}>📄 PMC Completo 2025-2026</div>
-                    <div style={{ fontSize: '13px', color: 'var(--c-text-muted)' }}>Documento Word con todas las secciones: portada, normativa, diagnóstico, plan de acción, metas individuales y firmas</div>
+                    <div style={{ fontWeight: 700, color: '#818cf8', marginBottom: '4px' }}>📄 PMC Completo 2025-2026</div>
+                    <div style={{ fontSize: '13px', color: 'rgba(240,244,255,0.6)' }}>Documento Word con todas las secciones: portada, normativa, diagnóstico, plan de acción, metas individuales y firmas</div>
                   </div>
                   <a
                     href={`/api/docx/pmc/${projectId}`}
@@ -1130,39 +1133,39 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
                   </a>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#d1ecf1', borderRadius: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.25)', borderRadius: '8px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: '#0c5460', marginBottom: '4px' }}>📋 Plantilla: Informe Parcial de Avance</div>
-                    <div style={{ fontSize: '13px', color: '#0c5460', opacity: 0.8 }}>
+                    <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: '4px' }}>📋 Plantilla: Informe Parcial de Avance</div>
+                    <div style={{ fontSize: '13px', color: 'rgba(240,244,255,0.6)' }}>
                       Formato personalizado para el seguimiento a mitad de ciclo. Incluye las metas de tu PMC con espacios para registrar los avances y evidencias reales.
                     </div>
-                    <div style={{ fontSize: '12px', color: '#856404', background: '#fff3cd', padding: '4px 8px', borderRadius: '4px', marginTop: '6px', display: 'inline-block' }}>
+                    <div style={{ fontSize: '12px', color: '#fcd34d', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', padding: '4px 8px', borderRadius: '4px', marginTop: '6px', display: 'inline-block' }}>
                       ⚠️ Este documento lo debe completar el personal con evidencias reales — NO es generado por IA
                     </div>
                   </div>
                   <a
                     href={`/api/docx/pmc/${projectId}/informe-parcial`}
                     className="btn btn-sm"
-                    style={{ flexShrink: 0, backgroundColor: '#17a2b8', borderColor: '#17a2b8', color: '#fff', textDecoration: 'none' }}
+                    style={{ flexShrink: 0, background: 'rgba(14,165,233,0.25)', border: '1px solid rgba(14,165,233,0.4)', color: '#38bdf8', textDecoration: 'none' }}
                   >
                     ↓ Informe Parcial
                   </a>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#d4edda', borderRadius: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '8px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: '#155724', marginBottom: '4px' }}>📋 Plantilla: Informe Final</div>
-                    <div style={{ fontSize: '13px', color: '#155724', opacity: 0.8 }}>
+                    <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '4px' }}>📋 Plantilla: Informe Final</div>
+                    <div style={{ fontSize: '13px', color: 'rgba(240,244,255,0.6)' }}>
                       Formato para el informe anual al cierre del ciclo escolar. Incluye todas las metas institucionales e individuales con espacios para evidencias y conclusiones.
                     </div>
-                    <div style={{ fontSize: '12px', color: '#856404', background: '#fff3cd', padding: '4px 8px', borderRadius: '4px', marginTop: '6px', display: 'inline-block' }}>
+                    <div style={{ fontSize: '12px', color: '#fcd34d', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', padding: '4px 8px', borderRadius: '4px', marginTop: '6px', display: 'inline-block' }}>
                       ⚠️ Este documento lo debe completar el personal con evidencias reales — NO es generado por IA
                     </div>
                   </div>
                   <a
                     href={`/api/docx/pmc/${projectId}/informe-final`}
                     className="btn btn-sm"
-                    style={{ flexShrink: 0, backgroundColor: '#28a745', borderColor: '#28a745', color: '#fff', textDecoration: 'none' }}
+                    style={{ flexShrink: 0, background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.35)', color: '#34d399', textDecoration: 'none' }}
                   >
                     ↓ Informe Final
                   </a>
@@ -1170,9 +1173,9 @@ export default function PmcWizardClient({ locale, teacherId, teacherName, teache
               </div>
             </div>
 
-            <div style={{ ...sectionCard, background: '#fff3cd', borderColor: '#ffc107' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#856404', marginBottom: '8px' }}>📌 Instrucciones para los Informes</h3>
-              <ul style={{ fontSize: '13px', color: '#856404', paddingLeft: '18px', margin: 0, lineHeight: '1.8' }}>
+            <div style={{ ...sectionCard, background: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.3)' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#fcd34d', marginBottom: '8px' }}>📌 Instrucciones para los Informes</h3>
+              <ul style={{ fontSize: '13px', color: 'rgba(240,244,255,0.75)', paddingLeft: '18px', margin: 0, lineHeight: '1.8' }}>
                 <li>El <strong>Informe Parcial</strong> se entrega aproximadamente a mitad del ciclo escolar (enero-febrero 2026)</li>
                 <li>El <strong>Informe Final</strong> se entrega al cierre del ciclo escolar (junio-julio 2026)</li>
                 <li>Cada trabajador debe registrar sus avances con <strong>evidencias documentales reales</strong> (no fotografías solas)</li>
