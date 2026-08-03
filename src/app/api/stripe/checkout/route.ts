@@ -2,12 +2,13 @@ import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getTeacherByEmail, sql } from '@/lib/db';
+import https from 'https';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
 const stripe = stripeSecretKey
   ? new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16' as any,
-      httpClient: Stripe.createFetchHttpClient(),
+      httpAgent: new https.Agent({ family: 4 }),
     })
   : null;
 

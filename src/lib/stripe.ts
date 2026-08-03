@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import https from 'https';
 
 // ─── Lazy Stripe client ──────────────────────────────────────────────────────
 let _stripe: Stripe | null = null;
@@ -12,7 +13,7 @@ export function getStripe(): Stripe {
     _stripe = new Stripe(secretKey, {
       apiVersion: '2023-10-16' as any,
       typescript: true,
-      httpClient: Stripe.createFetchHttpClient(),
+      httpAgent: new https.Agent({ family: 4 }),
     });
   }
   return _stripe;
