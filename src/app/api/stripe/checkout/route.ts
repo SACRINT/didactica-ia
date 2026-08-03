@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { getTeacherByEmail, sql } from '@/lib/db';
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -19,10 +20,38 @@ export async function POST(req: Request) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+    }
+
+    let limit = 1;
+    if (planId === 'standard') limit = 3;
+    if (planId === 'advanced') limit = 5;
+    if (planId === 'complete') limit = 10;
+
     if (!process.env.STRIPE_SECRET_KEY || !stripe) {
       console.warn('No STRIPE_SECRET_KEY found. Mocking successful checkout.');
+      
+      try {
+        await sql()`
+          DELETE FROM subscriptions WHERE teacher_id = ${teacher.id}::uuid
+        `;
+        await sql()`
+          INSERT INTO subscriptions (
+            teacher_id, plan_name, plan_subjects, status, 
+            stripe_customer_id, stripe_subscription_id, current_period_end
+          ) VALUES (
+            ${teacher.id}::uuid, ${planName}, ${limit}, 'active', 
+            'mock_cus_123', 'mock_sub_123', NOW() + INTERVAL '30 days'
+          )
+        `;
+      } catch (e) {
+        console.error('Error inserting mock subscription:', e);
+      }
+      
       // Si no hay key de stripe, simulamos el éxito para desarrollo
-      return NextResponse.json({ url: `${appUrl}/es/dashboard?mock_success=true` });
+      return NextResponse.json({ url: `${appUrl}/es/suscripcion/exito` });
     }
 
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -45,10 +74,12 @@ export async function POST(req: Request) {
         },
       ],
       metadata: {
+        teacher_id: teacher.id,
         teacher_email: session.user.email,
         plan_id: planId,
+        plan_subjects: limit.toString(),
       },
-      success_url: `${appUrl}/es/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/es/suscripcion/exito?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/es/suscripcion`,
     });
 
