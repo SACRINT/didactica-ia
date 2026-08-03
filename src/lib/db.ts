@@ -5,7 +5,7 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 // Prevents Vercel build failures when DATABASE_URL is missing during static analysis.
 let _client: NeonQueryFunction<false, false> | null = null;
 
-function sql(): NeonQueryFunction<false, false> {
+export function sql(): NeonQueryFunction<false, false> {
   if (!_client) {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL environment variable is not set');
@@ -19,13 +19,16 @@ function sql(): NeonQueryFunction<false, false> {
 
 export async function getTeacherByEmail(email: string) {
   const rows = await sql()`
-    SELECT id, name, email, school_name, municipality, subsystem, custom_api_key, custom_api_provider, role, created_at
+    SELECT id, name, email, school_name, municipality, subsystem,
+           custom_api_key, custom_api_provider, role, created_at,
+           profile_completed, school_locked
     FROM teachers
     WHERE email = ${email}
     LIMIT 1
   `;
   return rows[0] || null;
 }
+
 
 export async function updateTeacherKey(teacherId: string, customApiKey: string | null, customApiProvider: string | null) {
   const rows = await sql()`

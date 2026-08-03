@@ -1,10 +1,12 @@
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getTeacherByEmail, getPlanningsByTeacher } from '@/lib/db';
+import { getSubscriptionStatus } from '@/lib/subscription-gate';
 import AppLayout from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import DeletePlanningButton from '@/components/planeacion/DeletePlanningButton';
 import CustomKeyCard from '@/components/dashboard/CustomKeyCard';
+import SubscriptionBanner from '@/components/dashboard/SubscriptionBanner';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -35,7 +37,10 @@ export default async function DashboardPage({
   const teacher = await getTeacherByEmail(session.user.email);
   if (!teacher) redirect(`/${locale}/login`);
 
-  const plannings = await getPlanningsByTeacher(teacher.id);
+  const [plannings, subStatus] = await Promise.all([
+    getPlanningsByTeacher(teacher.id as string),
+    getSubscriptionStatus(teacher.id as string, session.user.email)
+  ]);
 
   return (
     <AppLayout locale={locale} activeSection="dashboard">
@@ -48,6 +53,17 @@ export default async function DashboardPage({
           </Link>
         </div>
       </div>
+
+      {subStatus.hasActiveSubscription && (
+        <SubscriptionBanner
+          locale={locale}
+          planName={subStatus.subscription?.planName || 'Básico'}
+          planSubjects={subStatus.subscription?.planSubjects || 1}
+          usedSubjectsCount={subStatus.usedSubjectsCount}
+          availableSlots={subStatus.availableSlots}
+          isAdmin={subStatus.isAdmin}
+        />
+      )}
 
       {plannings.length === 0 ? (
         <div className="empty-state">

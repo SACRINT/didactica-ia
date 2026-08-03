@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getTeacherByEmail, getPlanningsByTeacher, createPlanning } from '@/lib/db';
+import { canCreatePlanningForSubject, lockSubjectInSubscription } from '@/lib/subscription-gate';
 
 export async function GET() {
   try {
@@ -40,15 +41,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const planning = await createPlanning({
-      teacherId: teacher.id,
+    // ── SUBSCRIPTION GATE ─────────────────────────────────────────────────────
+    const access = await canCreatePlanningForSubject(
+      teacher.id as string,
+      session.user.email,
       uacName,
-      semester,
+      Number(semester),
+      component
+    );
+
+    if (!access.allowed) {
+      return NextResponse.json(
+        {
+          error: access.message || 'No tienes acceso para crear planeaciones en esta materia.',
+          reason: access.reason,
+          upgradeUrl: '/suscripcion',
+        },
+        { status: 403 }
+      );
+    }
+
+    // Crear la planeación
+    const planning = await createPlanning({
+      teacherId: teacher.id as string,
+      uacName,
+      semester: Number(semester),
       component,
       curriculumName,
       paecContext,
       extractedData,
     });
+
+    // Registrar la materia en la suscripción si aún no está (consume un slot)
+    if (access.reason !== 'admin') {
+      try {
+        await lockSubjectInSubscription(
+          teacher.id as string,
+          uacName,
+          Number(semester),
+          component
+        );
+      } catch (lockErr) {
+        console.warn('[plannings POST] Could not lock subject:', lockErr);
+        // No fallamos la creación si esto falla
+      }
+    }
 
     return NextResponse.json({ planning }, { status: 201 });
   } catch (error) {

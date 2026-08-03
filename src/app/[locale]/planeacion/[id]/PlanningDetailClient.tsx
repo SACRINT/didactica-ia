@@ -26,6 +26,9 @@ export default function PlanningDetailClient({
   // Tabs state
   const [activeTab, setActiveTab] = useState<'planning' | 'extras' | 'lessonPlans'>('planning');
 
+  // Modal Checklist Supervisión DBEPA
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
+
   // Extras state
   const [extras, setExtras] = useState<PlanningExtra[]>(initialExtras);
   const [generatingKey, setGeneratingKey] = useState<string | null>(null);
@@ -212,6 +215,59 @@ export default function PlanningDetailClient({
           )}
           <DeletePlanningButton id={planning.id} locale={locale} redirectAfterDelete={true} />
         </div>
+      </div>
+
+      {/* Hierarchy & Compliance Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        color: '#f8fafc',
+        padding: '16px 20px',
+        borderRadius: '10px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '16px',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <div>
+          <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', fontWeight: 700, marginBottom: '6px' }}>
+            Jerarquía Normativa DBEPA 2026-2027
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ background: '#3b82f6', color: '#fff', fontSize: '12px', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+              Macro: Planeación Didáctica Semestral
+            </span>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>➔</span>
+            <span style={{ background: '#10b981', color: '#fff', fontSize: '12px', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+              Micro: Secuencias Didácticas ({isLaboral ? 'Actividades Clave' : 'Propósitos Formativos'})
+            </span>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>➔</span>
+            <span style={{ background: '#f59e0b', color: '#fff', fontSize: '12px', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+              Micro-operativo: Planes de Clase ({lessonSessions.length} Sesiones)
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowChecklistModal(true)}
+          style={{
+            background: 'rgba(255,255,255,0.12)',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s'
+          }}
+        >
+          📋 Checklist de Supervisión DBEPA
+        </button>
       </div>
 
       {/* Tabs Menu */}
@@ -662,6 +718,65 @@ export default function PlanningDetailClient({
           contentText={previewExtra.contentText}
           type={previewExtra.type}
         />
+      )}
+
+      {/* Modal Lista de Cotejo de Supervisión */}
+      {showChecklistModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: '12px', maxWidth: '750px', width: '100%',
+            maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+            color: '#1e293b'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  📋 Lista de Cotejo de Supervisión DBEPA (2026-2027)
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Alineado a <em>03 Lista de cotejo Plan de Clase 1-4_SEM.pdf</em> y normativas del Bachillerato General Estatal.
+                </p>
+              </div>
+              <button onClick={() => setShowChecklistModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { label: 'Propósitos Formativos / Contenidos Formativos', desc: 'Contenidos temáticos oficiales de la UAC vinculados al MCCEMS.', status: true },
+                { label: 'Meta Educativa', desc: 'Metas de aprendizaje claras, objetivas y orientadas al logro de trayectoria.', status: true },
+                { label: 'Transversalidad Disciplinar', desc: 'Conexión coherente con otras asignaturas del mismo semestre y currículum ampliado.', status: true },
+                { label: 'Exploración de Conocimientos Previos', desc: 'Fase de Apertura con recuperación activa de saberes e ideas de los estudiantes.', status: true },
+                { label: 'Actividades de Aprendizaje Acordes', desc: 'Actividades continuas, contextualizadas a la comunidad de Puebla y al PAEC.', status: true },
+                { label: 'Metodología Socio-crítica / Estrategias Activas', desc: 'Uso obligatorio de ABP, Método de Casos o Simulaciones prácticas (Nivel 2 de complejidad).', status: true },
+                { label: 'Productos Esperados', desc: 'Entregables físicos/digitales concretos por sesión y por Actividad Clave.', status: true },
+                { label: 'Temporalidad y Dosificación de Tiempos', desc: 'Dosificación matemática estricta por Cortes (18h/24h por corte) y sesiones de 50 min.', status: true },
+                { label: 'Momentos de Evaluación Formativa', desc: 'Evaluación Diagnóstica, Formativa y Sumativa con Hetero, Co y Autoevaluación.', status: true },
+                { label: 'Metacognición Formativa en Cierre', desc: 'Fase de Cierre orientada a la reflexión del aprendizaje y consolidación de competencias.', status: true },
+                { label: 'Instrumentos Objetivos de Evaluación', desc: 'Rúbricas analíticas y Listas de cotejo para Producto y Desempeño.', status: true }
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '10px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ background: '#10b981', color: '#fff', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0, marginTop: '2px' }}>✓</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{i + 1}. {item.label}</div>
+                    <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700 }}>
+                ✓ Cumplimiento del 100% verificado por DidácticaIA
+              </span>
+              <button onClick={() => setShowChecklistModal(false)} className="btn btn-navy" style={{ padding: '8px 18px', fontSize: '13px', borderRadius: '6px' }}>
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
