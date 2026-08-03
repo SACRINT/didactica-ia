@@ -1,18 +1,44 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Props {
   locale: string;
 }
 
 export default function SuscripcionClient({ locale }: Props) {
+  const router = useRouter();
+  const [loading, setLoading] = useState<string | null>(null);
+
   const plans = [
-    { name: 'Básico', price: 99, limit: 1, color: '#3b82f6', desc: 'Ideal para probar la herramienta en una sola materia.' },
-    { name: 'Estándar', price: 249, limit: 3, color: '#8b5cf6', desc: 'Perfecto para la carga docente promedio.' },
-    { name: 'Avanzado', price: 399, limit: 5, color: '#ec4899', desc: 'Para docentes con múltiples grupos y materias.' },
-    { name: 'Completo', price: 699, limit: 10, color: '#f59e0b', desc: 'Solución total para tiempo completo.' },
+    { id: 'basic', name: 'Básico', price: 99, limit: 1, color: '#3b82f6', desc: 'Ideal para probar la herramienta en una sola materia.' },
+    { id: 'standard', name: 'Estándar', price: 249, limit: 3, color: '#8b5cf6', desc: 'Perfecto para la carga docente promedio.' },
+    { id: 'advanced', name: 'Avanzado', price: 399, limit: 5, color: '#ec4899', desc: 'Para docentes con múltiples grupos y materias.' },
+    { id: 'complete', name: 'Completo', price: 699, limit: 10, color: '#f59e0b', desc: 'Solución total para tiempo completo.' },
   ];
+
+  const handleSubscribe = async (planId: string, planName: string, price: number) => {
+    try {
+      setLoading(planId);
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, planName, price }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Error al procesar el pago');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de conexión');
+    } finally {
+      setLoading(null);
+    }
+  };
 
   return (
     <div style={{
@@ -50,10 +76,14 @@ export default function SuscripcionClient({ locale }: Props) {
           color: #fff;
           font-weight: bold;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: background 0.2s, opacity 0.2s;
         }
-        .plan-card:hover .plan-btn {
+        .plan-card:hover .plan-btn:not(:disabled) {
           background: var(--hover-bg);
+        }
+        .plan-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
       `}</style>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -113,11 +143,13 @@ export default function SuscripcionClient({ locale }: Props) {
                 </li>
               </ul>
               
-              <button className="plan-btn" style={{
-                '--hover-bg': plan.color
-              } as any}
+              <button 
+                className="plan-btn" 
+                style={{ '--hover-bg': plan.color } as any}
+                onClick={() => handleSubscribe(plan.id, plan.name, plan.price)}
+                disabled={loading === plan.id}
               >
-                Suscribirme
+                {loading === plan.id ? 'Procesando...' : 'Suscribirme'}
               </button>
             </div>
           ))}
