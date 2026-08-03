@@ -33,6 +33,8 @@ export default async function ConfigurarPerfilPage({
       currentData={{
         schoolName: (teacher.school_name as string) || '',
         municipality: (teacher.municipality as string) || '',
+        city: (teacher.city as string) || '',
+        cct: (teacher.cct as string) || '',
         subsystem: (teacher.subsystem as string) || '',
       }}
     />

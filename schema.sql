@@ -14,12 +14,17 @@ CREATE TABLE IF NOT EXISTS teachers (
   name          TEXT NOT NULL,
   email         TEXT UNIQUE NOT NULL,
   school_name   TEXT,
+  cct           TEXT,
   municipality  TEXT,
+  city          TEXT,
   subsystem     TEXT,   -- 'bge' | 'digital' | 'emsad'
   custom_api_key TEXT,
   custom_api_provider TEXT,
   role          TEXT NOT NULL DEFAULT 'docente', -- 'administrador' | 'supervisor' | 'atp' | 'director' | 'docente'
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  profile_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  school_locked BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ─── Plannings ───────────────────────────────────────────────────────

@@ -10,10 +10,10 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { schoolName, municipality, subsystem, name, lockProfile } = body;
+    const { schoolName, municipality, city, cct, subsystem, name, lockProfile } = body;
 
     // Validaciones básicas
-    if (!schoolName?.trim() || !municipality?.trim() || !subsystem?.trim()) {
+    if (!schoolName?.trim() || !municipality?.trim() || !city?.trim() || !cct?.trim() || !subsystem?.trim()) {
       return NextResponse.json(
         { error: 'Todos los campos son requeridos' },
         { status: 400 }
@@ -50,6 +50,8 @@ export async function POST(req: Request) {
         name = ${name?.trim() || session.user.name || session.user.email},
         school_name = ${schoolName.trim()},
         municipality = ${municipality.trim()},
+        city = ${city.trim()},
+        cct = ${cct.trim()},
         subsystem = ${subsystem.trim()},
         profile_completed = true,
         school_locked = ${lockProfile === true},
@@ -77,7 +79,7 @@ export async function GET() {
 
     const db = neon(process.env.DATABASE_URL!);
     const rows = await db`
-      SELECT name, school_name, municipality, subsystem,
+      SELECT name, school_name, municipality, city, cct, subsystem,
              profile_completed, school_locked
       FROM teachers
       WHERE email = ${session.user.email}

@@ -10,6 +10,8 @@ interface Props {
   currentData: {
     schoolName: string;
     municipality: string;
+    city?: string;
+    cct?: string;
     subsystem: string;
   };
 }
@@ -29,6 +31,8 @@ export default function ConfigurarPerfilClient({ locale, teacherName, teacherEma
   const [form, setForm] = useState({
     schoolName: currentData.schoolName || '',
     municipality: currentData.municipality || '',
+    city: currentData.city || '',
+    cct: currentData.cct || '',
     subsystem: currentData.subsystem || '',
     teacherFullName: teacherName || '',
   });
@@ -37,7 +41,7 @@ export default function ConfigurarPerfilClient({ locale, teacherName, teacherEma
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.schoolName.trim() || !form.municipality.trim() || !form.subsystem) {
+    if (!form.schoolName.trim() || !form.municipality.trim() || !form.city.trim() || !form.cct.trim() || !form.subsystem) {
       setError('Por favor completa todos los campos.');
       return;
     }
@@ -50,6 +54,8 @@ export default function ConfigurarPerfilClient({ locale, teacherName, teacherEma
         body: JSON.stringify({
           schoolName: form.schoolName.trim(),
           municipality: form.municipality.trim(),
+          city: form.city.trim(),
+          cct: form.cct.trim(),
           subsystem: form.subsystem,
           name: form.teacherFullName.trim(),
           lockProfile: true,
@@ -190,7 +196,7 @@ export default function ConfigurarPerfilClient({ locale, teacherName, teacherEma
           </div>
 
           {/* Municipio */}
-          <div style={{ marginBottom: 28 }}>
+          <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'rgba(240,244,255,0.7)', marginBottom: 8 }}>
               Municipio *
             </label>
@@ -199,6 +205,52 @@ export default function ConfigurarPerfilClient({ locale, teacherName, teacherEma
               value={form.municipality}
               onChange={(e) => setForm({ ...form, municipality: e.target.value })}
               placeholder="Ej: Puebla de Zaragoza"
+              required
+              style={{
+                width: '100%', padding: '12px 16px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 10, color: '#f0f4ff', fontSize: 15,
+                outline: 'none', transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+              onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+            />
+          </div>
+
+          {/* Localidad o Ciudad */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'rgba(240,244,255,0.7)', marginBottom: 8 }}>
+              Localidad o Ciudad *
+            </label>
+            <input
+              type="text"
+              value={form.city}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+              placeholder="Ej: Cholula"
+              required
+              style={{
+                width: '100%', padding: '12px 16px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 10, color: '#f0f4ff', fontSize: 15,
+                outline: 'none', transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+              onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+            />
+          </div>
+
+          {/* CCT de la escuela */}
+          <div style={{ marginBottom: 28 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'rgba(240,244,255,0.7)', marginBottom: 8 }}>
+              Clave de Centro de Trabajo (CCT) *
+            </label>
+            <input
+              type="text"
+              value={form.cct}
+              onChange={(e) => setForm({ ...form, cct: e.target.value })}
+              placeholder="Ej: 21EBH0000Z"
               required
               style={{
                 width: '100%', padding: '12px 16px',
