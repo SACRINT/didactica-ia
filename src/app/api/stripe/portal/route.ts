@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       `${appUrl}/es/dashboard`
     );
 
-    return NextResponse.json({ url: portalSession.url });
+    return NextResponse.redirect(portalSession.url, 303);
   } catch (error: any) {
     console.error('[Stripe Portal] Error:', error);
     return NextResponse.json(

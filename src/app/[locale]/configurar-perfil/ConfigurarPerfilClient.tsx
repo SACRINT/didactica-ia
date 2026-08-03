@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import SignOutButton from '@/components/layout/SignOutButton';
 
 interface Props {
   locale: string;
@@ -85,7 +86,10 @@ export default function ConfigurarPerfilClient({ locale, teacherName, teacherEma
     }}>
       <div style={{ width: '100%', maxWidth: 540 }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+        <div style={{ textAlign: 'center', marginBottom: 40, position: 'relative' }}>
+          <div style={{ position: 'absolute', top: -10, right: 0 }}>
+            <SignOutButton locale={locale} />
+          </div>
           <div style={{ fontSize: 56, marginBottom: 16 }}>📚</div>
           <h1 style={{
             fontSize: 28, fontWeight: 800, color: '#f0f4ff',

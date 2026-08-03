@@ -19,7 +19,7 @@ export default function SignOutButton({ locale, signOutAction }: Props) {
 
   return (
     <form action={signOutAction.bind(null, locale)} onSubmit={handleSubmit}>
-      <button type="submit" className="header-btn">Cerrar sesión</button>
+      <button type="submit" className="btn btn-ghost">Cerrar sesión</button>
     </form>
   );
 }
