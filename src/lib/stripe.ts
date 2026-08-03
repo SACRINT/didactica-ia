@@ -5,10 +5,11 @@ let _stripe: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!_stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
+    const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+    if (!secretKey) {
       throw new Error('STRIPE_SECRET_KEY environment variable is not set');
     }
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    _stripe = new Stripe(secretKey, {
       apiVersion: '2023-10-16' as any,
       typescript: true,
       httpClient: Stripe.createFetchHttpClient(),
