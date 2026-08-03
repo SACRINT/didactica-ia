@@ -12,12 +12,16 @@ type Props = {
 };
 
 async function checkIsAdmin(email: string): Promise<boolean> {
+  if (process.env.ADMIN_EMAIL === email) return true;
   try {
     const sql = neon(process.env.DATABASE_URL!);
-    const rows = await sql`SELECT email FROM admins WHERE email = ${email} LIMIT 1`;
-    if (rows.length > 0) return true;
+    const adminRows = await sql`SELECT email FROM admins WHERE email = ${email} LIMIT 1`;
+    if (adminRows.length > 0) return true;
+    
+    const teacherRows = await sql`SELECT role FROM teachers WHERE email = ${email} LIMIT 1`;
+    if (teacherRows.length > 0 && teacherRows[0].role === 'administrador') return true;
   } catch {}
-  return process.env.ADMIN_EMAIL === email;
+  return false;
 }
 
 async function getMaintenanceStatus(): Promise<{ active: boolean; message: string }> {

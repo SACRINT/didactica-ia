@@ -28,7 +28,7 @@ async function getTeacherStatus(email: string) {
   try {
     const db = neon(process.env.DATABASE_URL!);
     const rows = await db`
-      SELECT t.id, t.profile_completed, t.school_locked,
+      SELECT t.id, t.profile_completed, t.school_locked, t.role,
              s.status as sub_status
       FROM teachers t
       LEFT JOIN subscriptions s ON s.teacher_id = t.id
@@ -67,6 +67,11 @@ export async function middleware(request: NextRequest) {
 
     if (isProtected) {
       const teacher = await getTeacherStatus(email);
+
+      // 2.5 Admin por rol
+      if (teacher?.role === 'administrador') {
+        return intlMiddleware(request);
+      }
 
       // 3. Perfil no completado → configurar perfil
       if (!teacher || !teacher.profile_completed) {

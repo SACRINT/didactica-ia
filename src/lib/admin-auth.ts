@@ -15,17 +15,20 @@ export async function requireAdmin(): Promise<string> {
 
   const email = session.user.email;
 
+  if (process.env.ADMIN_EMAIL === email) return email;
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const rows = await sql`SELECT email FROM admins WHERE email = ${email} LIMIT 1`;
-    if (rows.length === 0) throw new Error('FORBIDDEN');
+    if (rows.length > 0) return email;
+    
+    const tRows = await sql`SELECT role FROM teachers WHERE email = ${email} LIMIT 1`;
+    if (tRows.length > 0 && tRows[0].role === 'administrador') return email;
+    
+    throw new Error('FORBIDDEN');
   } catch (err: any) {
     if (err.message === 'FORBIDDEN') throw err;
-    // Also check env var as fallback during initial setup
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail || adminEmail !== email) {
-      throw new Error('FORBIDDEN');
-    }
+    throw new Error('FORBIDDEN');
   }
 
   return email;

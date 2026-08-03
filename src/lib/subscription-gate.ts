@@ -48,8 +48,20 @@ export async function getSubscriptionStatus(
   teacherId: string,
   teacherEmail?: string
 ): Promise<SubscriptionStatus> {
-  // Admin siempre tiene acceso total
+  // Consultar rol
+  let isAdmin = false;
   if (teacherEmail && teacherEmail === ADMIN_EMAIL) {
+    isAdmin = true;
+  } else {
+    try {
+      const roleRows = await sql()`SELECT role FROM teachers WHERE id = ${teacherId}::uuid LIMIT 1`;
+      if (roleRows.length > 0 && roleRows[0].role === 'administrador') {
+        isAdmin = true;
+      }
+    } catch {}
+  }
+
+  if (isAdmin) {
     return {
       hasActiveSubscription: true,
       subscription: {
@@ -139,12 +151,11 @@ export async function canCreatePlanningForSubject(
   semester: number,
   component: string
 ): Promise<AccessResult> {
-  // Admin bypass
-  if (teacherEmail === ADMIN_EMAIL) {
+  const status = await getSubscriptionStatus(teacherId, teacherEmail);
+
+  if (status.isAdmin) {
     return { allowed: true, reason: 'admin' };
   }
-
-  const status = await getSubscriptionStatus(teacherId, teacherEmail);
 
   if (!status.hasActiveSubscription) {
     return {
