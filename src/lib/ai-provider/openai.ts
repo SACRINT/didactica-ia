@@ -8,10 +8,11 @@ import type { AIProvider } from './types';
 
 // Base URLs for OpenAI-compatible providers
 const BASE_URLS: Record<string, string> = {
-  openai:  'https://api.openai.com/v1',
-  nvidia:  'https://integrate.api.nvidia.com/v1',
-  qwen:    'https://dashscope.aliyuncs.com/compatible-mode/v1',
-  mistral: 'https://api.mistral.ai/v1',
+  openai:     'https://api.openai.com/v1',
+  nvidia:     'https://integrate.api.nvidia.com/v1',
+  qwen:       'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  mistral:    'https://api.mistral.ai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
 };
 
 export class OpenAICompatibleProvider implements AIProvider {

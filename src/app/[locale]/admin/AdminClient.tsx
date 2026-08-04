@@ -27,7 +27,7 @@ interface Prompt { id: string; label: string; content: string; is_active: boolea
 interface UserDoc { id: string; teacher_email: string; doc_type: string; label: string; uac_name: string | null; file_name: string | null; used_count: number; created_at: string; }
 interface ActivityEntry { id: string; teacher_email: string; action: string; provider_used: string | null; model_used: string | null; success: boolean; error_msg: string | null; created_at: string; }
 
-const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral'];
+const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral', 'openrouter'];
 
 // Modelos disponibles por proveedor para USO ESTÁNDAR (cuota gratuita masiva 500 RPD / 15 RPM)
 const STANDARD_MODELS: Record<string, { id: string; label: string }[]> = {
@@ -46,6 +46,11 @@ const STANDARD_MODELS: Record<string, { id: string; label: string }[]> = {
   ],
   qwen:    [{ id: 'qwen-turbo', label: 'qwen-turbo — Free tier' }],
   mistral: [{ id: 'mistral-small-latest', label: 'mistral-small-latest — Free tier' }],
+  openrouter: [
+    { id: 'google/gemini-2.0-flash-exp:free', label: 'gemini-2.0-flash-exp — Gratis (OpenRouter)' },
+    { id: 'meta-llama/llama-3.1-8b-instruct:free', label: 'llama-3.1-8b — Gratis (OpenRouter)' },
+    { id: 'mistralai/mistral-7b-instruct:free', label: 'mistral-7b — Gratis (OpenRouter)' },
+  ],
 };
 
 // Modelos disponibles por proveedor para USO PREMIUM (APIs de paga / avanzadas)
@@ -79,12 +84,26 @@ const PREMIUM_MODELS: Record<string, { id: string; label: string }[]> = {
     { id: 'mistral-small-latest', label: 'mistral-small-latest — Free tier' },
     { id: 'mistral-large-latest', label: 'mistral-large-latest — API de paga' },
   ],
+  openrouter: [
+    { id: 'google/gemini-2.0-flash-exp:free',          label: 'gemini-2.0-flash-exp — Gratis' },
+    { id: 'meta-llama/llama-3.1-8b-instruct:free',     label: 'llama-3.1-8b — Gratis' },
+    { id: 'mistralai/mistral-7b-instruct:free',        label: 'mistral-7b — Gratis' },
+    { id: 'google/gemini-2.5-flash',                   label: 'gemini-2.5-flash — De paga' },
+    { id: 'anthropic/claude-sonnet-4-5',               label: 'claude-sonnet-4-5 — De paga' },
+    { id: 'openai/gpt-4o',                             label: 'gpt-4o — De paga' },
+  ],
 };
 
 // Alias para formulario de agregar key
 const MODELS = PREMIUM_MODELS;
 
-// ── Helper ───────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** A user is considered "active" only if they had activity in the last 30 minutes */
+function isRecentlyActive(lastActive: string | null): boolean {
+  if (!lastActive) return false;
+  return (Date.now() - new Date(lastActive).getTime()) < 30 * 60 * 1000;
+}
 
 function relativeTime(dateStr: string | null): string {
   if (!dateStr) return 'Nunca';
@@ -197,8 +216,14 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   }
 
   async function toggleUser(teacherId: string, isBlocked: boolean) {
-    await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacherId, isBlocked }) });
-    loadTeachers(); showMsg(isBlocked ? 'Usuario bloqueado' : 'Usuario reactivado');
+    const res = await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teacherId, isBlocked }) });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      showMsg(d.error || 'Error al actualizar usuario', false);
+      return;
+    }
+    loadTeachers();
+    showMsg(isBlocked ? 'Usuario bloqueado' : 'Usuario reactivado');
   }
 
   async function changeUserRole(teacherId: string, role: string) {
@@ -723,8 +748,13 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       <td><span className="badge badge-blue">{t.paec_count}</span></td>
                       <td><span className="badge badge-blue">{t.pmc_count}</span></td>
                       <td>{t.doc_count}</td>
-                      <td style={{ fontSize: 11 }}>{relativeTime(t.last_active)}</td>
-                      <td><span className={`badge ${t.is_blocked ? 'badge-red' : 'badge-green'}`}>{t.is_blocked ? 'Bloqueado' : 'Activo'}</span></td>
+                      <td style={{ fontSize: 11 }}>
+                        {relativeTime(t.last_active)}
+                        {isRecentlyActive(t.last_active) && (
+                          <span style={{ marginLeft: 6, display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 4px #4ade80', verticalAlign: 'middle' }} title="Activo ahora (últimos 30 min)" />
+                        )}
+                      </td>
+                      <td><span className={`badge ${t.is_blocked ? 'badge-red' : 'badge-green'}`}>{t.is_blocked ? 'Bloqueado' : 'Habilitado'}</span></td>
                       <td>
                         <button className={`btn-sm ${t.is_blocked ? 'btn-primary' : 'btn-danger'}`}
                           onClick={() => toggleUser(t.id, !t.is_blocked)}>

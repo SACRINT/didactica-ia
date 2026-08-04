@@ -99,6 +99,7 @@ function buildProvider(provider: string, model: string, apiKey: string): AIProvi
     case 'nvidia':
     case 'qwen':
     case 'mistral':
+    case 'openrouter':
       return new OpenAICompatibleProvider(apiKey, provider, model);
     default:
       return new GeminiProvider(apiKey, model);

@@ -61,9 +61,20 @@ export async function GET(req: NextRequest) {
 // PUT /api/admin/users — block/unblock or change role of a user
 export async function PUT(req: NextRequest) {
   try {
-    await requireAdmin();
+    const adminEmail = await requireAdmin();
     const { teacherId, isBlocked, role, isPremium } = await req.json();
     const sql = getDb();
+
+    // Prevent admin from blocking their own account
+    if (isBlocked === true && teacherId) {
+      const selfRows = await sql`SELECT id FROM teachers WHERE email = ${adminEmail} AND id = ${teacherId}::uuid LIMIT 1`;
+      if (selfRows.length > 0) {
+        return NextResponse.json(
+          { error: 'No puedes bloquear tu propia cuenta de administrador.' },
+          { status: 400 }
+        );
+      }
+    }
 
   await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE`.catch(() => {});
     await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'docente'`.catch(() => {});
