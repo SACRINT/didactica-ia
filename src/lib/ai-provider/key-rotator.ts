@@ -48,8 +48,11 @@ function getDb() {
  * Antes de cargar claves activas, reactiva automáticamente las que llevan
  * más de COOLDOWN_MINUTES sin recibir un error. Esto permite que una clave
  * bloqueada por límite de quota se recupere sola tras el enfriamiento.
+ *
+ * Nota: El límite diario de Gemini free tier (500 RPD) puede tardar hasta
+ * 24h en recuperarse, pero 60 min es suficiente para la mayoría de picos.
  */
-const COOLDOWN_MINUTES = 5;
+const COOLDOWN_MINUTES = 60;
 const MAX_ERRORS_BEFORE_DEACTIVATE = 5;
 
 async function reactivateCooledKeys(provider: string) {
@@ -97,7 +100,9 @@ async function recordUsage(keyId: string) {
 async function recordError(keyId: string) {
   try {
     const sql = getDb();
-    // Increment error count and check if we should deactivate
+    // Increment error count and check if we should deactivate.
+    // IMPORTANT: Only call this for PERMANENT errors (401/403 invalid credentials).
+    // Do NOT call for transient errors (429 rate limit, 503 high demand).
     await sql`
       UPDATE api_keys
       SET error_count   = error_count + 1,
@@ -257,28 +262,54 @@ export async function withKeyRotation<T>(
       return result;
     } catch (err: any) {
       lastError = err;
+      const errStr = String(err?.message || '');
 
-      const is429 =
+      // Detect transient rate-limit / demand errors — do NOT penalize the key
+      const isRateLimit =
         err?.status === 429 ||
         err?.statusCode === 429 ||
-        (typeof err?.message === 'string' &&
-          (err.message.includes('429') || err.message.toLowerCase().includes('quota')));
+        errStr.includes('429') ||
+        errStr.toLowerCase().includes('quota') ||
+        errStr.toLowerCase().includes('resource_exhausted') ||
+        errStr.toLowerCase().includes('rate limit') ||
+        errStr.toLowerCase().includes('high demand') ||
+        errStr.toLowerCase().includes('too many requests');
 
-      // Record error in DB for pool keys
+      // Detect permanent credential errors — penalize key
+      const isPermanentError =
+        err?.status === 401 || err?.status === 403 ||
+        errStr.includes('401') || errStr.includes('403') ||
+        errStr.toLowerCase().includes('invalid') ||
+        errStr.toLowerCase().includes('unauthorized') ||
+        errStr.toLowerCase().includes('permission denied');
+
       if (keyId && source === 'pool') {
-        await recordError(keyId);
+        if (isPermanentError) {
+          // Bad credential: increment error count (may lead to deactivation)
+          console.warn(`[key-rotator] Permanent credential error on key ${keyId}. Recording error.`);
+          await recordError(keyId);
+        } else if (isRateLimit) {
+          // Transient quota: just update last_error_at without penalizing
+          console.warn(`[key-rotator] Rate-limit on key ${keyId}. NOT penalizing — will rotate.`);
+          try {
+            const sql = getDb();
+            await sql`UPDATE api_keys SET last_error_at = NOW() WHERE id = ${keyId}`;
+          } catch { /* non-critical */ }
+        }
+        // Other errors (network, etc.): no DB update
       }
 
-      if (is429 && i < attempts.length - 1) {
-        // Rotate to next key transparently
+      if ((isRateLimit || !isPermanentError) && i < attempts.length - 1) {
+        // Rotate to next key transparently for rate-limits and transient errors
         console.warn(
-          `[key-rotator] Key #${i + 1} (${source}:${keyId ?? 'env'}) hit quota. ` +
-          `Rotating to key #${i + 2}/${attempts.length}...`
+          `[key-rotator] Key #${i + 1} (${source}:${keyId ?? 'env'}) failed (${
+            isRateLimit ? 'rate-limit' : 'transient'
+          }). Rotating to key #${i + 2}/${attempts.length}...`
         );
         continue;
       }
 
-      // Non-quota error or no more keys — throw immediately
+      // Permanent error or no more keys — throw immediately
       throw err;
     }
   }

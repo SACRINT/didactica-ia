@@ -10,6 +10,11 @@
  * Supports two tiers:
  *   - Standard (docentes): active_provider / active_model  → gemini-3.5-flash-lite by default
  *   - Premium  (admins / authorized users): admin_provider / admin_model → configurable
+ *
+ * Multi-provider fallback (v2):
+ *   If the primary provider pool is exhausted, the orchestrator automatically
+ *   tries alternative providers that have keys configured in the DB.
+ *   Fallback order: openrouter → mistral → openai → claude → gemini (excluding primary)
  */
 
 import { neon } from '@neondatabase/serverless';
@@ -26,6 +31,21 @@ export const DEFAULT_STANDARD_MODEL = 'gemini-3.5-flash-lite';
 export const DEFAULT_STANDARD_PROVIDER = 'gemini';
 export const DEFAULT_PREMIUM_MODEL = 'gemini-3.5-flash-lite';
 export const DEFAULT_PREMIUM_PROVIDER = 'gemini';
+
+// ── Fallback provider order (excludes primary, tried in sequence) ────────────
+// Prioritizes free-tier / low-cost providers first
+const FALLBACK_PROVIDER_ORDER = ['openrouter', 'mistral', 'openai', 'claude', 'gemini'];
+
+// ── Default models per provider for fallback calls ───────────────────────────
+const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
+  gemini:     'gemini-3.5-flash-lite',
+  claude:     'claude-haiku-4-5',
+  openai:     'gpt-4o-mini',
+  nvidia:     'meta/llama-3.1-70b-instruct',
+  qwen:       'qwen-turbo',
+  mistral:    'mistral-small-latest',
+  openrouter: 'meta-llama/llama-3.1-8b-instruct:free',
+};
 
 // ── Read active provider config from DB ──────────────────────────────────────
 
@@ -63,6 +83,26 @@ async function getActiveConfig(isPremium = false): Promise<ActiveConfig> {
     // Fallback if DB is unavailable
     if (isPremium) return { provider: DEFAULT_PREMIUM_PROVIDER, model: DEFAULT_PREMIUM_MODEL };
     return { provider: DEFAULT_STANDARD_PROVIDER, model: DEFAULT_STANDARD_MODEL };
+  }
+}
+
+/**
+ * Returns providers (other than the given primary) that have active keys in DB.
+ * Used for multi-provider fallback orchestration.
+ */
+async function getAlternativeProviders(primaryProvider: string): Promise<string[]> {
+  try {
+    if (!process.env.DATABASE_URL) return [];
+    const sql = neon(process.env.DATABASE_URL);
+    const rows = await sql`
+      SELECT DISTINCT provider FROM api_keys
+      WHERE is_active = true AND provider != ${primaryProvider}
+    `;
+    const availableProviders = new Set(rows.map((r: any) => r.provider as string));
+    // Return in fallback order, only those with active keys
+    return FALLBACK_PROVIDER_ORDER.filter(p => p !== primaryProvider && availableProviders.has(p));
+  } catch {
+    return [];
   }
 }
 
@@ -124,7 +164,10 @@ export async function getAIProvider(isPremium = false): Promise<AIProvider> {
 
 /**
  * Generates text with automatic key rotation on quota errors.
- * If teacherId is provided, the teacher's own API key (if configured) is used first.
+ * If the primary provider pool is exhausted, falls back to alternative providers
+ * that have keys configured in the DB (multi-provider orchestration).
+ *
+ * Priority: teacher's own key → primary pool → alternative providers
  * @param isPremium - set true for admins or premium-authorized users
  */
 export async function generateWithRotation(
@@ -135,15 +178,53 @@ export async function generateWithRotation(
 ): Promise<string> {
   const { provider, model } = await getActiveConfig(isPremium);
 
-  return withKeyRotation(provider, async (apiKey) => {
-    const ai = buildProvider(provider, model, apiKey);
-    return ai.generate(systemPrompt, userPrompt);
-  }, teacherId);
+  // Try primary provider first (with full key rotation)
+  try {
+    return await withKeyRotation(provider, async (apiKey) => {
+      const ai = buildProvider(provider, model, apiKey);
+      return ai.generate(systemPrompt, userPrompt);
+    }, teacherId);
+  } catch (primaryErr: any) {
+    console.warn(
+      `[ai-provider] Primary provider "${provider}" pool exhausted. ` +
+      `Trying alternative providers...`
+    );
+
+    // Try alternative providers in fallback order
+    const alternatives = await getAlternativeProviders(provider);
+    for (const altProvider of alternatives) {
+      const altModel = DEFAULT_MODEL_BY_PROVIDER[altProvider] || 'gpt-4o-mini';
+      try {
+        const result = await withKeyRotation(altProvider, async (apiKey) => {
+          const ai = buildProvider(altProvider, altModel, apiKey);
+          return ai.generate(systemPrompt, userPrompt);
+        });
+        console.log(`[ai-provider] ✅ Fallback provider "${altProvider}" (${altModel}) succeeded.`);
+        return result;
+      } catch (altErr: any) {
+        console.warn(
+          `[ai-provider] Fallback provider "${altProvider}" also failed: ${altErr.message}`
+        );
+      }
+    }
+
+    // All providers exhausted — throw descriptive error
+    throw new Error(
+      `[ai-provider] All AI providers exhausted. Primary: ${provider}. ` +
+      `Alternatives tried: ${alternatives.join(', ') || 'none available'}. ` +
+      `Original error: ${primaryErr.message}`
+    );
+  }
 }
 
 /**
  * Generates a stream with automatic key rotation on quota errors.
  * Returns an AsyncGenerator<string>.
+ *
+ * NOTE: Multi-provider fallback is not supported for streams because a stream
+ * must stay connected to a single provider connection. The key-rotator will
+ * still rotate through all keys of the primary provider.
+ *
  * @param isPremium - set true for admins or premium-authorized users
  */
 export async function* generateStreamWithRotation(

@@ -47,9 +47,9 @@ const STANDARD_MODELS: Record<string, { id: string; label: string }[]> = {
   qwen:    [{ id: 'qwen-turbo', label: 'qwen-turbo — Free tier' }],
   mistral: [{ id: 'mistral-small-latest', label: 'mistral-small-latest — Free tier' }],
   openrouter: [
-    { id: 'google/gemini-2.0-flash-exp:free', label: 'gemini-2.0-flash-exp — Gratis (OpenRouter)' },
     { id: 'meta-llama/llama-3.1-8b-instruct:free', label: 'llama-3.1-8b — Gratis (OpenRouter)' },
     { id: 'mistralai/mistral-7b-instruct:free', label: 'mistral-7b — Gratis (OpenRouter)' },
+    { id: 'deepseek/deepseek-r1:free', label: 'deepseek-r1 — Gratis (OpenRouter)' },
   ],
 };
 
@@ -85,10 +85,9 @@ const PREMIUM_MODELS: Record<string, { id: string; label: string }[]> = {
     { id: 'mistral-large-latest', label: 'mistral-large-latest — API de paga' },
   ],
   openrouter: [
-    { id: 'google/gemini-2.0-flash-exp:free',          label: 'gemini-2.0-flash-exp — Gratis' },
     { id: 'meta-llama/llama-3.1-8b-instruct:free',     label: 'llama-3.1-8b — Gratis' },
     { id: 'mistralai/mistral-7b-instruct:free',        label: 'mistral-7b — Gratis' },
-    { id: 'google/gemini-2.5-flash',                   label: 'gemini-2.5-flash — De paga' },
+    { id: 'deepseek/deepseek-r1:free',                 label: 'deepseek-r1 — Gratis' },
     { id: 'anthropic/claude-sonnet-4-5',               label: 'claude-sonnet-4-5 — De paga' },
     { id: 'openai/gpt-4o',                             label: 'gpt-4o — De paga' },
   ],
