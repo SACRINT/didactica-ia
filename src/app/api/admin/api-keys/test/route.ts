@@ -78,13 +78,35 @@ async function pingProvider(provider: string, model: string, apiKey: string): Pr
       return { ok: true, latencyMs, model, message: text.trim() || 'OK' };
     }
 
-    // OpenAI-compatible (openai, nvidia, qwen, mistral, openrouter)
+    // OpenRouter: validate key using /api/v1/auth/key (no tokens consumed)
+    if (provider === 'openrouter') {
+      const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://didactica-ia.vercel.app',
+          'X-Title': 'DidacteCA',
+        },
+        signal: AbortSignal.timeout(12000),
+      });
+      const latencyMs = Date.now() - t0;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const errMsg = err?.error?.message || `HTTP ${res.status} - Llave inválida`;
+        return { ok: false, latencyMs, model: 'openrouter/auth', message: errMsg };
+      }
+      const data = await res.json();
+      const label = data?.data?.label || 'API Key válida';
+      const credits = data?.data?.usage !== undefined ? ` | Uso: $${(data.data.usage / 1000000).toFixed(4)}` : '';
+      return { ok: true, latencyMs, model: 'openrouter/auth', message: `${label}${credits}` };
+    }
+
+    // OpenAI-compatible (openai, nvidia, qwen, mistral)
     const BASE_URLS: Record<string, string> = {
-      openai:     'https://api.openai.com/v1',
-      nvidia:     'https://integrate.api.nvidia.com/v1',
-      qwen:       'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      mistral:    'https://api.mistral.ai/v1',
-      openrouter: 'https://openrouter.ai/api/v1',
+      openai:  'https://api.openai.com/v1',
+      nvidia:  'https://integrate.api.nvidia.com/v1',
+      qwen:    'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      mistral: 'https://api.mistral.ai/v1',
     };
     const baseURL = BASE_URLS[provider] || BASE_URLS.openai;
     const res = await fetch(`${baseURL}/chat/completions`, {
@@ -92,7 +114,6 @@ async function pingProvider(provider: string, model: string, apiKey: string): Pr
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        ...(provider === 'openrouter' ? { 'HTTP-Referer': 'https://didacteca.vercel.app', 'X-Title': 'Didacteca' } : {}),
       },
       body: JSON.stringify({
         model,
@@ -146,7 +167,7 @@ export async function POST(req: NextRequest) {
               row.provider === 'openai'     ? 'gpt-4o-mini' :
               row.provider === 'mistral'    ? 'mistral-small-latest' :
               row.provider === 'nvidia'     ? 'meta/llama-3.1-70b-instruct' :
-              row.provider === 'openrouter' ? 'mistralai/mistral-7b-instruct:free' :
+              row.provider === 'openrouter' ? 'openrouter/auth' :
               'gpt-4o-mini'
             );
             const result = await pingProvider(row.provider, model, apiKey);
@@ -178,7 +199,7 @@ export async function POST(req: NextRequest) {
       row.provider === 'openai'     ? 'gpt-4o-mini' :
       row.provider === 'mistral'    ? 'mistral-small-latest' :
       row.provider === 'nvidia'     ? 'meta/llama-3.1-70b-instruct' :
-      row.provider === 'openrouter' ? 'mistralai/mistral-7b-instruct:free' :
+      row.provider === 'openrouter' ? 'openrouter/auth' :
       'gpt-4o-mini'
     );
 
