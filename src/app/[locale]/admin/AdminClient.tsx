@@ -140,6 +140,11 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [seedingPrompts, setSeedingPrompts] = useState(false);
 
+  // Key test states
+  const [keyTestResults, setKeyTestResults] = useState<Record<string, { ok: boolean; latencyMs: number; message: string }>>({});
+  const [testingKeys, setTestingKeys] = useState<Set<string>>(new Set());
+  const [testingAll, setTestingAll] = useState(false);
+
   // ── Data fetchers ────────────────────────────────────────────────────────
 
   const showMsg = (text: string, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 4000); };
@@ -213,6 +218,45 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
       fetch('/api/admin/api-keys', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: swap.id, priority: sorted[idx].priority }) }),
     ]);
     loadKeys();
+  }
+
+  async function testKey(id: string) {
+    setTestingKeys(prev => new Set(prev).add(id));
+    try {
+      const res = await fetch('/api/admin/api-keys/test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      setKeyTestResults(prev => ({ ...prev, [id]: { ok: data.ok, latencyMs: data.latencyMs, message: data.message } }));
+    } catch {
+      setKeyTestResults(prev => ({ ...prev, [id]: { ok: false, latencyMs: 0, message: 'Error de red' } }));
+    } finally {
+      setTestingKeys(prev => { const s = new Set(prev); s.delete(id); return s; });
+    }
+  }
+
+  async function testAllKeys() {
+    setTestingAll(true);
+    setKeyTestResults({});
+    try {
+      const res = await fetch('/api/admin/api-keys/test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testAll: true }),
+      });
+      const data = await res.json();
+      if (data.results) {
+        const map: Record<string, { ok: boolean; latencyMs: number; message: string }> = {};
+        for (const r of data.results) map[r.id] = { ok: r.ok, latencyMs: r.latencyMs, message: r.message };
+        setKeyTestResults(map);
+        const ok = data.results.filter((r: any) => r.ok).length;
+        showMsg(`${ok}/${data.results.length} keys funcionando`, ok === data.results.length);
+      }
+    } catch {
+      showMsg('Error al probar las keys', false);
+    } finally {
+      setTestingAll(false);
+    }
   }
 
   async function toggleUser(teacherId: string, isBlocked: boolean) {
@@ -577,66 +621,131 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
             {keys.length === 0 ? (
               <div className="empty-state">No hay API Keys configuradas.<br/>Agrega tu primera key arriba.</div>
             ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Prioridad</th><th>Proveedor</th><th>Etiqueta</th><th>Key</th>
-                    <th>Estado</th><th>Usos</th><th>Errores</th><th>Último uso</th><th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...keys].sort((a, b) => a.priority - b.priority).map((k, idx) => (
-                    <tr key={k.id}>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn-sm btn-ghost" onClick={() => movePriority(k.id, 'up')} disabled={idx === 0}>↑</button>
-                          <span style={{ color: '#818cf8', fontWeight: 700 }}>#{k.priority}</span>
-                          <button className="btn-sm btn-ghost" onClick={() => movePriority(k.id, 'down')} disabled={idx === keys.length - 1}>↓</button>
-                        </div>
-                      </td>
-                      <td><span className="badge badge-blue">{k.provider}</span></td>
-                      <td>
-                        {editLabelId === k.id ? (
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <input
-                              value={editLabelValue}
-                              onChange={e => setEditLabelValue(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') saveKeyLabel(k.id); if (e.key === 'Escape') setEditLabelId(null); }}
-                              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #6366f1', borderRadius: 6, padding: '4px 8px', color: '#f0f4ff', fontSize: 12, width: 180 }}
-                              autoFocus
-                            />
-                            <button className="btn-sm btn-primary" onClick={() => saveKeyLabel(k.id)}>✓</button>
-                            <button className="btn-sm btn-ghost" onClick={() => setEditLabelId(null)}>✗</button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span>{k.label}</span>
-                            <button className="btn-sm btn-ghost" style={{ fontSize: 10, padding: '3px 8px' }}
-                              onClick={() => { setEditLabelId(k.id); setEditLabelValue(k.label); }}>✏️</button>
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ fontFamily: 'monospace', color: '#facc15' }}>{k.key_preview}</td>
-                      <td>
-                        <span className={`badge ${k.is_active ? 'badge-green' : 'badge-yellow'}`}>
-                          {k.is_active ? '✓ Activa' : '⏸ Inactiva'}
-                        </span>
-                      </td>
-                      <td>{k.usage_count}</td>
-                      <td style={{ color: k.error_count > 0 ? '#f87171' : 'inherit' }}>{k.error_count}</td>
-                      <td style={{ fontSize: 11 }}>{relativeTime(k.last_used_at)}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn-sm btn-ghost" onClick={() => toggleKey(k.id, !k.is_active)}>
-                            {k.is_active ? 'Pausar' : 'Activar'}
-                          </button>
-                          <button className="btn-sm btn-danger" onClick={() => deleteKey(k.id)}>🗑️</button>
-                        </div>
-                      </td>
+              <>
+                {/* Header bar with Test All button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+                    🔑 {keys.length} {keys.length === 1 ? 'key registrada' : 'keys registradas'}
+                  </span>
+                  <button
+                    className="btn-sm btn-primary"
+                    onClick={testAllKeys}
+                    disabled={testingAll}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', fontSize: 13 }}
+                  >
+                    {testingAll ? (
+                      <><span style={{ display: 'inline-block', width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Probando todas...</>
+                    ) : (
+                      <>🔬 Probar Todas las Llaves</>
+                    )}
+                  </button>
+                </div>
+
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Prioridad</th><th>Proveedor</th><th>Etiqueta</th><th>Key</th>
+                      <th>Estado</th><th>Usos</th><th>Errores</th><th>Último uso</th>
+                      <th>Resultado Prueba</th><th>Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {[...keys].sort((a, b) => a.priority - b.priority).map((k, idx) => {
+                      const testRes = keyTestResults[k.id];
+                      const isTesting = testingKeys.has(k.id);
+                      return (
+                        <tr key={k.id}>
+                          <td>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn-sm btn-ghost" onClick={() => movePriority(k.id, 'up')} disabled={idx === 0}>↑</button>
+                              <span style={{ color: '#818cf8', fontWeight: 700 }}>#{k.priority}</span>
+                              <button className="btn-sm btn-ghost" onClick={() => movePriority(k.id, 'down')} disabled={idx === keys.length - 1}>↓</button>
+                            </div>
+                          </td>
+                          <td><span className="badge badge-blue">{k.provider}</span></td>
+                          <td>
+                            {editLabelId === k.id ? (
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <input
+                                  value={editLabelValue}
+                                  onChange={e => setEditLabelValue(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') saveKeyLabel(k.id); if (e.key === 'Escape') setEditLabelId(null); }}
+                                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #6366f1', borderRadius: 6, padding: '4px 8px', color: '#f0f4ff', fontSize: 12, width: 180 }}
+                                  autoFocus
+                                />
+                                <button className="btn-sm btn-primary" onClick={() => saveKeyLabel(k.id)}>✓</button>
+                                <button className="btn-sm btn-ghost" onClick={() => setEditLabelId(null)}>✗</button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <span>{k.label}</span>
+                                <button className="btn-sm btn-ghost" style={{ fontSize: 10, padding: '3px 8px' }}
+                                  onClick={() => { setEditLabelId(k.id); setEditLabelValue(k.label); }}>✏️</button>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ fontFamily: 'monospace', color: '#facc15' }}>{k.key_preview}</td>
+                          <td>
+                            <span className={`badge ${k.is_active ? 'badge-green' : 'badge-yellow'}`}>
+                              {k.is_active ? '✓ Activa' : '⏸ Inactiva'}
+                            </span>
+                          </td>
+                          <td>{k.usage_count}</td>
+                          <td style={{ color: k.error_count > 0 ? '#f87171' : 'inherit' }}>{k.error_count}</td>
+                          <td style={{ fontSize: 11 }}>{relativeTime(k.last_used_at)}</td>
+
+                          {/* Test result cell */}
+                          <td style={{ minWidth: 130 }}>
+                            {isTesting ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                                <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#818cf8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                                Probando...
+                              </span>
+                            ) : testRes ? (
+                              <div>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  background: testRes.ok ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
+                                  border: `1px solid ${testRes.ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`,
+                                  borderRadius: 6, padding: '3px 8px', fontSize: 12,
+                                  color: testRes.ok ? '#4ade80' : '#f87171',
+                                }}>
+                                  {testRes.ok ? '✅' : '❌'}
+                                  {testRes.ok ? ` ${testRes.latencyMs}ms` : ''}
+                                </span>
+                                {!testRes.ok && (
+                                  <div style={{ fontSize: 10, color: '#f87171', marginTop: 3, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    title={testRes.message}>{testRes.message}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>—</span>
+                            )}
+                          </td>
+
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                className="btn-sm btn-ghost"
+                                onClick={() => testKey(k.id)}
+                                disabled={isTesting || testingAll}
+                                style={{ color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}
+                                title="Probar esta API Key"
+                              >
+                                {isTesting ? '...' : '🔬 Probar'}
+                              </button>
+                              <button className="btn-sm btn-ghost" onClick={() => toggleKey(k.id, !k.is_active)}>
+                                {k.is_active ? 'Pausar' : 'Activar'}
+                              </button>
+                              <button className="btn-sm btn-danger" onClick={() => deleteKey(k.id)}>🗑️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
             )}
           </>
         )}
