@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
               row.provider === 'openai'     ? 'gpt-4o-mini' :
               row.provider === 'mistral'    ? 'mistral-small-latest' :
               row.provider === 'nvidia'     ? 'meta/llama-3.1-70b-instruct' :
-              row.provider === 'openrouter' ? 'meta-llama/llama-3.1-8b-instruct:free' :
+              row.provider === 'openrouter' ? 'mistralai/mistral-7b-instruct:free' :
               'gpt-4o-mini'
             );
             const result = await pingProvider(row.provider, model, apiKey);
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
       row.provider === 'openai'     ? 'gpt-4o-mini' :
       row.provider === 'mistral'    ? 'mistral-small-latest' :
       row.provider === 'nvidia'     ? 'meta/llama-3.1-70b-instruct' :
-      row.provider === 'openrouter' ? 'meta-llama/llama-3.1-8b-instruct:free' :
+      row.provider === 'openrouter' ? 'mistralai/mistral-7b-instruct:free' :
       'gpt-4o-mini'
     );
 

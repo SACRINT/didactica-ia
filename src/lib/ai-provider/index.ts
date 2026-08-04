@@ -44,7 +44,7 @@ const DEFAULT_MODEL_BY_PROVIDER: Record<string, string> = {
   nvidia:     'meta/llama-3.1-70b-instruct',
   qwen:       'qwen-turbo',
   mistral:    'mistral-small-latest',
-  openrouter: 'meta-llama/llama-3.1-8b-instruct:free',
+  openrouter: 'mistralai/mistral-7b-instruct:free',
 };
 
 // ── Read active provider config from DB ──────────────────────────────────────
