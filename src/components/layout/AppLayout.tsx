@@ -171,6 +171,9 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         <Link href={`/${locale}/mis-escuelas`} className={`sidebar-link ${activeSection === 'mis-escuelas' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">🏫</span>Mis Escuelas
         </Link>
+        <Link href={`/${locale}/horarios`} className={`sidebar-link ${activeSection === 'horarios' ? 'active' : ''}`}>
+          <span className="sidebar-link-icon">📅</span>Horarios IA (Directores)
+        </Link>
 
         {/* Admin section — visible only for admins */}
         {isAdmin && (
