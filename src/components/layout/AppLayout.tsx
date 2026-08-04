@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { neon } from '@neondatabase/serverless';
 import { signOutAction, signOutPlain } from '@/lib/server-actions';
 import SignOutButton from './SignOutButton';
+import HeartbeatSender from './HeartbeatSender';
+import PedagogicalChatWidget from '../PedagogicalChatWidget';
 
 type Props = {
   children: React.ReactNode;
@@ -186,6 +188,8 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
 
       {/* Main */}
       <main className="app-main">
+        <HeartbeatSender />
+        <PedagogicalChatWidget />
         {children}
       </main>
     </div>

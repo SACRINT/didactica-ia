@@ -20,7 +20,7 @@ interface Stats {
 interface Teacher {
   id: string; name: string; email: string; school_name: string;
   planning_count: number; paec_count: number; pmc_count: number;
-  doc_count: number; last_active: string | null; is_blocked: boolean;
+  doc_count: number; last_active: string | null; last_seen_at?: string | null; is_blocked: boolean;
   role: string; is_premium: boolean;
 }
 interface Prompt { id: string; label: string; content: string; is_active: boolean; updated_at: string; updated_by: string | null; }
@@ -102,6 +102,12 @@ const MODELS = PREMIUM_MODELS;
 function isRecentlyActive(lastActive: string | null): boolean {
   if (!lastActive) return false;
   return (Date.now() - new Date(lastActive).getTime()) < 30 * 60 * 1000;
+}
+
+/** A user is considered "online" (connected right now) if heartbeat received in last 5 min */
+function isUserOnline(lastSeenAt?: string | null): boolean {
+  if (!lastSeenAt) return false;
+  return (Date.now() - new Date(lastSeenAt).getTime()) < 5 * 60 * 1000;
 }
 
 function relativeTime(dateStr: string | null): string {
@@ -858,9 +864,13 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       <td>{t.doc_count}</td>
                       <td style={{ fontSize: 11 }}>
                         {relativeTime(t.last_active)}
-                        {isRecentlyActive(t.last_active) && (
-                          <span style={{ marginLeft: 6, display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 4px #4ade80', verticalAlign: 'middle' }} title="Activo ahora (últimos 30 min)" />
-                        )}
+                        {isUserOnline(t.last_seen_at) ? (
+                          <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80', borderRadius: 12, padding: '2px 6px', fontSize: 10, fontWeight: 600 }} title="Conectado en este momento">
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} /> En línea
+                          </span>
+                        ) : isRecentlyActive(t.last_active) ? (
+                          <span style={{ marginLeft: 6, display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#fbbf24', opacity: 0.8, verticalAlign: 'middle' }} title="Reciente (últimos 30 min)" />
+                        ) : null}
                       </td>
                       <td><span className={`badge ${t.is_blocked ? 'badge-red' : 'badge-green'}`}>{t.is_blocked ? 'Bloqueado' : 'Habilitado'}</span></td>
                       <td>
