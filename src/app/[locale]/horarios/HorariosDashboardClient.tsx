@@ -10,25 +10,35 @@ import toast from 'react-hot-toast';
 interface Props {
   isDirector: boolean;
   teacherName: string;
+  teacherId: string;
+  schoolName: string;
+  cct: string;
 }
 
-export default function HorariosDashboardClient({ isDirector, teacherName }: Props) {
+export default function HorariosDashboardClient({
+  isDirector,
+  teacherName,
+  teacherId,
+  schoolName,
+  cct,
+}: Props) {
   const [loading, setLoading] = useState<boolean>(true);
   const [modo, setModo] = useState<'WIZARD' | 'EDITOR'>('WIZARD');
   const [pasoActual, setPasoActual] = useState<number>(1);
   const [mapaModalAbierto, setMapaModalAbierto] = useState<boolean>(false);
 
-  const escuela = {
-    id: 'didactica_plantel_1',
-    cct: '21EBH0001X',
-    nombre: 'Plantel DidactecaIA Puebla',
+  // escuela construida con datos reales del teacher (ID real, no hardcodeado)
+  const escuelaBase = {
+    id: teacherId,
+    cct,
+    nombre: schoolName,
     gruposPrimerAno: 1,
     gruposSegundoAno: 1,
     gruposTercerAno: 1,
-    mapaCurricularCompletado: true
+    mapaCurricularCompletado: false,
   };
 
-  const [escuelaState, setEscuelaState] = useState<any>(escuela);
+  const [escuelaState, setEscuelaState] = useState<any>(escuelaBase);
   const [config, setConfig] = useState<any>(null);
   const [grupos, setGrupos] = useState<any[]>([]);
   const [aulas, setAulas] = useState<any[]>([]);
@@ -42,16 +52,22 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
     } else {
       setLoading(false);
     }
-  }, [isDirector]);
+  }, [isDirector, teacherId]);
 
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/horarios/configuracion?escuelaId=${escuela.id}`);
+      const res = await fetch(`/api/horarios/configuracion?escuelaId=${teacherId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
       if (data.escuela) {
         setEscuelaState(data.escuela);
+        // ── Abrir modal de mapa curricular automáticamente si no está completo ──
+        // (replica la lógica de SISAT-ATP)
+        if (data.escuela.mapaCurricularCompletado === false) {
+          setMapaModalAbierto(true);
+        }
       }
       if (data.config) setConfig(data.config);
       if (data.grupos) setGrupos(data.grupos);
@@ -61,11 +77,11 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
       if (data.cargas) {
         const cargasNormalizadas = data.cargas.map((c: any) => ({
           grupoId: c.grupoId,
-          asignaturaId: c.asignaturaId,
-          uacName: c.asignatura?.uacName || c.uacName || '',
+          asignaturaId: c.asignaturaId || c.uacName,
+          uacName: c.uacName || '',
           personalId: c.personalId,
           horasSemanales: c.horasSemanales,
-          requiereAulaEspecial: c.requiereAulaEspecial || false
+          requiereAulaEspecial: c.requiereAulaEspecial || false,
         }));
         setCargas(cargasNormalizadas);
       }
@@ -76,7 +92,8 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
         setPasoActual(4);
       } else {
         setModo('WIZARD');
-        setPasoActual(1);
+        // Si ya hay grupos guardados, ir al paso 2; si no, paso 1
+        setPasoActual(data.grupos?.length > 0 ? 2 : 1);
       }
     } catch (e) {
       console.error('Error cargando configuración de horarios:', e);
@@ -98,9 +115,9 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
             docentes,
             aulas: aulas.length > 0 ? aulas : [{ id: 'aula-gen', nombre: 'Aula General', tipo: 'REGULAR' }],
             cargas,
-            config: config || { horasPorDia: 6, diasLectivos: 5 }
-          }
-        })
+            config: config || { horasPorDia: 6, diasLectivos: 5 },
+          },
+        }),
       });
 
       const data = await res.json();
@@ -121,13 +138,11 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
   };
 
   const handleEliminarHorario = async () => {
-    if (!confirm(`¿Estás SEGURO de eliminar el horario generado? Volverá al asistente de configuración.`)) return;
+    if (!confirm('¿Estás SEGURO de eliminar el horario generado? Volverá al asistente de configuración.')) return;
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/horarios/generar?escuelaId=${escuela.id}`, {
-        method: 'DELETE'
-      });
+      const res = await fetch(`/api/horarios/generar?escuelaId=${teacherId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         toast.success('Horario generado eliminado exitosamente.');
@@ -152,19 +167,17 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
   };
 
   const handleReiniciarMapaCurricular = async () => {
-    if (!confirm('¿Estás SEGURO de reiniciar la configuración de horarios para este plantel?')) return;
+    if (!confirm('¿Estás SEGURO de reiniciar completamente el Mapa Curricular? Se borrará la estructura de grupos previa.')) return;
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/escuelas/${escuela.id}/mapa-curricular`, {
-        method: 'DELETE'
-      });
+      const res = await fetch(`/api/escuelas/${teacherId}/mapa-curricular`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success('Configuración reiniciada correctamente.');
-        try {
-          localStorage.removeItem(`horarios_wizard_v4_${escuela.id}`);
-        } catch (err) {}
+        try { localStorage.removeItem(`horarios_wizard_v4_${teacherId}`); } catch {}
+        setEscuelaState((prev: any) => ({ ...prev, mapaCurricularCompletado: false }));
+        setMapaModalAbierto(true);
         cargarDatos();
       } else {
         toast.error(data.error || 'Error al reiniciar la configuración.');
@@ -176,16 +189,20 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
     }
   };
 
+  // ── Pantalla de acceso restringido ─────────────────────────────────
   if (!isDirector) {
     return (
       <div style={{
         background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-        borderRadius: 12, padding: 24, textAlign: 'center', margin: '40px auto', maxWidth: 600
+        borderRadius: 12, padding: 24, textAlign: 'center', margin: '40px auto', maxWidth: 600,
       }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fca5a5', marginBottom: 8 }}>Acceso Exclusivo para Directores y Supervisión</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fca5a5', marginBottom: 8 }}>
+          Acceso Exclusivo para Directores y Supervisión
+        </h2>
         <p style={{ fontSize: 14, opacity: 0.8, lineHeight: 1.5 }}>
-          Hola {teacherName}, esta herramienta está diseñada para la confección del horario escolar del plantel. Si eres Director, Supervisor o ATP y requieres acceso, solicita la actualización de tu rol en el panel administrativo.
+          Hola {teacherName}, esta herramienta está diseñada para la confección del horario escolar del plantel.
+          Si eres Director, Supervisor o ATP y requieres acceso, solicita la actualización de tu rol en el panel administrativo.
         </p>
       </div>
     );
@@ -204,18 +221,22 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Top Controls */}
+
+      {/* ── Header ───────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: '1rem', background: '#0f172a', padding: '1rem 1.25rem',
-        borderRadius: '14px', border: '1px solid #334155'
+        borderRadius: '14px', border: '1px solid #334155',
       }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-            <Calendar style={{ width: '22px', height: '22px', color: '#38bdf8' }} /> Asistente Interactivo de Horarios MCCEMS 2026-2027
+            <Calendar style={{ width: '22px', height: '22px', color: '#38bdf8' }} />
+            Asistente Interactivo de Horarios MCCEMS 2026-2027
           </h2>
           <p style={{ fontSize: '0.78125rem', color: '#94a3b8', margin: '0.25rem 0 0' }}>
-            {escuelaState?.nombre || escuela.nombre} ({escuelaState?.cct || escuela.cct}) · Confección semiautomática sin empalmes
+            {escuelaState?.nombre || schoolName}
+            {(escuelaState?.cct || cct) !== 'SIN CCT' && ` (${escuelaState?.cct || cct})`}
+            {' '}· Confección semiautomática sin empalmes
           </p>
         </div>
 
@@ -225,7 +246,7 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
             style={{
               background: 'linear-gradient(135deg, #10b981, #059669)', color: '#ffffff',
               padding: '0.45rem 0.85rem', borderRadius: '8px', fontWeight: 800, fontSize: '0.78125rem',
-              border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem'
+              border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
             }}
           >
             ⚙️ Configurar Mapa Curricular
@@ -236,7 +257,7 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
             style={{
               background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5',
               padding: '0.45rem 0.85rem', borderRadius: '8px', fontWeight: 800, fontSize: '0.78125rem',
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem'
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
             }}
           >
             🔄 Reiniciar Configuración
@@ -248,7 +269,7 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
               style={{
                 background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5',
                 padding: '0.45rem 0.85rem', borderRadius: '8px', fontWeight: 800, fontSize: '0.78125rem',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
               }}
             >
               🗑️ Eliminar Horario Generado
@@ -257,11 +278,11 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
         </div>
       </div>
 
-      {/* Stepper Principal */}
+      {/* ── Stepper ──────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#1e293b', border: '1px solid #334155', borderRadius: '14px',
-        padding: '0.75rem 1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+        padding: '0.75rem 1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginRight: '0.5rem' }}>
@@ -271,7 +292,7 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
             { num: 1, label: '1. Estructura & Currículum' },
             { num: 2, label: '2. Plantilla Docente' },
             { num: 3, label: '3. Matriz por Semestre' },
-            { num: 4, label: '4. Horario Generado (IA)' }
+            { num: 4, label: '4. Horario Generado (IA)' },
           ].map((step) => {
             const esActivo = pasoActual === step.num;
             const esCompletado = step.num < pasoActual || (step.num === 4 && !!horario);
@@ -284,15 +305,10 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
                 disabled={esDeshabilitado}
                 onClick={() => {
                   if (step.num === 4) {
-                    if (horario) {
-                      setModo('EDITOR');
-                      setPasoActual(4);
-                    } else {
-                      toast.error('Aún no se ha generado un horario. Complete los pasos 1-3 y haga clic en Generar.');
-                    }
+                    if (horario) { setModo('EDITOR'); setPasoActual(4); }
+                    else toast.error('Aún no se ha generado un horario. Complete los pasos 1-3.');
                   } else {
-                    setModo('WIZARD');
-                    setPasoActual(step.num);
+                    setModo('WIZARD'); setPasoActual(step.num);
                   }
                 }}
                 style={{
@@ -302,7 +318,7 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
                   background: esActivo ? '#2563eb' : esCompletado ? '#334155' : 'transparent',
                   color: esActivo ? '#ffffff' : esDeshabilitado ? '#64748b' : '#cbd5e1',
                   opacity: esDeshabilitado ? 0.6 : 1, transition: 'all 0.2s',
-                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem'
+                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
                 }}
               >
                 {step.num === 4 && horario ? '✨ ' : ''}{step.label}
@@ -312,11 +328,11 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
         </div>
       </div>
 
-      {/* Main Content View */}
+      {/* ── Contenido principal ───────────────────────────────────────── */}
       {modo === 'WIZARD' ? (
         <WizardConfiguracion
-          escuelaId={escuela.id}
-          configInicial={config}
+          escuelaId={teacherId}
+          configInicial={config ? { ...config, escuela: escuelaState } : null}
           gruposIniciales={grupos}
           aulasIniciales={aulas}
           docentesIniciales={docentes}
@@ -327,7 +343,7 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
         />
       ) : (
         <EditorHorarios
-          escuela={escuela}
+          escuela={escuelaState || escuelaBase}
           horarioInicial={horario}
           grupos={grupos}
           docentes={docentes}
@@ -338,14 +354,17 @@ export default function HorariosDashboardClient({ isDirector, teacherName }: Pro
         />
       )}
 
-      {/* Modal de Configuración de Mapa Curricular */}
+      {/* ── Modal Mapa Curricular ─────────────────────────────────────── */}
       <ModalConfiguracionMapaCurricular
-        escuela={escuelaState || escuela}
+        escuela={escuelaState || escuelaBase}
         gruposIniciales={grupos}
         isOpen={mapaModalAbierto}
         onClose={() => setMapaModalAbierto(false)}
-        onSaved={cargarDatos}
-        forceObligatorio={false}
+        onSaved={() => {
+          setMapaModalAbierto(false);
+          cargarDatos();
+        }}
+        forceObligatorio={!escuelaState?.mapaCurricularCompletado}
       />
     </div>
   );

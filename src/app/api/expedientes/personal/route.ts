@@ -14,23 +14,31 @@ export async function GET(req: NextRequest) {
 
     // Fetch teachers from database
     const rows = await sql()`
-      SELECT id, name as nombre, '' as "apellidoPaterno", '' as "apellidoMaterno", email, role as cargo
+      SELECT id::text, name as nombre, email, role as cargo
       FROM teachers
       ORDER BY name ASC
     `;
 
-    // Split name into first and last name if possible for display
+    // Map data to personal format
     const personal = rows.map((t: any) => {
       const parts = (t.nombre || '').trim().split(' ');
       const nombre = parts[0] || '';
       const apellidoPaterno = parts.slice(1).join(' ') || '';
+      
+      const cargoMap: Record<string, string> = {
+        'director': 'DIRECTOR',
+        'administrador': 'ADMINISTRATIVO',
+        'docente': 'DOCENTE'
+      };
+
       return {
         id: t.id,
-        nombre: nombre,
-        apellidoPaterno: apellidoPaterno,
+        nombre,
+        apellidoPaterno,
         apellidoMaterno: '',
-        cargo: t.cargo === 'director' ? 'DIRECTOR' : t.cargo === 'administrador' ? 'ADMINISTRATIVO' : 'DOCENTE',
-        horasAsignadas: 20
+        cargo: cargoMap[t.cargo as string] || 'DOCENTE',
+        horasOficiales: 20,
+        horasAsignadas: 20,
       };
     });
 

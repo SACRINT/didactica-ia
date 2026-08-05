@@ -85,13 +85,17 @@ export default function WizardConfiguracion({
     }
   }, [configInicial, escuelaId]);
 
-  // ─── PRIORIDAD ABSOLUTA BD: Los grupos de la BD recargan y generan los grupos completos ───
+  // ─── INICIALIZACIÓN: Cargar grupos desde BD o generar defaults si BD está vacía ───
+  // Se ejecuta solo UNA vez al montar (o cuando cambia escuelaId)
+  // - Si hay gruposIniciales (BD), los carga y activa el flag.
+  // - Si NO hay gruposIniciales (primera vez), genera la estructura con los valores actuales.
   useEffect(() => {
-    if (gruposIniciales && gruposIniciales.length > 0) {
+    if (!inicializadoDesdeBD) {
       generarGruposSegunEstructura(g1, g2, g3);
       setInicializadoDesdeBD(true);
     }
-  }, [gruposIniciales, escuelaId, g1, g2, g3]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escuelaId, gruposIniciales]);
 
   // Modo de Configuración: Semiautomático (SEP General) vs Manual Libre (Tecnológicos)
   const [modoConfiguracion, setModoConfiguracion] = useState<"SEMIAUTOMATICO" | "MANUAL_TECNOLOGICO">("SEMIAUTOMATICO");
@@ -1002,9 +1006,9 @@ export default function WizardConfiguracion({
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-            <div style={{ background: "#eff6ff", padding: "1rem", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Users style={{ width: "15px", height: "15px", color: "#2563eb", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e3a5f", padding: "1rem", borderRadius: "12px", border: "1px solid #3b82f6" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#bfdbfe", marginBottom: "0.4rem" }}>
+                <Users style={{ width: "15px", height: "15px", color: "#60a5fa", display: "inline", marginRight: "5px" }} />
                 1.er Año ({periodoActivo === "A" ? "1.º Semestre" : "2.º Semestre"})
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1014,17 +1018,17 @@ export default function WizardConfiguracion({
                   max={20}
                   value={g1}
                   onChange={(e) => { setG1(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
-                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #2563eb", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b" }}
+                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b", background: "#ffffff" }}
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#1d4ed8" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#93c5fd" }}>
                   Genera {periodoActivo === "A" ? "1°" : "2°"} A a {periodoActivo === "A" ? "1°" : "2°"} {String.fromCharCode(64 + Math.min(g1, 26))}
                 </span>
               </div>
             </div>
 
-            <div style={{ background: "#eff6ff", padding: "1rem", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Users style={{ width: "15px", height: "15px", color: "#2563eb", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e3a5f", padding: "1rem", borderRadius: "12px", border: "1px solid #3b82f6" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#bfdbfe", marginBottom: "0.4rem" }}>
+                <Users style={{ width: "15px", height: "15px", color: "#60a5fa", display: "inline", marginRight: "5px" }} />
                 2.º Año ({periodoActivo === "A" ? "3.er Semestre" : "4.º Semestre"})
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1034,17 +1038,17 @@ export default function WizardConfiguracion({
                   max={20}
                   value={g2}
                   onChange={(e) => { setG2(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
-                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #2563eb", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b" }}
+                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b", background: "#ffffff" }}
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#1d4ed8" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#93c5fd" }}>
                   Genera {periodoActivo === "A" ? "3°" : "4°"} A a {periodoActivo === "A" ? "3°" : "4°"} {String.fromCharCode(64 + Math.min(g2, 26))}
                 </span>
               </div>
             </div>
 
-            <div style={{ background: "#eff6ff", padding: "1rem", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Users style={{ width: "15px", height: "15px", color: "#2563eb", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e3a5f", padding: "1rem", borderRadius: "12px", border: "1px solid #3b82f6" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#bfdbfe", marginBottom: "0.4rem" }}>
+                <Users style={{ width: "15px", height: "15px", color: "#60a5fa", display: "inline", marginRight: "5px" }} />
                 3.er Año ({periodoActivo === "A" ? "5.º Semestre" : "6.º Semestre"})
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1054,9 +1058,9 @@ export default function WizardConfiguracion({
                   max={20}
                   value={g3}
                   onChange={(e) => { setG3(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
-                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #2563eb", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b" }}
+                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b", background: "#ffffff" }}
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#1d4ed8" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#93c5fd" }}>
                   Genera {periodoActivo === "A" ? "5°" : "6°"} A a {periodoActivo === "A" ? "5°" : "6°"} {String.fromCharCode(64 + Math.min(g3, 26))}
                 </span>
               </div>

@@ -21,7 +21,10 @@ export default async function HorariosDashboardPage({
   const teacher = await getTeacherByEmail(session.user.email);
   if (!teacher) redirect(`/${locale}/login`);
 
-  const isDirector = ['administrador', 'director', 'supervisor', 'atp'].includes(teacher.role || 'docente') || session.user.email === process.env.ADMIN_EMAIL;
+  // Roles con acceso al módulo de horarios
+  const isDirector =
+    ['administrador', 'director', 'supervisor', 'atp'].includes(teacher.role || 'docente') ||
+    session.user.email === process.env.ADMIN_EMAIL;
 
   return (
     <AppLayout locale={locale} activeSection="horarios">
@@ -37,6 +40,9 @@ export default async function HorariosDashboardPage({
       <HorariosDashboardClient
         isDirector={isDirector}
         teacherName={teacher.name || 'Docente'}
+        teacherId={teacher.id}
+        schoolName={teacher.school_name || 'Mi Plantel'}
+        cct={teacher.cct || 'SIN CCT'}
       />
     </AppLayout>
   );

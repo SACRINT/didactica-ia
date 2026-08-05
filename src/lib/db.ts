@@ -19,7 +19,7 @@ export function sql(): NeonQueryFunction<false, false> {
 
 export async function getTeacherByEmail(email: string) {
   const rows = await sql()`
-    SELECT id, name, email, school_name, municipality, subsystem,
+    SELECT id, name, email, school_name, municipality, subsystem, cct,
            custom_api_key, custom_api_provider, role, created_at,
            profile_completed, school_locked
     FROM teachers
@@ -28,6 +28,7 @@ export async function getTeacherByEmail(email: string) {
   `;
   return rows[0] || null;
 }
+
 
 
 export async function updateTeacherKey(teacherId: string, customApiKey: string | null, customApiProvider: string | null) {
