@@ -10,7 +10,6 @@ export async function POST() {
     }
 
     const sql = neon(process.env.DATABASE_URL!);
-    await sql`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`.catch(() => {});
     await sql`UPDATE teachers SET last_seen_at = NOW() WHERE email = ${session.user.email}`;
 
     return NextResponse.json({ success: true, timestamp: new Date().toISOString() });

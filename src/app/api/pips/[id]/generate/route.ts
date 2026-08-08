@@ -10,6 +10,8 @@ import {
   getChunk2Prompt,
   getChunk3Prompt,
 } from '@/lib/prompts/pips-chunks';
+import { getUserLibraryContext } from '@/lib/context-extractor';
+import { getNormativaForGenerator } from '@/lib/normativa-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 180; // 3 minutos máximo en Next.js/Vercel
@@ -82,21 +84,33 @@ export async function POST(
     // ── Ejecución de la IA por Chunks (Secuencial con Rotación) ─────────────
     console.log(`[PIPS-Gen] Iniciando generación de PIPS para Zona 004 en 3 partes...`);
 
-    // PARTE 1
+    const libraryContext = await getUserLibraryContext(teacher.email);
+
+    // PARTE 1: Presentación + Fundamentación Normativa + Diagnóstico
+    // Inyectamos la normativa oficial en el Chunk 1, que incluye la sección
+    // "FUNDAMENTACIÓN NORMATIVA" del PIPS. El contexto de biblioteca complementa.
+    const normativaContext = await getNormativaForGenerator('pips');
     const prompt1 = getChunk1Prompt(row, plantelesData, totalAlumnos, totalPersonal);
-    const chunk1Result = await generateWithRotation(PIPS_SYSTEM_PROMPT, prompt1, teacher.id);
+
+    let prompt1WithCtx = prompt1;
+    if (normativaContext) prompt1WithCtx = `${normativaContext}\n\n${prompt1WithCtx}`;
+    if (libraryContext) prompt1WithCtx = `${libraryContext}\n\n${prompt1WithCtx}`;
+
+    const chunk1Result = await generateWithRotation(PIPS_SYSTEM_PROMPT, prompt1WithCtx, teacher.id);
     console.log(`[PIPS-Gen] Parte 1 generada exitosamente. Esperando cooldown...`);
     await sleep(1000); // 1s de cooldown para evitar RPM limits en la API Key
 
     // PARTE 2
     const prompt2 = getChunk2Prompt(row, chunk1Result);
-    const chunk2Result = await generateWithRotation(PIPS_SYSTEM_PROMPT, prompt2, teacher.id);
+    const prompt2WithCtx = libraryContext ? `${libraryContext}\n\n${prompt2}` : prompt2;
+    const chunk2Result = await generateWithRotation(PIPS_SYSTEM_PROMPT, prompt2WithCtx, teacher.id);
     console.log(`[PIPS-Gen] Parte 2 generada exitosamente. Esperando cooldown...`);
     await sleep(1000);
 
     // PARTE 3
     const prompt3 = getChunk3Prompt(row, chunk1Result + '\n\n' + chunk2Result);
-    const chunk3Result = await generateWithRotation(PIPS_SYSTEM_PROMPT, prompt3, teacher.id);
+    const prompt3WithCtx = libraryContext ? `${libraryContext}\n\n${prompt3}` : prompt3;
+    const chunk3Result = await generateWithRotation(PIPS_SYSTEM_PROMPT, prompt3WithCtx, teacher.id);
     console.log(`[PIPS-Gen] Parte 3 generada exitosamente. Armando resultado...`);
 
     // Unir las tres partes en un único documento Markdown estructurado

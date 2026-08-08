@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { GeneratedPlanningContent, Planning, PlanningExtra } from '@/types/planning';
 import { ExtraPreviewModal } from '@/components/planeacion/ExtraPreviewModal';
 import DeletePlanningButton from '@/components/planeacion/DeletePlanningButton';
+import GenerationFeedback from '@/components/feedback/GenerationFeedback';
 
 interface PlanningDetailClientProps {
   locale: string;
@@ -320,6 +321,7 @@ export default function PlanningDetailClient({
       </div>
 
       {/* TAB CONTENT: PLANNING GENERAL */}
+      {/* TAB CONTENT: PLANNING GENERAL */}
       {activeTab === 'planning' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Section I */}
@@ -422,6 +424,7 @@ export default function PlanningDetailClient({
 
       {/* TAB CONTENT: EXTRAS & INSTRUMENTS */}
       {activeTab === 'extras' && (
+        <>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Section V - Instruments generation */}
@@ -607,6 +610,10 @@ export default function PlanningDetailClient({
             </div>
           </div>
         </div>
+
+        {/* Feedback Widget */}
+        <GenerationFeedback entityType="planning" entityId={planning.id} />
+        </>
       )}
 
       {/* TAB CONTENT: LESSON PLANS */}

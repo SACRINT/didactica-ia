@@ -26,6 +26,9 @@ interface Teacher {
 interface Prompt { id: string; label: string; content: string; is_active: boolean; updated_at: string; updated_by: string | null; }
 interface UserDoc { id: string; teacher_email: string; doc_type: string; label: string; uac_name: string | null; file_name: string | null; used_count: number; created_at: string; }
 interface ActivityEntry { id: string; teacher_email: string; action: string; provider_used: string | null; model_used: string | null; success: boolean; error_msg: string | null; created_at: string; }
+interface NormativaArticulo { id: string; numero: string; texto: string; aplicable_a: string[]; orden_en_doc: number; }
+interface NormativaDoc { id: string; titulo: string; tipo: string; fuente: string | null; vigente: boolean; orden_display: number; created_at: string; articulos: NormativaArticulo[]; }
+interface NormativaStats { total_documentos: number; total_articulos: number; arts_pmc: number; arts_paec: number; arts_pips: number; arts_planeacion: number; }
 
 const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral', 'openrouter'];
 
@@ -122,7 +125,7 @@ function relativeTime(dateStr: string | null): string {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminClient({ locale, adminEmail }: { locale: string; adminEmail: string }) {
-  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity'>('stats');
+  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa'>('stats');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -134,6 +137,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [adminDocs, setAdminDocs] = useState<UserDoc[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [normativaDocs, setNormativaDocs] = useState<NormativaDoc[]>([]);
+  const [normativaStats, setNormativaStats] = useState<NormativaStats | null>(null);
 
   // Form states
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
@@ -161,6 +166,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const loadPrompts = useCallback(() => fetch('/api/admin/prompts').then(r => r.json()).then(d => setPrompts(d.prompts || [])), []);
   const loadDocs    = useCallback(() => fetch('/api/admin/documents').then(r => r.json()).then(d => setAdminDocs(d.documents || [])), []);
   const loadActivity = useCallback(() => fetch('/api/admin/activity').then(r => r.json()).then(d => setActivity(d.activity || [])), []);
+  const loadNormativa = useCallback(() => fetch('/api/admin/normativa').then(r => r.json()).then(d => { setNormativaDocs(d.documentos || []); setNormativaStats(d.stats || null); }), []);
 
   useEffect(() => {
     loadStats();
@@ -173,6 +179,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     if (activeTab === 'prompts') loadPrompts();
     if (activeTab === 'docs') loadDocs();
     if (activeTab === 'activity') loadActivity();
+    if (activeTab === 'normativa') loadNormativa();
   }, [activeTab]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -334,6 +341,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     { id: 'config',   label: 'Configuración', icon: '⚙️' },
     { id: 'users',    label: 'Usuarios',      icon: '👥' },
     { id: 'prompts',  label: 'Prompts',       icon: '✏️' },
+    { id: 'normativa',label: 'Normativa',     icon: '🏛️' },
     { id: 'docs',     label: 'Documentos',    icon: '📁' },
     { id: 'activity', label: 'Actividad',     icon: '📜' },
   ];
@@ -939,6 +947,74 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                   </div>
                 </div>
               ))
+            )}
+          </>
+        )}
+
+        {/* ── NORMATIVA ── */}
+        {activeTab === 'normativa' && (
+          <>
+            <h1>🏛️ Catálogo Normativo (Base de Datos)</h1>
+
+            {normativaStats && (
+              <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
+                <div className="stat-card"><div className="num">{normativaStats.total_documentos}</div><div className="lbl">Documentos</div></div>
+                <div className="stat-card"><div className="num">{normativaStats.total_articulos}</div><div className="lbl">Artículos Totales</div></div>
+                <div className="stat-card"><div className="num">{normativaStats.arts_pmc}</div><div className="lbl">Para PMC</div></div>
+                <div className="stat-card"><div className="num">{normativaStats.arts_paec}</div><div className="lbl">Para PAEC</div></div>
+                <div className="stat-card"><div className="num">{normativaStats.arts_pips}</div><div className="lbl">Para PIPS</div></div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
+              <button className="btn-sm btn-primary" onClick={() => alert('Próximamente: Crear Documento')}>+ Nuevo Documento</button>
+            </div>
+
+            {normativaDocs.length === 0 ? (
+              <div className="empty-state">No hay normativa cargada. Ejecuta el seeder para inicializarla.</div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40%' }}>Documento</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Artículos</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {normativaDocs.map(doc => (
+                    <tr key={doc.id}>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{doc.titulo}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{doc.fuente || 'Sin fuente'}</div>
+                      </td>
+                      <td><span className="badge badge-blue">{doc.tipo}</span></td>
+                      <td>
+                        {doc.vigente 
+                          ? <span className="badge badge-green">Vigente</span>
+                          : <span className="badge badge-yellow">No vigente</span>}
+                      </td>
+                      <td>
+                        <span className="badge badge-blue" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                          {doc.articulos?.length || 0} arts
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn-sm" style={{ background: 'rgba(255,255,255,0.1)' }} onClick={() => alert('Próximamente: Editar/Ver')}>Ver</button>
+                          <button className="btn-sm btn-danger" onClick={async () => {
+                            if (!confirm('¿Eliminar este documento y TODOS sus artículos?')) return;
+                            await fetch(`/api/admin/normativa?documento_id=${doc.id}`, { method: 'DELETE' });
+                            loadNormativa();
+                          }}>🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </>
         )}

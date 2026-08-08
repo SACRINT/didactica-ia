@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS teachers (
   role          TEXT NOT NULL DEFAULT 'docente', -- 'administrador' | 'supervisor' | 'atp' | 'director' | 'docente'
   profile_completed BOOLEAN NOT NULL DEFAULT FALSE,
   school_locked BOOLEAN NOT NULL DEFAULT FALSE,
+  last_seen_at  TIMESTAMPTZ DEFAULT NOW(),             -- Updated by heartbeat every ~3 min
+  custom_preferences JSONB,                            -- User AI preference profile (feedback loop)
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -116,9 +118,32 @@ CREATE TRIGGER plannings_updated_at
   BEFORE UPDATE ON plannings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- ─── Biblioteca Documental Personal (Módulo 3) ───────────────────────
+CREATE TABLE IF NOT EXISTS user_library_docs (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_email TEXT NOT NULL,
+  file_name     TEXT NOT NULL,
+  file_type     TEXT NOT NULL,
+  file_size     INTEGER NOT NULL,
+  extracted_text TEXT,
+  embedding     vector(1536), -- Si en el futuro usan pgvector para búsqueda semántica, opcional. Lo dejaremos como TEXT para full-text por ahora.
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS user_library_docs_updated_at ON user_library_docs;
+CREATE TRIGGER user_library_docs_updated_at
+  BEFORE UPDATE ON user_library_docs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- ════════════════════════════════════════════════════════════════════
 --  DONE. Tables created:
---    · teachers       — one row per Google account
---    · plannings      — planeaciones, private by teacher_id
---    · uploaded_pdfs  — PDF blob references
+--    · teachers          — one row per Google account
+--                          last_seen_at: heartbeat timestamp (online status)
+--                          custom_preferences: user AI preference profile (feedback loop)
+--    · plannings         — planeaciones, private by teacher_id
+--    · uploaded_pdfs     — PDF blob references
+--    · subscriptions     — Stripe subscriptions (see schema_stripe.sql)
+--    · user_library_docs — personal document library
+--    · generation_feedback — user feedback on AI generations (see schema_analytics.sql)
 -- ════════════════════════════════════════════════════════════════════

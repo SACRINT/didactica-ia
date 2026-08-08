@@ -4,6 +4,8 @@ import { getTeacherByEmail } from '@/lib/db';
 import { neon } from '@neondatabase/serverless';
 import { logActivity } from '@/lib/ai-provider';
 import { callGeminiPool } from '@/lib/gemini';
+import { getUserLibraryContext } from '@/lib/context-extractor';
+import { getNormativaForGenerator } from '@/lib/normativa-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -13,85 +15,9 @@ const sql = neon(process.env.DATABASE_URL!);
 type RouteContext = { params: Promise<{ id: string }> };
 type StepType = 'normativa' | 'diagnostico' | 'plan_accion';
 
-// ─── Fixed Normativa JSON ────────────────────────────────────────────────────
-const NORMATIVA_BGE = {
-  titulo: 'Marco Normativo',
-  descripcion:
-    'El presente Plan de Mejora Continua (PMC) se sustenta en el siguiente marco jurídico y normativo vigente para el Bachillerato General del Estado de Puebla (BGE), dependiente de la Dirección de Bachillerato y Educación Para Adultos (DBEPA).',
-  documentos: [
-    {
-      orden: 1,
-      titulo: 'Constitución Política de los Estados Unidos Mexicanos',
-      articulos: ['Artículo 3° — establece el derecho a la educación y los principios que la rigen.'],
-    },
-    {
-      orden: 2,
-      titulo: 'Ley General de Educación (2019)',
-      articulos: [
-        'Artículo 14 — obligatoriedad de la educación media superior.',
-        'Artículo 16 — criterios que orientan la educación pública.',
-        'Artículo 18 — inclusión, equidad y excelencia educativa.',
-      ],
-    },
-    {
-      orden: 3,
-      titulo: 'Ley General del Sistema para la Carrera de las Maestras y los Maestros (LGSCMM, 2019)',
-      articulos: [
-        'Artículo 4° — definición de la función docente y directiva.',
-        'Artículo 69 — atribuciones de las autoridades educativas en EMS.',
-      ],
-    },
-    {
-      orden: 4,
-      titulo: 'Plan Nacional de Desarrollo 2019-2024 / 2025-2030',
-      articulos: [
-        'Eje 2: Política Social — "La educación al servicio del pueblo".',
-        'Prioridad de reducción del abandono escolar en EMS.',
-      ],
-    },
-    {
-      orden: 5,
-      titulo: 'Nueva Escuela Mexicana (NEM)',
-      articulos: [
-        'Marco curricular basado en el aprendizaje situado, comunitario y crítico.',
-        'MCCEMS — Marco Curricular Común de la Educación Media Superior.',
-      ],
-    },
-    {
-      orden: 6,
-      titulo: 'Acuerdo Secretarial 14/08/22 — MCCEMS',
-      articulos: [
-        'Define los aprendizajes fundamentales para el egreso de EMS.',
-        'Establece las 8 categorías de gestión educativa para la mejora continua.',
-      ],
-    },
-    {
-      orden: 7,
-      titulo: 'Lineamientos para la Planeación de la Mejora Continua 2025-2026 — DBEPA',
-      articulos: [
-        'Establece la metodología PMC para planteles BGE del Estado de Puebla.',
-        'Define estructura, proceso de elaboración, seguimiento y evaluación del PMC.',
-        'Señala las 8 categorías priorizables: (1) Desarrollo académico y del aprendizaje, (2) Convivencia escolar y formación integral, (3) Gestión escolar y liderazgo directivo, (4) Planta docente y desarrollo profesional, (5) Vinculación con la comunidad, (6) Infraestructura y recursos educativos, (7) Atención y permanencia del alumnado, (8) Salud, bienestar y vida saludable.',
-      ],
-    },
-    {
-      orden: 8,
-      titulo: 'Programa Sectorial de Educación 2020-2024 / 2025-2030 — SEP',
-      articulos: [
-        'Objetivo 1 — Garantizar el derecho a la educación inclusiva, equitativa y de calidad.',
-        'Objetivo 3 — Fortalecer la gestión educativa y la participación social.',
-      ],
-    },
-    {
-      orden: 9,
-      titulo: 'Reglamento de las Condiciones Generales de Trabajo — BGE Puebla',
-      articulos: [
-        'Define las obligaciones del personal directivo, docente y administrativo.',
-        'Sustenta la elaboración y seguimiento del PMC como responsabilidad institucional.',
-      ],
-    },
-  ],
-};
+// ─── Normativa dinámica desde BD (via normativa-context.ts) ──────────────────
+// La normativa ya no es hardcodeada. Se lee de normativa_articulos en Neon.
+// Fallback automático si la BD está vacía (ver getNormativaFallback en normativa-context.ts).
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function safeStr(val: unknown): string {
@@ -154,19 +80,36 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
 
     const now = new Date().toISOString();
+    const libraryContext = await getUserLibraryContext(teacher.email);
 
-    // ── NORMATIVA ────────────────────────────────────────────────────────────
+    // ── NORMATIVA (dinámica desde BD) ────────────────────────────────────────
     if (step === 'normativa') {
+      // Lee artículos desde normativa_articulos; usa fallback si BD está vacía
+      const normativaTexto = await getNormativaForGenerator('pmc');
+
+      // Construye el objeto JSON que se guarda en pmc_projects.normativa
+      // (mantiene la misma estructura que esperan el DOCX y el frontend)
+      const normativaJson = {
+        titulo: 'Marco Normativo',
+        descripcion:
+          'El presente Plan de Mejora Continua (PMC) se sustenta en el siguiente marco jurídico y normativo vigente para el Bachillerato General del Estado de Puebla (BGE), dependiente de la Dirección de Bachillerato y Educación Para Adultos (DBEPA).',
+        // Bloque de texto completo para IA y DOCX
+        texto_normativo: normativaTexto,
+        // Metadatos de trazabilidad
+        fuente: 'BD normativa_articulos — catálogo curado',
+        generado_en: now,
+      };
+
       const [updated] = await sql`
         UPDATE pmc_projects
-        SET normativa = ${JSON.stringify(NORMATIVA_BGE)},
+        SET normativa = ${JSON.stringify(normativaJson)},
             current_step = GREATEST(current_step, 2),
             updated_at = ${now}
         WHERE id = ${id}
           AND teacher_id = ${teacher.id}
         RETURNING *
       `;
-      return NextResponse.json({ success: true, step, data: NORMATIVA_BGE, project: updated });
+      return NextResponse.json({ success: true, step, data: normativaJson, project: updated });
     }
 
     // ── DIAGNÓSTICO ──────────────────────────────────────────────────────────
@@ -190,6 +133,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       }>(project.foda);
 
       const prompt = `Eres un experto en gestión directiva de planteles de Bachillerato General del Estado de Puebla (BGE), alineado a los Lineamientos para la Planeación de la Mejora Continua 2025-2026 de la DBEPA.
+
+${libraryContext}
 
 Con base en la siguiente información del plantel "${safeStr(project.school_name)}" (CCT: ${safeStr(project.school_cct)}), ubicado en ${safeStr(project.locality)}, municipio de ${safeStr(project.municipality)}, Puebla:
 
@@ -308,6 +253,8 @@ Responde con JSON con exactamente estas 5 claves. Texto formal y técnico. NO in
         : 'No especificado';
 
       const prompt = `Eres un evaluador y planeador experto en la Mejora Continua para planteles BGE/TBC de Puebla bajo los LINEAMIENTOS DBEPA 2025-2026.
+
+${libraryContext}
 
 CONTEXTO DEL PLANTEL:
 - Nombre: ${safeStr(project.school_name)} | CCT: ${safeStr(project.school_cct)} | Ciclo: ${safeStr(project.ciclo_escolar)}

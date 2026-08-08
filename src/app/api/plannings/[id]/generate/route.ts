@@ -4,6 +4,8 @@ import { getTeacherByEmail, getPlanningById, updatePlanningContent } from '@/lib
 import { generatePlanningStream } from '@/lib/gemini';
 import { logActivity } from '@/lib/ai-provider';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
+import { getUserLibraryContext } from '@/lib/context-extractor';
+import { getNormativaForGenerator } from '@/lib/normativa-context';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
 export const runtime = 'nodejs';
@@ -51,6 +53,17 @@ export async function POST(
       planning.component as string
     );
 
+    const libraryContext = await getUserLibraryContext(session.user.email!);
+    const normativaContext = await getNormativaForGenerator('planeacion');
+
+    let fullUserPrompt = userPrompt;
+    if (libraryContext) {
+      fullUserPrompt += `\n\n${libraryContext}`;
+    }
+    if (normativaContext) {
+      fullUserPrompt += `\n\n${normativaContext}`;
+    }
+
     const teacherEmail = session.user.email!;
     const encoder = new TextEncoder();
 
@@ -59,7 +72,7 @@ export async function POST(
       async start(controller) {
         let accumulatedText = '';
         try {
-          const textGenerator = await generatePlanningStream(userPrompt);
+          const textGenerator = await generatePlanningStream(fullUserPrompt);
           
           for await (const chunk of textGenerator) {
             accumulatedText += chunk;

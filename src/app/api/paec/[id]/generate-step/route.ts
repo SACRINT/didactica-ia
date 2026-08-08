@@ -17,6 +17,8 @@ import {
 } from '@/lib/prompts/paec-prompts';
 import { getAIProvider, logActivity } from '@/lib/ai-provider';
 import { callGeminiPool } from '@/lib/gemini';
+import { getUserLibraryContext } from '@/lib/context-extractor';
+import { getNormativaForGenerator } from '@/lib/normativa-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -138,9 +140,28 @@ export async function POST(
       }
     }
 
+    // Inyectar contexto de la biblioteca documental si existe
+    const libraryContext = await getUserLibraryContext(session.user.email!);
+
+    // Inyectar normativa oficial en pasos 1 y 2 (Diagnóstico y Justificación),
+    // donde el fundamento legal enriquece directamente la generación.
+    let normativaContext = '';
+    if (step === 1 || step === 2) {
+      normativaContext = await getNormativaForGenerator('paec');
+    }
+
+    // Construir el prompt completo: prompt base + normativa (si aplica) + biblioteca
+    let fullUserPrompt = userPrompt;
+    if (normativaContext) {
+      fullUserPrompt = `${fullUserPrompt}\n\n${normativaContext}`;
+    }
+    if (libraryContext) {
+      fullUserPrompt = `${fullUserPrompt}\n\n${libraryContext}`;
+    }
+
     // Call AI via pool engine (reads active model from platform_config)
     console.log(`Generating PAEC Step ${step} using callGeminiPool...`);
-    const text = await callGeminiPool(PAEC_SYSTEM_PROMPT, userPrompt, teacher.id);
+    const text = await callGeminiPool(PAEC_SYSTEM_PROMPT, fullUserPrompt, teacher.id);
 
     if (!text) {
       throw new Error('Respuesta vacía del proveedor de IA');
