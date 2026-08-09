@@ -139,6 +139,20 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [normativaDocs, setNormativaDocs] = useState<NormativaDoc[]>([]);
   const [normativaStats, setNormativaStats] = useState<NormativaStats | null>(null);
+  const [normativaSearch, setNormativaSearch] = useState('');
+  const [normativaTypeFilter, setNormativaTypeFilter] = useState('todos');
+  const [normativaVigenteFilter, setNormativaVigenteFilter] = useState<'todos' | 'vigentes' | 'no_vigentes'>('todos');
+  const [normativaGenFilter, setNormativaGenFilter] = useState('todos');
+  const [selectedNormativaDoc, setSelectedNormativaDoc] = useState<NormativaDoc | null>(null);
+  const [showNewDocModal, setShowNewDocModal] = useState(false);
+  const [newDocForm, setNewDocForm] = useState({ titulo: '', tipo: 'ley_general', fuente: '', orden_display: 0, vigente: true });
+  const [showNewArtModal, setShowNewArtModal] = useState(false);
+  const [newArtForm, setNewArtForm] = useState<{ documento_id: string; numero: string; texto: string; aplicable_a: string[]; orden_en_doc: number }>({
+    documento_id: '', numero: '', texto: '', aplicable_a: ['pmc', 'paec', 'pips', 'planeacion'], orden_en_doc: 0
+  });
+  const [editingArt, setEditingArt] = useState<NormativaArticulo | null>(null);
+  const [artSearch, setArtSearch] = useState('');
+  const [seedingNormativa, setSeedingNormativa] = useState(false);
 
   // Form states
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
@@ -322,6 +336,181 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     if (!confirm('¿Eliminar este documento del usuario?')) return;
     await fetch('/api/admin/documents', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     loadDocs(); showMsg('Documento eliminado');
+  }
+
+  // ── Acciones Catálogo Normativo ───────────────────────────────────────────
+  async function toggleNormativaVigente(docId: string, currentVigente: boolean) {
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_vigente', id: docId, vigente: !currentVigente })
+      });
+      if (r.ok) {
+        setNormativaDocs(prev => prev.map(d => d.id === docId ? { ...d, vigente: !currentVigente } : d));
+        if (selectedNormativaDoc?.id === docId) {
+          setSelectedNormativaDoc(prev => prev ? { ...prev, vigente: !currentVigente } : null);
+        }
+        showMsg(!currentVigente ? 'Documento activado (Vigente) ✓' : 'Documento desactivado');
+        loadNormativa();
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al cambiar vigencia', false);
+      }
+    } catch {
+      showMsg('Error de conexión', false);
+    }
+  }
+
+  async function activateAllNormativa() {
+    if (!confirm('¿Deseas activar TODOS los documentos normativos del catálogo como vigentes?')) return;
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'activate_all' })
+      });
+      if (r.ok) {
+        loadNormativa();
+        showMsg('Todos los documentos han sido activados ✓');
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al activar documentos', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    }
+  }
+
+  async function deleteNormativaDoc(docId: string, docTitle: string) {
+    if (!confirm(`¿Eliminar el documento "${docTitle}" y TODOS sus artículos asociados?`)) return;
+    try {
+      const r = await fetch(`/api/admin/normativa?documento_id=${docId}`, { method: 'DELETE' });
+      if (r.ok) {
+        setNormativaDocs(prev => prev.filter(d => d.id !== docId));
+        if (selectedNormativaDoc?.id === docId) setSelectedNormativaDoc(null);
+        loadNormativa();
+        showMsg('Documento y artículos eliminados ✓');
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al eliminar documento', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    }
+  }
+
+  async function deleteNormativaArt(artId: string) {
+    if (!confirm('¿Eliminar este artículo del documento?')) return;
+    try {
+      const r = await fetch(`/api/admin/normativa?articulo_id=${artId}`, { method: 'DELETE' });
+      if (r.ok) {
+        if (selectedNormativaDoc) {
+          const updatedArts = selectedNormativaDoc.articulos.filter(a => a.id !== artId);
+          setSelectedNormativaDoc({ ...selectedNormativaDoc, articulos: updatedArts });
+          setNormativaDocs(prev => prev.map(d => d.id === selectedNormativaDoc.id ? { ...d, articulos: updatedArts } : d));
+        }
+        loadNormativa();
+        showMsg('Artículo eliminado ✓');
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al eliminar artículo', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    }
+  }
+
+  async function handleCreateDoc(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newDocForm.titulo.trim() || !newDocForm.tipo) {
+      return showMsg('Título y tipo de documento son requeridos', false);
+    }
+    setSaving(true);
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_documento', ...newDocForm })
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setShowNewDocModal(false);
+        setNewDocForm({ titulo: '', tipo: 'ley_general', fuente: '', orden_display: 0, vigente: true });
+        loadNormativa();
+        showMsg('Documento normativo creado exitosamente ✓');
+      } else {
+        showMsg(d.error || 'Error al crear documento', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreateArt(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newArtForm.documento_id || !newArtForm.numero.trim() || !newArtForm.texto.trim()) {
+      return showMsg('Completa número y texto del artículo', false);
+    }
+    if (newArtForm.aplicable_a.length === 0) {
+      return showMsg('Selecciona al menos un módulo aplicable (PMC, PAEC, PIPS o Planeación)', false);
+    }
+    setSaving(true);
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_articulo', ...newArtForm })
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setShowNewArtModal(false);
+        setNewArtForm({ documento_id: '', numero: '', texto: '', aplicable_a: ['pmc', 'paec', 'pips', 'planeacion'], orden_en_doc: 0 });
+        loadNormativa();
+        if (selectedNormativaDoc && selectedNormativaDoc.id === newArtForm.documento_id) {
+          setSelectedNormativaDoc(prev => prev ? { ...prev, articulos: [...prev.articulos, d.articulo] } : null);
+        }
+        showMsg('Artículo normativo agregado ✓');
+      } else {
+        showMsg(d.error || 'Error al crear artículo', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpdateArt(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingArt) return;
+    setSaving(true);
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_articulo', ...editingArt })
+      });
+      const d = await r.json();
+      if (r.ok) {
+        if (selectedNormativaDoc) {
+          const updatedArts = selectedNormativaDoc.articulos.map(a => a.id === editingArt.id ? editingArt : a);
+          setSelectedNormativaDoc({ ...selectedNormativaDoc, articulos: updatedArts });
+          setNormativaDocs(prev => prev.map(doc => doc.id === selectedNormativaDoc.id ? { ...doc, articulos: updatedArts } : doc));
+        }
+        setEditingArt(null);
+        loadNormativa();
+        showMsg('Artículo actualizado correctamente ✓');
+      } else {
+        showMsg(d.error || 'Error al actualizar artículo', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function testConnection() {
