@@ -280,14 +280,26 @@ export default function ModalConfiguracionMapaCurricular({
           {(!forceObligatorio || isAdmin) && onClose && (
             <button
               onClick={onClose}
-              style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", borderRadius: "8px", width: "32px", height: "32px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-              title="Cerrar ventana"
+              style={{
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.35)",
+                color: "white",
+                borderRadius: "8px",
+                padding: "6px 12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                transition: "all 0.2s",
+              }}
+              title="Cerrar modal (Modo Administrador / Opcional)"
             >
               <X size={18} />
+              <span>{isAdmin ? "Cerrar (Admin)" : "Cerrar"}</span>
             </button>
           )}
-
-
         </div>
 
         {/* Stepper Tabs */}
@@ -695,7 +707,27 @@ export default function ModalConfiguracionMapaCurricular({
             Total de grupos a registrar: <strong>{g1 + g2 + g3} grupos</strong>
           </span>
 
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            {isAdmin && onClose && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={onClose}
+                disabled={guardando}
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  borderColor: "rgba(239, 68, 68, 0.4)",
+                  color: "#ef4444",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem"
+                }}
+              >
+                <X size={16} /> Cerrar sin guardar (Admin)
+              </button>
+            )}
+
             {paso === 2 && (
               <button
                 className="btn btn-outline"

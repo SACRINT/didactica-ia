@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 
 interface Props {
   isDirector: boolean;
+  isAdmin?: boolean;
   teacherName: string;
   teacherId: string;
   schoolName: string;
@@ -17,6 +18,7 @@ interface Props {
 
 export default function HorariosDashboardClient({
   isDirector,
+  isAdmin = false,
   teacherName,
   teacherId,
   schoolName,
@@ -364,7 +366,8 @@ export default function HorariosDashboardClient({
           setMapaModalAbierto(false);
           cargarDatos();
         }}
-        forceObligatorio={!escuelaState?.mapaCurricularCompletado}
+        forceObligatorio={isAdmin ? false : !escuelaState?.mapaCurricularCompletado}
+        isAdmin={isAdmin}
       />
     </div>
   );
