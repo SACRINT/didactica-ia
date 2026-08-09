@@ -169,25 +169,29 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      let snapshot: { vigentes: string[]; no_vigentes: string[]; saved_at: string; total: number };
+      let snapshot: { vigentes: any[]; no_vigentes: any[]; saved_at?: string; updated_at?: string; total?: number };
       try {
         snapshot = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
       } catch {
         return NextResponse.json({ error: 'El snapshot guardado está corrupto.' }, { status: 500 });
       }
-      if (snapshot.vigentes?.length > 0) {
-        await db`UPDATE normativa_documentos SET vigente = TRUE  WHERE id = ANY(${snapshot.vigentes}::uuid[])`;
+
+      const vigentesIds = (snapshot.vigentes || []).map((id: any) => parseInt(id, 10)).filter((id: number) => !isNaN(id));
+
+      if (vigentesIds.length > 0) {
+        await db`UPDATE normativa_documentos SET vigente = TRUE WHERE id = ANY(${vigentesIds}::int[])`;
+        await db`UPDATE normativa_documentos SET vigente = FALSE WHERE NOT (id = ANY(${vigentesIds}::int[]))`;
+      } else if (snapshot.no_vigentes?.length > 0) {
+        const noVigentesIds = snapshot.no_vigentes.map((id: any) => parseInt(id, 10)).filter((id: number) => !isNaN(id));
+        await db`UPDATE normativa_documentos SET vigente = FALSE WHERE id = ANY(${noVigentesIds}::int[])`;
       }
-      if (snapshot.no_vigentes?.length > 0) {
-        await db`UPDATE normativa_documentos SET vigente = FALSE WHERE id = ANY(${snapshot.no_vigentes}::uuid[])`;
-      }
+
       return NextResponse.json({
         success: true,
-        message: `🔄 Configuración restablecida: ${snapshot.vigentes?.length || 0} vigentes, ${snapshot.no_vigentes?.length || 0} desactivados`,
+        message: `🔄 Configuración restablecida: ${vigentesIds.length} vigentes`,
         restored: {
-          vigentes: snapshot.vigentes?.length || 0,
-          no_vigentes: snapshot.no_vigentes?.length || 0,
-          saved_at: snapshot.saved_at,
+          vigentes: vigentesIds.length,
+          saved_at: snapshot.saved_at || snapshot.updated_at,
         },
       });
     }
