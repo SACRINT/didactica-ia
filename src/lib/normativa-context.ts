@@ -133,9 +133,86 @@ function buildNormativaBlock(rows: NormativaArticulo[], generador: GeneratorType
 }
 
 /**
- * Versión síncrona (para compatibilidad con código que no puede ser async).
- * Retorna directamente el fallback estático, sin acceso a BD.
+ * Obtiene la normativa estructurada para los generadores de DOCX y UI,
+ * omitiendo el texto largo de los artículos y listando solo los números.
  */
-export function getNormativaFallback(generador: GeneratorType): string {
-  return FALLBACK_NORMATIVA[generador];
+export async function getStructuredNormativaForGenerator(
+  generador: GeneratorType
+): Promise<Array<{ orden: number; titulo: string; articulos: string[] }>> {
+  try {
+    const db = neon(process.env.DATABASE_URL!);
+
+    const rows = await db`
+      SELECT
+        a.numero,
+        d.titulo  AS titulo_documento,
+        d.orden_display
+      FROM normativa_articulos a
+      JOIN normativa_documentos d ON d.id = a.documento_id
+      WHERE d.vigente = TRUE
+        AND ${generador} = ANY(a.aplicable_a)
+      ORDER BY d.orden_display ASC, a.orden_en_doc ASC
+    `;
+
+    if (!rows || rows.length === 0) {
+      return getStructuredFallback(generador);
+    }
+
+    const byDoc = new Map<string, { orden: number; articulos: string[] }>();
+    for (const row of rows) {
+      const key = row.titulo_documento;
+      if (!byDoc.has(key)) {
+        byDoc.set(key, { orden: row.orden_display, articulos: [] });
+      }
+      byDoc.get(key)!.articulos.push(row.numero);
+    }
+
+    const result = Array.from(byDoc.entries()).map(([titulo, data]) => ({
+      orden: data.orden,
+      titulo,
+      articulos: data.articulos,
+    }));
+
+    result.sort((a, b) => a.orden - b.orden);
+
+    // Reasignar orden secuencial para la presentación
+    return result.map((doc, idx) => ({ ...doc, orden: idx + 1 }));
+  } catch (error) {
+    console.error('[normativa-context] Error obteniendo normativa estructurada de BD:', error);
+    return getStructuredFallback(generador);
+  }
 }
+
+/**
+ * Fallback estructurado para cuando la BD falla o está vacía.
+ */
+function getStructuredFallback(generador: GeneratorType): Array<{ orden: number; titulo: string; articulos: string[] }> {
+  const fallbacks: Record<GeneratorType, Array<{ orden: number; titulo: string; articulos: string[] }>> = {
+    pmc: [
+      { orden: 1, titulo: "Constitución Política de los Estados Unidos Mexicanos", articulos: ["Artículo 3°"] },
+      { orden: 2, titulo: "Ley General de Educación (2019)", articulos: ["Artículo 14", "Artículo 16", "Artículo 18"] },
+      { orden: 3, titulo: "Ley General del Sistema para la Carrera de las Maestras y los Maestros (2019)", articulos: ["Artículo 4°", "Artículo 69"] },
+      { orden: 4, titulo: "Acuerdo Secretarial 14/08/22 (MCCEMS)", articulos: ["8 categorías de gestión educativa para la mejora continua"] },
+      { orden: 5, titulo: "Lineamientos para la Planeación de la Mejora Continua 2025-2026 de la DBEPA", articulos: ["Metodología PMC para planteles BGE"] }
+    ],
+    paec: [
+      { orden: 1, titulo: "Constitución Política de los Estados Unidos Mexicanos", articulos: ["Artículo 3°"] },
+      { orden: 2, titulo: "Ley General de Educación (2019)", articulos: ["Artículo 18"] },
+      { orden: 3, titulo: "Acuerdo Secretarial 14/08/22 (MCCEMS)", articulos: ["Aprendizajes situados, comunitarios y críticos"] },
+      { orden: 4, titulo: "Lineamientos PAEC-PEC DBEPA 2026-2027", articulos: ["Estructura y criterios del Proyecto Escolar Comunitario"] }
+    ],
+    pips: [
+      { orden: 1, titulo: "Constitución Política de los Estados Unidos Mexicanos", articulos: ["Artículo 3°"] },
+      { orden: 2, titulo: "Ley General de Educación (2019)", articulos: ["Artículo 14", "Artículo 16", "Artículo 44", "Artículo 46"] },
+      { orden: 3, titulo: "Ley de Educación del Estado de Puebla", articulos: ["Atribuciones de la supervisión en EMS"] },
+      { orden: 4, titulo: "Lineamientos PIPS DBEPA", articulos: ["Elaboración, seguimiento y evaluación del Plan de Supervisión"] }
+    ],
+    planeacion: [
+      { orden: 1, titulo: "Constitución Política de los Estados Unidos Mexicanos", articulos: ["Artículo 3°"] },
+      { orden: 2, titulo: "Acuerdo Secretarial 14/08/22 (MCCEMS)", articulos: ["Marcos Curriculares por componente"] },
+      { orden: 3, titulo: "Lineamientos de planeación DBEPA", articulos: ["Estructura de la planeación didáctica BGE"] }
+    ]
+  };
+  return fallbacks[generador] || fallbacks.pmc;
+}
+

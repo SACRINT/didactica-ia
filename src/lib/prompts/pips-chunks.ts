@@ -60,8 +60,9 @@ ${JSON.stringify(plantelesData, null, 2)}
 - Explica la importancia estratégica del PIPS en el marco del MCCEMS y la Nueva Escuela Mexicana.
 
 # 2. FUNDAMENTACIÓN NORMATIVA
-Menciona y fundamenta la aplicación práctica en la supervisión escolar de:
-- Artículo 3° Constitucional (derecho a la educación, excelencia y equidad).
+Menciona la fundamentación normativa aplicable a la supervisión escolar.
+**IMPORTANTE:** SÓLO enlista los nombres de las Leyes, Reglamentos, Acuerdos, Lineamientos, etc., y los números de los artículos aplicables (ej. Artículo 3°). **NO incluyas el texto completo de los artículos** en el documento. Apóyate en el contexto normativo proveído:
+- Constitución Política de los Estados Unidos Mexicanos.
 - Ley General de Educación (LGE) y Ley de Educación del Estado de Puebla.
 - Lineamientos específicos de la DBEPA para la elaboración del PIPS.
 

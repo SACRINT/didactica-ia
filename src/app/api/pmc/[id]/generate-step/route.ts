@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { logActivity } from '@/lib/ai-provider';
 import { callGeminiPool } from '@/lib/gemini';
 import { getUserLibraryContext } from '@/lib/context-extractor';
-import { getNormativaForGenerator } from '@/lib/normativa-context';
+import { getNormativaForGenerator, getStructuredNormativaForGenerator } from '@/lib/normativa-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (step === 'normativa') {
       // Lee artículos desde normativa_articulos; usa fallback si BD está vacía
       const normativaTexto = await getNormativaForGenerator('pmc');
+      const normativaEstructurada = await getStructuredNormativaForGenerator('pmc');
 
       // Construye el objeto JSON que se guarda en pmc_projects.normativa
       // (mantiene la misma estructura que esperan el DOCX y el frontend)
@@ -93,8 +94,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         titulo: 'Marco Normativo',
         descripcion:
           'El presente Plan de Mejora Continua (PMC) se sustenta en el siguiente marco jurídico y normativo vigente para el Bachillerato General del Estado de Puebla (BGE), dependiente de la Dirección de Bachillerato y Educación Para Adultos (DBEPA).',
-        // Bloque de texto completo para IA y DOCX
+        // Bloque de texto completo para IA
         texto_normativo: normativaTexto,
+        // Lista estructurada para DOCX y UI
+        documentos: normativaEstructurada,
         // Metadatos de trazabilidad
         fuente: 'BD normativa_articulos — catálogo curado',
         generado_en: now,
