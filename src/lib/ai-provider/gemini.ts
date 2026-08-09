@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { AIProvider } from './types';
 
 /**
@@ -26,38 +25,81 @@ export class GeminiProvider implements AIProvider {
   }
 
   async generate(systemPrompt: string, userPrompt: string): Promise<string> {
-    const genAI = new GoogleGenerativeAI(this.apiKey);
-    const model = genAI.getGenerativeModel({
-      model: this.modelId,
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:generateContent?key=${this.apiKey}`;
+    const payload = {
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        temperature: 0.4,
+        topP: 0.95,
+        responseMimeType: 'text/plain',
+      },
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20000),
     });
 
-    const response = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{ text: `System Instructions:\n${systemPrompt}\n\nUser Input:\n${userPrompt}` }],
-      }],
-    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
 
-    const text = response.response.text();
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error('Empty response from Gemini API');
     return text;
   }
 
   async *generateStream(systemPrompt: string, userPrompt: string): AsyncGenerator<string> {
-    const genAI = new GoogleGenerativeAI(this.apiKey);
-    const model = genAI.getGenerativeModel({ model: this.modelId });
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
+    const payload = {
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        temperature: 0.4,
+        topP: 0.95,
+      },
+    };
 
-    const result = await model.generateContentStream({
-      contents: [{
-        role: 'user',
-        parts: [{ text: `System Instructions:\n${systemPrompt}\n\nUser Input:\n${userPrompt}` }],
-      }],
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(30000),
     });
 
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
-      if (text) yield text;
+    if (!res.ok || !res.body) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(trimmed.substring(6));
+            const chunkText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (chunkText) yield chunkText;
+          } catch {
+            // Non-JSON line in SSE
+          }
+        }
+      }
     }
   }
 }
-

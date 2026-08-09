@@ -213,7 +213,7 @@ async function executeWithModelFallback(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!res.ok) {
