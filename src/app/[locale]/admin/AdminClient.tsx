@@ -153,6 +153,9 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [editingArt, setEditingArt] = useState<NormativaArticulo | null>(null);
   const [artSearch, setArtSearch] = useState('');
   const [seedingNormativa, setSeedingNormativa] = useState(false);
+  const [normativaDefaultInfo, setNormativaDefaultInfo] = useState<{ saved_at: string; vigentes: number; total: number } | null>(null);
+  const [savingDefault, setSavingDefault] = useState(false);
+  const [resettingDefault, setResettingDefault] = useState(false);
 
   // Form states
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
@@ -180,7 +183,26 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const loadPrompts = useCallback(() => fetch('/api/admin/prompts').then(r => r.json()).then(d => setPrompts(d.prompts || [])), []);
   const loadDocs    = useCallback(() => fetch('/api/admin/documents').then(r => r.json()).then(d => setAdminDocs(d.documents || [])), []);
   const loadActivity = useCallback(() => fetch('/api/admin/activity').then(r => r.json()).then(d => setActivity(d.activity || [])), []);
-  const loadNormativa = useCallback(() => fetch('/api/admin/normativa').then(r => r.json()).then(d => { setNormativaDocs(d.documentos || []); setNormativaStats(d.stats || null); }), []);
+  const loadNormativa = useCallback(async () => {
+    const r = await fetch('/api/admin/normativa');
+    const d = await r.json();
+    setNormativaDocs(d.documentos || []);
+    setNormativaStats(d.stats || null);
+    // Cargar también la info del snapshot predeterminado
+    try {
+      const rc = await fetch('/api/admin/normativa?action=get_default');
+      const dc = await rc.json();
+      if (dc.snapshot) {
+        setNormativaDefaultInfo({
+          saved_at: dc.snapshot.saved_at,
+          vigentes: dc.snapshot.vigentes?.length || 0,
+          total: dc.snapshot.total || 0,
+        });
+      } else {
+        setNormativaDefaultInfo(null);
+      }
+    } catch { /* sin snapshot */ }
+  }, []);
 
   useEffect(() => {
     loadStats();
@@ -379,6 +401,60 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
       }
     } catch {
       showMsg('Error de red', false);
+    }
+  }
+
+  async function saveDefaultNormativa() {
+    if (!confirm('¿Guardar la configuración actual de documentos vigentes como PREDETERMINADA?\n\nEsto sobreescribirá cualquier configuración predeterminada anterior.')) return;
+    setSavingDefault(true);
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_default' })
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setNormativaDefaultInfo({
+          saved_at: d.snapshot.saved_at,
+          vigentes: d.snapshot.vigentes?.length || 0,
+          total: d.snapshot.total || 0,
+        });
+        showMsg(`💾 Configuración predeterminada guardada ✓ (${d.snapshot.vigentes?.length || 0} vigentes)`);
+      } else {
+        showMsg(d.error || 'Error al guardar configuración', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    } finally {
+      setSavingDefault(false);
+    }
+  }
+
+  async function resetToDefaultNormativa() {
+    if (!normativaDefaultInfo) {
+      return showMsg('No hay una configuración predeterminada guardada. Usa "💾 Guardar Predeterminado" primero.', false);
+    }
+    const savedDate = new Date(normativaDefaultInfo.saved_at).toLocaleString('es-MX');
+    if (!confirm(`¿Restablecer la configuración guardada el ${savedDate}?\n\n• ${normativaDefaultInfo.vigentes} documentos quedarán vigentes\n• ${normativaDefaultInfo.total - normativaDefaultInfo.vigentes} documentos quedarán desactivados\n\nEsta acción sobrescribirá todos los cambios actuales.`)) return;
+    setResettingDefault(true);
+    try {
+      const r = await fetch('/api/admin/normativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_to_default' })
+      });
+      const d = await r.json();
+      if (r.ok) {
+        loadNormativa();
+        showMsg(d.message || '🔄 Configuración restablecida al estado predeterminado ✓');
+      } else {
+        showMsg(d.error || 'Error al restablecer', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    } finally {
+      setResettingDefault(false);
     }
   }
 
@@ -1156,12 +1232,53 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
             )}
 
             {/* Toolbar */}
-            <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button className="btn-sm btn-primary" onClick={() => setShowNewDocModal(true)}>+ Nuevo Documento</button>
               <button className="btn-sm" style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}
                 onClick={activateAllNormativa}>✅ Activar Todos</button>
-              <button className="btn-sm btn-ghost" onClick={loadNormativa}>↺ Actualizar</button>
+              <span style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', display: 'inline-block', margin: '0 4px' }} />
+              <button
+                className="btn-sm"
+                style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#a5b4fc' }}
+                onClick={saveDefaultNormativa}
+                disabled={savingDefault}
+                title="Guarda el estado actual como configuración predeterminada"
+              >
+                {savingDefault ? '💾 Guardando...' : '💾 Guardar Predeterminado'}
+              </button>
+              <button
+                className="btn-sm"
+                style={{
+                  background: normativaDefaultInfo ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${normativaDefaultInfo ? 'rgba(251,191,36,0.35)' : 'rgba(255,255,255,0.12)'}`,
+                  color: normativaDefaultInfo ? '#fbbf24' : 'rgba(255,255,255,0.35)',
+                  cursor: normativaDefaultInfo ? 'pointer' : 'not-allowed',
+                }}
+                onClick={resetToDefaultNormativa}
+                disabled={resettingDefault || !normativaDefaultInfo}
+                title={normativaDefaultInfo
+                  ? `Restablecer al estado guardado el ${new Date(normativaDefaultInfo.saved_at).toLocaleString('es-MX')}`
+                  : 'Primero guarda una configuración predeterminada'}
+              >
+                {resettingDefault ? '🔄 Restableciendo...' : '🔄 Restablecer Predeterminado'}
+              </button>
+              <button className="btn-sm btn-ghost" onClick={loadNormativa} style={{ marginLeft: 'auto' }}>↺ Actualizar</button>
             </div>
+            {/* Indicador de configuración predeterminada guardada */}
+            {normativaDefaultInfo ? (
+              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, fontSize: 12, color: 'rgba(165,180,252,0.85)' }}>
+                <span>📌</span>
+                <span>
+                  <strong>Predeterminado guardado:</strong>{' '}
+                  {normativaDefaultInfo.vigentes} de {normativaDefaultInfo.total} documentos vigentes
+                  {' · '}Guardado el {new Date(normativaDefaultInfo.saved_at).toLocaleString('es-MX')}
+                </span>
+              </div>
+            ) : (
+              <div style={{ marginBottom: 14, padding: '7px 14px', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 8, fontSize: 12, color: 'rgba(251,191,36,0.7)' }}>
+                ⚠️ Aún no hay configuración predeterminada guardada. Usa <strong>💾 Guardar Predeterminado</strong> para crear una.
+              </div>
+            )}
 
             {/* Filtros */}
             <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>

@@ -24,9 +24,18 @@ export async function GET(request: NextRequest) {
 
   const db = getDb();
   const { searchParams } = new URL(request.url);
-  const generador = searchParams.get('generador'); // filtrar por generador: pmc|paec|pips|planeacion
+  const generador = searchParams.get('generador');
+  const actionParam = searchParams.get('action');
 
   try {
+    // ── Modo especial: leer snapshot predeterminado
+    if (actionParam === 'get_default') {
+      const rows = await db`SELECT value FROM platform_config WHERE key = 'normativa_default_snapshot'`;
+      if (!rows.length) return NextResponse.json({ snapshot: null });
+      const snap = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+      return NextResponse.json({ snapshot: snap });
+    }
+
     // Lee documentos con sus artículos agrupados
     const documentos = await db`
       SELECT
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── POST — Crea documento, artículo o ejecuta seed ───────────────────────────
+// ─── POST — Crea documento, artículo o ejecuta acciones ───────────────────────
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin();
@@ -125,10 +134,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, articulo: art });
     }
 
-    // ── Activar todos los documentos oficiales clave
+    // ── Activar todos los documentos
     if (body.action === 'activate_all') {
       await db`UPDATE normativa_documentos SET vigente = TRUE`;
       return NextResponse.json({ success: true, message: 'Todos los documentos han sido marcados como vigentes' });
+    }
+
+    // ── Guardar configuración predeterminada (snapshot del estado actual de vigencia)
+    if (body.action === 'save_default') {
+      const allDocs = await db`SELECT id, vigente FROM normativa_documentos`;
+      const snapshot = {
+        saved_at: new Date().toISOString(),
+        total: allDocs.length,
+        vigentes: allDocs.filter((d: any) => d.vigente).map((d: any) => d.id),
+        no_vigentes: allDocs.filter((d: any) => !d.vigente).map((d: any) => d.id),
+      };
+      const snapshotJson = JSON.stringify(snapshot);
+      await db`
+        INSERT INTO platform_config (key, value, updated_at)
+        VALUES ('normativa_default_snapshot', ${snapshotJson}, NOW())
+        ON CONFLICT (key) DO UPDATE
+          SET value = EXCLUDED.value,
+              updated_at = NOW()
+      `;
+      return NextResponse.json({ success: true, snapshot });
+    }
+
+    // ── Restablecer al estado predeterminado guardado
+    if (body.action === 'reset_to_default') {
+      const rows = await db`SELECT value FROM platform_config WHERE key = 'normativa_default_snapshot'`;
+      if (!rows.length) {
+        return NextResponse.json(
+          { error: 'No existe una configuración predeterminada guardada. Usa "Guardar Predeterminado" primero.' },
+          { status: 404 }
+        );
+      }
+      let snapshot: { vigentes: string[]; no_vigentes: string[]; saved_at: string; total: number };
+      try {
+        snapshot = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+      } catch {
+        return NextResponse.json({ error: 'El snapshot guardado está corrupto.' }, { status: 500 });
+      }
+      if (snapshot.vigentes?.length > 0) {
+        await db`UPDATE normativa_documentos SET vigente = TRUE  WHERE id = ANY(${snapshot.vigentes}::uuid[])`;
+      }
+      if (snapshot.no_vigentes?.length > 0) {
+        await db`UPDATE normativa_documentos SET vigente = FALSE WHERE id = ANY(${snapshot.no_vigentes}::uuid[])`;
+      }
+      return NextResponse.json({
+        success: true,
+        message: `🔄 Configuración restablecida: ${snapshot.vigentes?.length || 0} vigentes, ${snapshot.no_vigentes?.length || 0} desactivados`,
+        restored: {
+          vigentes: snapshot.vigentes?.length || 0,
+          no_vigentes: snapshot.no_vigentes?.length || 0,
+          saved_at: snapshot.saved_at,
+        },
+      });
     }
 
     return NextResponse.json({ error: 'Acción no reconocida' }, { status: 400 });
