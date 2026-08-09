@@ -59,10 +59,8 @@ const STANDARD_MODELS: Record<string, { id: string; label: string }[]> = {
 // Modelos disponibles por proveedor para USO PREMIUM (APIs de paga / avanzadas)
 const PREMIUM_MODELS: Record<string, { id: string; label: string }[]> = {
   gemini: [
-    { id: 'gemini-3.5-flash-lite', label: 'gemini-3.5-flash-lite — 500 RPD / 15 RPM (Gratuito)' },
-    { id: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite — 500 RPD / 15 RPM (Gratuito)' },
-    { id: 'gemini-3.5-flash',      label: 'gemini-3.5-flash — 1000 RPD / 15 RPM (Pago recomendado)' },
-    { id: 'gemini-3.1-flash',      label: 'gemini-3.1-flash — 1000 RPD / 15 RPM (Pago)' },
+    { id: 'gemini-3.5-flash-lite', label: 'gemini-3.5-flash-lite — 500 RPD / 15 RPM (Autorizado)' },
+    { id: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite — 500 RPD / 15 RPM (Autorizado)' },
   ],
   claude: [
     { id: 'claude-haiku-4-5',   label: 'claude-haiku-4-5 — 50 RPD (free) / ∞ con API key' },

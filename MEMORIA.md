@@ -1,4 +1,4 @@
-﻿# MEMORIA.md — DidactecaIA
+# MEMORIA.md — DidactecaIA
 
 > Última actualización: 2026-08-05
 > Estado: Módulos 1-4 completos. Módulo 5 (Normativa) en planificación.
@@ -311,10 +311,36 @@ sin abrirlos. La estrategia es catálogo curado manualmente en BD (NO carga masi
 
 ---
 
-## 11. GOTCHAS IMPORTANTES
+## 11. POLÍTICA ESTRICTA DE MODELOS DE IA
+
+1. **Modelos ÚNICOS Autorizados:**
+   - `gemini-3.5-flash-lite` (Predeterminado)
+   - `gemini-3.1-flash-lite`
+2. **Modelos PROHIBIDOS:**
+   - Queda estrictamente prohibido el uso o fallback a familias 1.5 (`gemini-1.5-flash`), 2.0 (`gemini-2.0-flash`) y 2.5 (`gemini-2.5-flash`, `gemini-2.5-flash-lite`, etc.).
+3. **Sanitización Obligatoria:**
+   - Toda llamada en `src/lib/ai-provider/gemini.ts`, `src/lib/ai-provider/index.ts`, `src/lib/gemini.ts` y `platform_config` pasa por `sanitizeGeminiModel` forzando exclusivamente los modelos 3.5 Flash Lite y 3.1 Flash Lite.
+
+---
+
+## 12. CHAT TÉCNICO-PEDAGÓGICO (DidactecaBot IA)
+
+- **Componente:** `src/components/PedagogicalChatWidget.tsx`
+- **Ruta API:** `src/app/api/pedagogical-chat/route.ts` (maxDuration: 60s, con `generateWithRotation`)
+- **Funcionalidades ported de SISAT-ATP:**
+  1. Controles Text-To-Speech (TTS) nativos con SpeechSynthesis en español (es-MX).
+  2. Botones de reproducción interactiva: Leer respuesta, Pausar / Reanudar, Detener y selector de velocidad (1x, 1.5x, 2x).
+  3. Formato de respuesta estrictamente en texto plano normal (sin Markdown ni asteriscos) para lectura por voz óptima.
+  4. Preguntas sugeridas de inicio rápido para docentes sobre secuencias didácticas, PAEC y evaluación formativa.
+  5. Botón de reiniciar historial y diseño oscuro institucional.
+
+---
+
+## 13. GOTCHAS IMPORTANTES
 
 - Gemini pool: si todas las keys están bloqueadas (429), el usuario verá error
 - pdfjs-dist: requiere runtime nodejs (no edge), máx 60 páginas, falla con PDFs escaneados
 - Neon serverless: instanciar neon() dentro de la función, no a nivel módulo global
 - Streaming Claude: routes de Planeaciones retornan ReadableStream SSE
 - Windows scripts: usar cmd /c "node --env-file=.env.local", nunca npx dotenv-cli
+

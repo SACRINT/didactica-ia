@@ -1,9 +1,19 @@
-/**
- * Google Gemini AI Provider implementation.
- */
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { AIProvider } from './types';
+
+/**
+ * Normalizes Gemini model names to enforce strictly authorized models:
+ * - gemini-3.5-flash-lite (default)
+ * - gemini-3.1-flash-lite
+ * Any legacy or prohibited models (e.g. gemini-2.5-flash, gemini-1.5-flash)
+ * are mapped safely to gemini-3.5-flash-lite.
+ */
+export function sanitizeGeminiModel(model?: string | null): string {
+  if (!model) return 'gemini-3.5-flash-lite';
+  const clean = model.trim().toLowerCase();
+  if (clean === 'gemini-3.1-flash-lite') return 'gemini-3.1-flash-lite';
+  return 'gemini-3.5-flash-lite';
+}
 
 export class GeminiProvider implements AIProvider {
   providerId = 'gemini';
@@ -12,14 +22,13 @@ export class GeminiProvider implements AIProvider {
 
   constructor(apiKey: string, modelId = 'gemini-3.5-flash-lite') {
     this.apiKey = apiKey;
-    this.modelId = modelId;
+    this.modelId = sanitizeGeminiModel(modelId);
   }
 
   async generate(systemPrompt: string, userPrompt: string): Promise<string> {
     const genAI = new GoogleGenerativeAI(this.apiKey);
     const model = genAI.getGenerativeModel({
       model: this.modelId,
-      generationConfig: { responseMimeType: 'application/json' },
     });
 
     const response = await model.generateContent({
@@ -51,3 +60,4 @@ export class GeminiProvider implements AIProvider {
     }
   }
 }
+

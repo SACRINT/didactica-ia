@@ -14,6 +14,7 @@
 import { neon } from '@neondatabase/serverless';
 import { SYSTEM_PROMPT } from './prompts/system-prompt';
 import { generateStreamWithRotation, resolveUserIsPremium } from './ai-provider';
+import { sanitizeGeminiModel } from './ai-provider/gemini';
 import type { GeneratedPlanningContent } from '@/types/planning';
 
 // ── Puntero global de Round-Robin ─────────────────────────────────────────────
@@ -22,15 +23,15 @@ import type { GeneratedPlanningContent } from '@/types/planning';
 let globalKeyPointerIndex = 0;
 
 // ── Cadena de fallback por modelo ─────────────────────────────────────────────
-// Solo se activa si el modelo solicitado devuelve HTTP 404 (descontinuado).
+// Modelos autorizados: únicamente gemini-3.5-flash-lite y gemini-3.1-flash-lite
 const FALLBACK_CHAIN_STANDARD = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
-const FALLBACK_CHAIN_PREMIUM  = ['gemini-3.5-flash', 'gemini-3.1-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+const FALLBACK_CHAIN_PREMIUM  = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
 
 function buildModelChain(requestedModel: string, isPremium: boolean): string[] {
+  const sanitized = sanitizeGeminiModel(requestedModel);
   const chain = isPremium ? FALLBACK_CHAIN_PREMIUM : FALLBACK_CHAIN_STANDARD;
-  // Pon el modelo solicitado primero (si no está ya en la cadena)
-  if (chain[0] === requestedModel) return chain;
-  return [requestedModel, ...chain.filter(m => m !== requestedModel)];
+  if (chain[0] === sanitized) return chain;
+  return [sanitized, ...chain.filter(m => m !== sanitized)];
 }
 
 // ── Motor principal: callGeminiPool ───────────────────────────────────────────

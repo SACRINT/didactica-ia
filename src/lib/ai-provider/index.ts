@@ -19,7 +19,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { withKeyRotation } from './key-rotator';
-import { GeminiProvider } from './gemini';
+import { GeminiProvider, sanitizeGeminiModel } from './gemini';
 import { ClaudeProvider } from './claude';
 import { OpenAICompatibleProvider } from './openai';
 import type { AIProvider } from './types';
@@ -70,14 +70,18 @@ async function getActiveConfig(isPremium = false): Promise<ActiveConfig> {
     for (const row of rows) map[row.key] = row.value;
 
     if (isPremium) {
+      const provider = map['admin_provider'] || DEFAULT_PREMIUM_PROVIDER;
+      const rawModel = map['admin_model']    || DEFAULT_PREMIUM_MODEL;
       return {
-        provider: map['admin_provider'] || DEFAULT_PREMIUM_PROVIDER,
-        model:    map['admin_model']    || DEFAULT_PREMIUM_MODEL,
+        provider,
+        model: provider === 'gemini' ? sanitizeGeminiModel(rawModel) : rawModel,
       };
     }
+    const provider = map['active_provider'] || DEFAULT_STANDARD_PROVIDER;
+    const rawModel = map['active_model']    || DEFAULT_STANDARD_MODEL;
     return {
-      provider: map['active_provider'] || DEFAULT_STANDARD_PROVIDER,
-      model:    map['active_model']    || DEFAULT_STANDARD_MODEL,
+      provider,
+      model: provider === 'gemini' ? sanitizeGeminiModel(rawModel) : rawModel,
     };
   } catch {
     // Fallback if DB is unavailable
