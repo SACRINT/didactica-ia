@@ -18,7 +18,6 @@ import {
 import { getAIProvider, logActivity } from '@/lib/ai-provider';
 import { callGeminiPool } from '@/lib/gemini';
 import { getUserLibraryContext } from '@/lib/context-extractor';
-import { getNormativaForGenerator } from '@/lib/normativa-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -143,18 +142,12 @@ export async function POST(
     // Inyectar contexto de la biblioteca documental si existe
     const libraryContext = await getUserLibraryContext(session.user.email!);
 
-    // Inyectar normativa oficial en pasos 1 y 2 (Diagnóstico y Justificación),
-    // donde el fundamento legal enriquece directamente la generación.
-    let normativaContext = '';
-    if (step === 1 || step === 2) {
-      normativaContext = await getNormativaForGenerator('paec');
-    }
+    // NOTA: La normativa oficial NO se inyecta en PAEC-PEC.
+    // Decisión del usuario (2026-08-08): solo PMC y PIPS llevan
+    // fundamentación jurídica; los PAEC reales de la Zona 004 no citan leyes.
 
-    // Construir el prompt completo: prompt base + normativa (si aplica) + biblioteca
+    // Construir el prompt completo: prompt base + biblioteca
     let fullUserPrompt = userPrompt;
-    if (normativaContext) {
-      fullUserPrompt = `${fullUserPrompt}\n\n${normativaContext}`;
-    }
     if (libraryContext) {
       fullUserPrompt = `${fullUserPrompt}\n\n${libraryContext}`;
     }

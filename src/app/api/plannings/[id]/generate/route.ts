@@ -5,7 +5,6 @@ import { generatePlanningStream } from '@/lib/gemini';
 import { logActivity } from '@/lib/ai-provider';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
 import { getUserLibraryContext } from '@/lib/context-extractor';
-import { getNormativaForGenerator } from '@/lib/normativa-context';
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 
 export const runtime = 'nodejs';
@@ -54,14 +53,14 @@ export async function POST(
     );
 
     const libraryContext = await getUserLibraryContext(session.user.email!);
-    const normativaContext = await getNormativaForGenerator('planeacion');
+
+    // NOTA: La normativa oficial NO se inyecta en planeaciones didácticas.
+    // Decisión del usuario (2026-08-08): solo PMC y PIPS llevan
+    // fundamentación jurídica; el formato DBEPA de planeación no la incluye.
 
     let fullUserPrompt = userPrompt;
     if (libraryContext) {
       fullUserPrompt += `\n\n${libraryContext}`;
-    }
-    if (normativaContext) {
-      fullUserPrompt += `\n\n${normativaContext}`;
     }
 
     const teacherEmail = session.user.email!;

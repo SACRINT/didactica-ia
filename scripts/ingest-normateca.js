@@ -76,35 +76,47 @@ async function generateWithRotation(prompt, retries = 3) {
 const ALLOWED_FOLDERS = [
   'Lineamientos',
   'Ley Local - Ley Federal  - Ley General',
-  'Ley Reglamentaria'
+  'Ley Reglamentaria',
+  'Acuerdos',
+  'Circulares',
+  'Constituciones Políticas',
+  'Códigos',
+  'Decreto de Creación'
 ];
 
 async function extractInfoFromText(text, filename) {
   const prompt = `
-Eres un asistente experto en análisis legal y normativo para el sistema de educación pública en México.
+Eres un asistente experto en análisis legal y normativo para el sistema de educación pública en México (Bachillerato General Estatal, EMS).
 Tengo el siguiente texto extraído de un documento PDF titulado "${filename}".
 
-Tu tarea es extraer:
+PRIMERO decide si el documento ES APLICABLE a la educación media superior (EMS), planeación didáctica, gestión escolar (PMC), supervisión (PIPS) o proyectos comunitarios (PAEC). Ejemplos de documentos NO aplicables: leyes fiscales, tributarias, financieras, hacendarias, de ingresos, de amparo, de expropiación, de firma electrónica, de coordinación fiscal, de adquisiciones, de ahorro para el retiro, civiles, mercantiles, religiosas, migratorias y similares.
+Si NO es aplicable, responde: {"aplica": false} y NADA más.
+
+Si SÍ es aplicable, extrae:
 1. El título oficial del documento.
-2. El tipo de documento (debe ser uno de: constitucion, ley_general, ley_local, reglamento, acuerdo, lineamiento, otro).
+2. El tipo de documento (debe ser uno de: constitucion, ley_general, ley_federal, ley_local, reglamento, acuerdo, lineamiento, circular, decreto, tratado, otro).
 3. La fuente o fecha de publicación si está disponible.
-4. Una lista de artículos o apartados relevantes, con su número y texto.
+4. Una lista de artículos o apartados relevantes para la EMS/planeación/gestión escolar, con su número, su texto y a qué generadores aplica.
+
+REGLA CRÍTICA DE TEXTOS: El "texto" de cada artículo debe ser la transcripción LITERAL del texto legal. NUNCA lo resumas, parafrasees ni inventes. Si el fragmento original es muy extenso, transcribe solo el inciso o fracción que aplica a educación (pero siempre textual). Máximo 1500 caracteres por artículo.
+REGLA DE APLICABILIDAD: Para cada artículo indica "aplicable_a" con uno o más de: ["pmc"] (gestión directiva/mejora continua), ["paec"] (proyectos comunitarios), ["pips"] (supervisión), ["planeacion"] (planeación didáctica). Si el artículo no aplica a ninguno, omítelo.
 
 El formato de respuesta DEBE ser estrictamente JSON, sin markdown, con esta estructura:
 {
+  "aplica": true,
   "titulo": "string",
   "tipo": "string",
   "fuente": "string",
   "articulos": [
     {
-      "numero": "string",
-      "texto": "string (resumen o texto completo)"
+      "numero": "string (número o nombre exacto del artículo/fracción/lineamiento)",
+      "texto": "string (transcripción LITERAL)",
+      "aplicable_a": ["pmc" | "paec" | "pips" | "planeacion"]
     }
   ]
 }
 
-Asegúrate de que los artículos extraídos sean los más relevantes para educación (ej. educación media superior, planeación, evaluación). 
-Si el documento es muy corto, extrae los lineamientos principales.
+Solo incluye artículos con relevancia directa para educación. Si el documento es muy corto, extrae los lineamientos principales. NUNCA inventes números de artículo ni textos que no aparezcan en el documento.
 
 Texto del documento (truncado a 30000 caracteres por límites):
 ${text.substring(0, 30000)}
@@ -212,7 +224,7 @@ async function main() {
       
       const text = await processPdf(pdfPath);
       if (text.length < 100) {
-        console.log(`  ⏭️  Saltando por ser muy corto (<100 chars).`);
+        console.log(`  ⏭️  [ESCANEADO-OCR] PDF sin texto extraíble (<100 chars). Requiere OCR manual.`);
         skippedCount++;
         continue;
       }
@@ -223,6 +235,16 @@ async function main() {
       if (!extracted) {
         console.log(`  ❌ Falló la extracción para ${filename}.`);
         continue;
+      }
+
+      if (extracted.aplica === false) {
+        console.log(`  ⏭️  [NO-APLICA] Documento sin relevancia educativa (EMS/PMC/PAEC/PIPS), omitido: "${filename}"`);
+        skippedCount++;
+        continue;
+      }
+
+      if (!Array.isArray(extracted.articulos)) {
+        extracted.articulos = [];
       }
 
       console.log(`  ✅ Extraído: "${extracted.titulo}" (${extracted.articulos.length} artículos)`);
@@ -254,13 +276,24 @@ async function main() {
         // Upsert articles
         for (let i = 0; i < extracted.articulos.length; i++) {
           const art = extracted.articulos[i];
+          if (!art.numero || !art.texto || art.texto.trim().length < 40) {
+            console.log(`     ⏭️  Artículo omitido por estar vacío o incompleto: ${art.numero || '(sin número)'}`);
+            continue;
+          }
+
+          // Aplicabilidad por artículo (fallback conservador: solo si la IA lo clasificó)
+          const aplicable_a = Array.isArray(art.aplicable_a) && art.aplicable_a.length > 0
+            ? art.aplicable_a.filter(g => ['pmc', 'paec', 'pips', 'planeacion'].includes(g))
+            : ['planeacion'];
+          if (aplicable_a.length === 0) {
+            console.log(`     ⏭️  Artículo sin generador aplicable, omitido: ${art.numero}`);
+            continue;
+          }
+
           const artExists = await sql`
             SELECT id FROM normativa_articulos WHERE documento_id = ${docId} AND numero = ${art.numero} LIMIT 1
           `;
-          
-          // Apply to everything for now as default
-          const aplicable_a = ['pmc', 'paec', 'pips', 'planeacion'];
-          
+
           if (artExists.length > 0) {
             await sql`
               UPDATE normativa_articulos
