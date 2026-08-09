@@ -1155,55 +1155,235 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
               </div>
             )}
 
-            <div style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
-              <button className="btn-sm btn-primary" onClick={() => alert('Próximamente: Crear Documento')}>+ Nuevo Documento</button>
+            {/* Toolbar */}
+            <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button className="btn-sm btn-primary" onClick={() => setShowNewDocModal(true)}>+ Nuevo Documento</button>
+              <button className="btn-sm" style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}
+                onClick={activateAllNormativa}>✅ Activar Todos</button>
+              <button className="btn-sm btn-ghost" onClick={loadNormativa}>↺ Actualizar</button>
             </div>
 
-            {normativaDocs.length === 0 ? (
-              <div className="empty-state">No hay normativa cargada. Ejecuta el seeder para inicializarla.</div>
-            ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '40%' }}>Documento</th>
-                    <th>Tipo</th>
-                    <th>Estado</th>
-                    <th>Artículos</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {normativaDocs.map(doc => (
-                    <tr key={doc.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{doc.titulo}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{doc.fuente || 'Sin fuente'}</div>
-                      </td>
-                      <td><span className="badge badge-blue">{doc.tipo}</span></td>
-                      <td>
-                        {doc.vigente 
-                          ? <span className="badge badge-green">Vigente</span>
-                          : <span className="badge badge-yellow">No vigente</span>}
-                      </td>
-                      <td>
-                        <span className="badge badge-blue" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                          {doc.articulos?.length || 0} arts
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn-sm" style={{ background: 'rgba(255,255,255,0.1)' }} onClick={() => alert('Próximamente: Editar/Ver')}>Ver</button>
-                          <button className="btn-sm btn-danger" onClick={async () => {
-                            if (!confirm('¿Eliminar este documento y TODOS sus artículos?')) return;
-                            await fetch(`/api/admin/normativa?documento_id=${doc.id}`, { method: 'DELETE' });
-                            loadNormativa();
-                          }}>🗑️</button>
+            {/* Filtros */}
+            <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                placeholder="🔍 Buscar por título o fuente..."
+                value={normativaSearch}
+                onChange={e => setNormativaSearch(e.target.value)}
+                style={{ flex: '1 1 240px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+              />
+              <select value={normativaTypeFilter} onChange={e => setNormativaTypeFilter(e.target.value)}
+                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
+                <option value="todos">Todos los tipos</option>
+                <option value="ley_general">Ley General</option>
+                <option value="ley_local">Ley Local</option>
+                <option value="ley_federal">Ley Federal</option>
+                <option value="reglamento">Reglamento</option>
+                <option value="acuerdo">Acuerdo</option>
+                <option value="circular">Circular</option>
+                <option value="constitucion">Constitución</option>
+                <option value="manual">Manual</option>
+                <option value="otro">Otro</option>
+              </select>
+              <select value={normativaVigenteFilter} onChange={e => setNormativaVigenteFilter(e.target.value as any)}
+                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
+                <option value="todos">Todos los estados</option>
+                <option value="vigentes">Solo Vigentes</option>
+                <option value="no_vigentes">Solo No Vigentes</option>
+              </select>
+            </div>
+
+            {/* Vista detalle de documento seleccionado */}
+            {selectedNormativaDoc ? (
+              <div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                  <button className="btn-sm btn-ghost" onClick={() => setSelectedNormativaDoc(null)}>← Volver</button>
+                  <h3 style={{ color: '#818cf8', fontSize: 14, margin: 0, flex: 1 }}>{selectedNormativaDoc.titulo}</h3>
+                  <button
+                    className="btn-sm"
+                    style={{ background: selectedNormativaDoc.vigente ? 'rgba(251,191,36,0.15)' : 'rgba(74,222,128,0.15)', border: `1px solid ${selectedNormativaDoc.vigente ? 'rgba(251,191,36,0.3)' : 'rgba(74,222,128,0.3)'}`, color: selectedNormativaDoc.vigente ? '#fbbf24' : '#4ade80' }}
+                    onClick={() => toggleNormativaVigente(selectedNormativaDoc.id, selectedNormativaDoc.vigente)}
+                  >{selectedNormativaDoc.vigente ? 'Desactivar' : 'Activar'}</button>
+                  <button className="btn-sm btn-primary" onClick={() => { setNewArtForm(f => ({ ...f, documento_id: selectedNormativaDoc.id })); setShowNewArtModal(true); }}>+ Artículo</button>
+                  <button className="btn-sm btn-danger" onClick={() => deleteNormativaDoc(selectedNormativaDoc.id, selectedNormativaDoc.titulo)}>🗑️ Eliminar doc</button>
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>
+                  {selectedNormativaDoc.articulos?.length || 0} artículo(s) · Tipo: {selectedNormativaDoc.tipo} · Fuente: {selectedNormativaDoc.fuente || '—'}
+                </div>
+                <input
+                  placeholder="🔍 Buscar artículo..."
+                  value={artSearch}
+                  onChange={e => setArtSearch(e.target.value)}
+                  style={{ width: '100%', marginBottom: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, boxSizing: 'border-box' }}
+                />
+                {(selectedNormativaDoc.articulos || []).filter(a => !artSearch || a.numero.toLowerCase().includes(artSearch.toLowerCase()) || a.texto.toLowerCase().includes(artSearch.toLowerCase())).map(art => (
+                  <div key={art.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+                    {editingArt?.id === art.id ? (
+                      <form onSubmit={handleUpdateArt}>
+                        <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+                          <input value={editingArt.numero} onChange={e => setEditingArt(a => a ? { ...a, numero: e.target.value } : null)}
+                            placeholder="Número (ej: Art. 3°)" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 10px', color: '#f0f4ff', fontSize: 13 }} />
+                          <textarea value={editingArt.texto} onChange={e => setEditingArt(a => a ? { ...a, texto: e.target.value } : null)}
+                            rows={3} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '6px 10px', color: '#f0f4ff', fontSize: 13, resize: 'vertical' }} />
+                          <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                            {(['pmc', 'paec', 'pips', 'planeacion'] as const).map(m => (
+                              <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={editingArt.aplicable_a.includes(m)}
+                                  onChange={e => setEditingArt(a => a ? { ...a, aplicable_a: e.target.checked ? [...a.aplicable_a, m] : a.aplicable_a.filter(x => x !== m) } : null)} />
+                                {m.toUpperCase()}
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="submit" className="btn-sm btn-primary" disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button>
+                          <button type="button" className="btn-sm btn-ghost" onClick={() => setEditingArt(null)}>Cancelar</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 12, color: '#818cf8', marginBottom: 4 }}>{art.numero}</div>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{art.texto}</div>
+                          <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {(art.aplicable_a || []).map(m => (
+                              <span key={m} className="badge badge-blue" style={{ fontSize: 10, padding: '2px 6px' }}>{m.toUpperCase()}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button className="btn-sm btn-ghost" onClick={() => setEditingArt(art)}>✏️</button>
+                          <button className="btn-sm btn-danger" onClick={() => deleteNormativaArt(art.id)}>🗑️</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {(selectedNormativaDoc.articulos?.length || 0) === 0 && <div className="empty-state">Este documento no tiene artículos cargados.</div>}
+              </div>
+            ) : (() => {
+              const filtered = normativaDocs.filter(doc => {
+                const q = normativaSearch.toLowerCase();
+                const matchSearch = !q || doc.titulo.toLowerCase().includes(q) || (doc.fuente || '').toLowerCase().includes(q);
+                const matchType = normativaTypeFilter === 'todos' || doc.tipo === normativaTypeFilter;
+                const matchV = normativaVigenteFilter === 'todos' || (normativaVigenteFilter === 'vigentes' ? doc.vigente : !doc.vigente);
+                return matchSearch && matchType && matchV;
+              });
+              return filtered.length === 0 ? (
+                <div className="empty-state">
+                  {normativaDocs.length === 0 ? 'No hay normativa cargada. Ejecuta el seeder para inicializarla.' : 'No se encontraron documentos con los filtros aplicados.'}
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>Mostrando {filtered.length} de {normativaDocs.length} documento(s)</div>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '45%' }}>Documento</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Artículos</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(doc => (
+                        <tr key={doc.id}>
+                          <td>
+                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{doc.titulo}</div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{doc.fuente || 'Sin fuente'}</div>
+                          </td>
+                          <td><span className="badge badge-blue">{doc.tipo}</span></td>
+                          <td>
+                            <button onClick={() => toggleNormativaVigente(doc.id, doc.vigente)} title={doc.vigente ? 'Clic para desactivar' : 'Clic para activar'} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                              {doc.vigente ? <span className="badge badge-green">Vigente ✓</span> : <span className="badge badge-yellow">No vigente</span>}
+                            </button>
+                          </td>
+                          <td><span className="badge" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>{doc.articulos?.length || 0} arts</span></td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn-sm" style={{ background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.3)', color: '#818cf8' }} onClick={() => setSelectedNormativaDoc(doc)}>Ver artículos</button>
+                              <button className="btn-sm btn-danger" onClick={() => deleteNormativaDoc(doc.id, doc.titulo)}>🗑️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              );
+            })()}
+
+            {/* Modal: Nuevo Documento */}
+            {showNewDocModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 520 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <h3 style={{ color: '#818cf8', margin: 0 }}>Nuevo Documento Normativo</h3>
+                    <button className="btn-sm btn-ghost" onClick={() => setShowNewDocModal(false)}>✕ Cerrar</button>
+                  </div>
+                  <form onSubmit={handleCreateDoc} style={{ display: 'grid', gap: 14 }}>
+                    <div className="form-group"><label>Título *</label><input value={newDocForm.titulo} onChange={e => setNewDocForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej: Ley General de Educación" required /></div>
+                    <div className="form-group">
+                      <label>Tipo *</label>
+                      <select value={newDocForm.tipo} onChange={e => setNewDocForm(f => ({ ...f, tipo: e.target.value }))} style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, width: '100%' }}>
+                        <option value="ley_general">Ley General</option><option value="ley_local">Ley Local</option><option value="ley_federal">Ley Federal</option>
+                        <option value="reglamento">Reglamento</option><option value="acuerdo">Acuerdo</option><option value="circular">Circular</option>
+                        <option value="constitucion">Constitución</option><option value="manual">Manual</option><option value="otro">Otro</option>
+                      </select>
+                    </div>
+                    <div className="form-group"><label>Fuente / DOF</label><input value={newDocForm.fuente} onChange={e => setNewDocForm(f => ({ ...f, fuente: e.target.value }))} placeholder="Ej: DOF 30-09-2019" /></div>
+                    <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="checkbox" checked={newDocForm.vigente} onChange={e => setNewDocForm(f => ({ ...f, vigente: e.target.checked }))} style={{ accentColor: '#6366f1' }} />
+                      Marcar como vigente
+                    </label>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                      <button type="submit" className="btn-sm btn-primary" disabled={saving} style={{ flex: 1 }}>{saving ? 'Creando...' : 'Crear Documento'}</button>
+                      <button type="button" className="btn-sm btn-ghost" onClick={() => setShowNewDocModal(false)}>Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Nuevo Artículo */}
+            {showNewArtModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <h3 style={{ color: '#818cf8', margin: 0 }}>Nuevo Artículo</h3>
+                    <button className="btn-sm btn-ghost" onClick={() => setShowNewArtModal(false)}>✕ Cerrar</button>
+                  </div>
+                  <form onSubmit={handleCreateArt} style={{ display: 'grid', gap: 14 }}>
+                    <div className="form-group">
+                      <label>Documento</label>
+                      <select value={newArtForm.documento_id} onChange={e => setNewArtForm(f => ({ ...f, documento_id: e.target.value }))} required
+                        style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, width: '100%' }}>
+                        <option value="">— Selecciona un documento —</option>
+                        {normativaDocs.map(d => <option key={d.id} value={d.id}>{d.titulo}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group"><label>Número del artículo *</label><input value={newArtForm.numero} onChange={e => setNewArtForm(f => ({ ...f, numero: e.target.value }))} placeholder="Ej: Art. 3°" required /></div>
+                    <div className="form-group"><label>Texto del artículo *</label><textarea value={newArtForm.texto} onChange={e => setNewArtForm(f => ({ ...f, texto: e.target.value }))} rows={5} placeholder="Texto completo del artículo..." required style={{ minHeight: 120 }} /></div>
+                    <div>
+                      <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', display: 'block', marginBottom: 8 }}>Aplicable a módulos:</label>
+                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                        {(['pmc', 'paec', 'pips', 'planeacion'] as const).map(m => (
+                          <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={newArtForm.aplicable_a.includes(m)}
+                              onChange={e => setNewArtForm(f => ({ ...f, aplicable_a: e.target.checked ? [...f.aplicable_a, m] : f.aplicable_a.filter(x => x !== m) }))}
+                              style={{ accentColor: '#6366f1' }} />
+                            {m.toUpperCase()}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                      <button type="submit" className="btn-sm btn-primary" disabled={saving} style={{ flex: 1 }}>{saving ? 'Agregando...' : 'Agregar Artículo'}</button>
+                      <button type="button" className="btn-sm btn-ghost" onClick={() => setShowNewArtModal(false)}>Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             )}
           </>
         )}
