@@ -2,14 +2,15 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getTeacherByEmail } from '@/lib/db';
 import AppLayout from '@/components/layout/AppLayout';
-import HorariosDashboardClient from './HorariosDashboardClient';
+import MiZonaClient from './MiZonaClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Generador de Horarios Escolar IA (Directores) · DidactecaIA',
+  title: 'Mi Zona de Supervisión · DidactecaIA',
+  description: 'Gestión de los planteles de tu zona de supervisión.',
 };
 
-export default async function HorariosDashboardPage({
+export default async function MiZonaPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -25,30 +26,28 @@ export default async function HorariosDashboardPage({
     teacher.role === 'administrador' ||
     session.user.email === process.env.ADMIN_EMAIL;
 
-  const isDirector = isAdmin || teacher.role === 'director';
+  const isSupervisor = isAdmin || teacher.role === 'supervisor';
 
-  if (!isDirector) {
+  if (!isSupervisor) {
     redirect(`/${locale}/dashboard`);
   }
 
   return (
-    <AppLayout locale={locale} activeSection="horarios">
+    <AppLayout locale={locale} activeSection="mi-zona">
       <div className="page-header">
         <div>
-          <h1 className="page-title">📅 Generador de Horarios Escolar Inteligente</h1>
+          <h1 className="page-title">🔍 Mi Zona de Supervisión</h1>
           <p className="page-subtitle">
-            Gestión y construcción de plantillas sin empalmes para Directores · DBEPA Puebla
+            Registro y seguimiento de los planteles bajo tu supervisión
+            {teacher.school_name ? ` · ${teacher.school_name}` : ''}
           </p>
         </div>
       </div>
 
-      <HorariosDashboardClient
-        isDirector={isDirector}
+      <MiZonaClient
+        supervisorName={teacher.name || 'Supervisor'}
+        zoneName={teacher.school_name || 'Mi Zona'}
         isAdmin={isAdmin}
-        teacherName={teacher.name || 'Docente'}
-        teacherId={teacher.id}
-        schoolName={teacher.school_name || 'Mi Plantel'}
-        cct={teacher.cct || 'SIN CCT'}
       />
     </AppLayout>
   );

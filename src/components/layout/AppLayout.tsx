@@ -13,17 +13,17 @@ type Props = {
   activeSection?: string;
 };
 
-async function checkIsAdmin(email: string): Promise<boolean> {
-  if (process.env.ADMIN_EMAIL === email) return true;
+async function getUserRole(email: string): Promise<{ isAdmin: boolean; role: string }> {
+  if (process.env.ADMIN_EMAIL === email) return { isAdmin: true, role: 'administrador' };
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const adminRows = await sql`SELECT email FROM admins WHERE email = ${email} LIMIT 1`;
-    if (adminRows.length > 0) return true;
+    if (adminRows.length > 0) return { isAdmin: true, role: 'administrador' };
     
     const teacherRows = await sql`SELECT role FROM teachers WHERE email = ${email} LIMIT 1`;
-    if (teacherRows.length > 0 && teacherRows[0].role === 'administrador') return true;
+    if (teacherRows.length > 0) return { isAdmin: false, role: teacherRows[0].role };
   } catch {}
-  return false;
+  return { isAdmin: false, role: 'docente' };
 }
 
 async function getMaintenanceStatus(): Promise<{ active: boolean; message: string }> {
@@ -53,8 +53,8 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
     ? user.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
     : user.email?.[0].toUpperCase() || '?';
 
-  const [isAdmin, maintenance] = await Promise.all([
-    user.email ? checkIsAdmin(user.email) : Promise.resolve(false),
+  const [{ isAdmin, role }, maintenance] = await Promise.all([
+    user.email ? getUserRole(user.email) : Promise.resolve({ isAdmin: false, role: 'docente' }),
     getMaintenanceStatus(),
   ]);
 
@@ -152,18 +152,13 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
           + Nueva planeación
         </Link>
 
-        <div className="sidebar-section-label">Menú</div>
+        {/* ── SECCIÓN DOCENTE (todos) ── */}
+        <div className="sidebar-section-label">Planeación Docente</div>
         <Link href={`/${locale}/dashboard`} className={`sidebar-link ${activeSection === 'dashboard' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📝</span>Mis planeaciones
         </Link>
         <Link href={`/${locale}/paec`} className={`sidebar-link ${activeSection === 'paec' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">🏫</span>Proyectos PAEC-PEC
-        </Link>
-        <Link href={`/${locale}/pmc`} className={`sidebar-link ${activeSection === 'pmc' ? 'active' : ''}`}>
-          <span className="sidebar-link-icon">📈</span>Plan de Mejora (PMC)
-        </Link>
-        <Link href={`/${locale}/pips`} className={`sidebar-link ${activeSection === 'pips' ? 'active' : ''}`}>
-          <span className="sidebar-link-icon">📋</span>PIPS Supervisión
         </Link>
         <Link href={`/${locale}/mis-documentos`} className={`sidebar-link ${activeSection === 'mis-documentos' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📁</span>Mis Documentos
@@ -171,9 +166,35 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         <Link href={`/${locale}/mis-escuelas`} className={`sidebar-link ${activeSection === 'mis-escuelas' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">🏫</span>Mis Escuelas
         </Link>
-        <Link href={`/${locale}/horarios`} className={`sidebar-link ${activeSection === 'horarios' ? 'active' : ''}`}>
-          <span className="sidebar-link-icon">📅</span>Horarios IA (Directores)
-        </Link>
+
+        {/* ── SECCIÓN DIRECTOR ── */}
+        {(role === 'director' || isAdmin) && (
+          <>
+            <div className="sidebar-section-label" style={{ marginTop: 14 }}>Gestión del Plantel</div>
+            <Link href={`/${locale}/mi-escuela`} className={`sidebar-link ${activeSection === 'mi-escuela' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">👥</span>Mi Personal
+            </Link>
+            <Link href={`/${locale}/horarios`} className={`sidebar-link ${activeSection === 'horarios' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">📅</span>Horarios IA (Directores)
+            </Link>
+            <Link href={`/${locale}/pmc`} className={`sidebar-link ${activeSection === 'pmc' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">📈</span>Plan de Mejora (PMC)
+            </Link>
+          </>
+        )}
+
+        {/* ── SECCIÓN SUPERVISOR ── */}
+        {(role === 'supervisor' || isAdmin) && (
+          <>
+            <div className="sidebar-section-label" style={{ marginTop: 14 }}>Supervisión de Zona</div>
+            <Link href={`/${locale}/mi-zona`} className={`sidebar-link ${activeSection === 'mi-zona' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">🗺️</span>Mi Zona
+            </Link>
+            <Link href={`/${locale}/pips`} className={`sidebar-link ${activeSection === 'pips' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">📋</span>Cartografía de Supervisión
+            </Link>
+          </>
+        )}
 
         {/* Admin section — visible only for admins */}
         {isAdmin && (

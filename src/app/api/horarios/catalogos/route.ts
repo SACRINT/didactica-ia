@@ -9,32 +9,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Devuelve todos los teachers como lista de docentes
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: "Docente no encontrado" }, { status: 404 });
+    }
+
+    // Devuelve el personal registrado por este Director
     let rows: any[] = [];
     try {
       rows = await sql()`
-        SELECT id::text, name, email, role, school_name
-        FROM teachers
-        ORDER BY name ASC
+        SELECT id::text, nombre, apellido_paterno, apellido_materno, cargo, horas_base, email
+        FROM escuela_personal
+        WHERE director_id = ${teacher.id}::uuid AND activo = TRUE
+        ORDER BY apellido_paterno ASC, nombre ASC
       `;
     } catch (e) {
-      console.warn("[api/horarios/catalogos GET] Error consultando teachers:", e);
+      console.warn("[api/horarios/catalogos GET] Error consultando escuela_personal:", e);
     }
 
-    const docentes = rows.map((t: any) => {
-      const parts = (t.name || "").trim().split(" ");
-      return {
-        id: t.id,
-        nombre: parts[0] || "",
-        apellidoPaterno: parts.slice(1).join(" ") || "Docente",
-        apellidoMaterno: "",
-        cargo: t.role === "director" ? "DIRECTOR"
-             : t.role === "administrador" ? "DIRECTOR"
-             : "DOCENTE",
-        horasAsignadas: 20,
-        email: t.email,
-      };
-    });
+    const docentes = rows.map((p: any) => ({
+      id: p.id,
+      nombre: p.nombre || "",
+      apellidoPaterno: p.apellido_paterno || "",
+      apellidoMaterno: p.apellido_materno || "",
+      cargo: p.cargo || "DOCENTE",
+      horasAsignadas: p.horas_base || 20,
+      email: p.email || "",
+    }));
 
     return NextResponse.json({ success: true, docentes });
   } catch (error: any) {
@@ -50,34 +51,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    const teacher = await getTeacherByEmail(session.user.email);
+    if (!teacher) {
+      return NextResponse.json({ error: "Docente no encontrado" }, { status: 404 });
+    }
+
     const body = await req.json();
-    const { accion, nombre, apellidoPaterno, apellidoMaterno, email: emailDocente } = body;
+    const { accion, nombre, apellidoPaterno, apellidoMaterno, email: emailDocente, cargo, horasBase } = body;
 
     if (accion === "CREAR_DOCENTE") {
-      const fullName = [nombre, apellidoPaterno, apellidoMaterno].filter(Boolean).join(" ");
-      const emailFinal = emailDocente || `docente_${Date.now()}@didacteca.local`;
+      const nom = (nombre || "").trim();
+      const apP = (apellidoPaterno || "").trim();
+      const apM = (apellidoMaterno || "").trim();
+      const car = (cargo || "DOCENTE").toUpperCase();
+      const hrs = Number(horasBase) || 20;
+
+      if (!nom || !apP) {
+        return NextResponse.json({ error: "Nombre y apellido paterno son requeridos" }, { status: 400 });
+      }
 
       let docenteId = `doc_temp_${Date.now()}`;
       try {
         const rows = await sql()`
-          INSERT INTO teachers (name, email, role)
-          VALUES (${fullName}, ${emailFinal}, 'docente')
-          ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+          INSERT INTO escuela_personal
+            (director_id, nombre, apellido_paterno, apellido_materno, email, cargo, horas_base)
+          VALUES
+            (${teacher.id}::uuid, ${nom}, ${apP}, ${apM || null}, ${(emailDocente || "").trim() || null}, ${car}, ${hrs})
+          ON CONFLICT (director_id, nombre, apellido_paterno) DO UPDATE SET
+            apellido_materno = EXCLUDED.apellido_materno,
+            cargo            = EXCLUDED.cargo,
+            horas_base       = EXCLUDED.horas_base,
+            activo           = TRUE
           RETURNING id::text
         `;
         if (rows[0]?.id) docenteId = rows[0].id;
       } catch (e) {
-        console.warn("[api/horarios/catalogos POST] Insert docente fallback:", e);
+        console.warn("[api/horarios/catalogos POST] Insert escuela_personal error:", e);
       }
 
       const docente = {
         id: docenteId,
-        nombre: nombre || "Docente",
-        apellidoPaterno: apellidoPaterno || "",
-        apellidoMaterno: apellidoMaterno || "",
-        cargo: "DOCENTE",
-        horasAsignadas: 20,
-        email: emailFinal,
+        nombre: nom,
+        apellidoPaterno: apP,
+        apellidoMaterno: apM,
+        cargo: car,
+        horasAsignadas: hrs,
+        email: emailDocente || "",
       };
       return NextResponse.json({ success: true, docente });
     }

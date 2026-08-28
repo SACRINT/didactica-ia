@@ -92,30 +92,42 @@ export async function GET(req: NextRequest) {
       requiereAulaEspecial: c.requiereAulaEspecial,
     }));
 
-    // ── Docentes: todos los teachers de la DB ──────────────────────────
-    let docentesRows: any[] = [];
+    // ── Docentes: Personal del plantel registrado por el Director ────────
+    let personalRows: any[] = [];
     try {
-      docentesRows = await sql()`
-        SELECT id::text, name, email, role, school_name
-        FROM teachers
-        ORDER BY name ASC
+      personalRows = await sql()`
+        SELECT id::text, nombre, apellido_paterno, apellido_materno, cargo, horas_base, email
+        FROM escuela_personal
+        WHERE director_id = ${teacherId}::uuid AND activo = TRUE
+        ORDER BY apellido_paterno ASC, nombre ASC
       `;
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.warn("[api/horarios/configuracion GET] Error consultando escuela_personal:", e);
+    }
 
-    const docentes = docentesRows.map((t: any) => {
-      const parts = (t.name || "").trim().split(" ");
-      return {
-        id: t.id,
-        nombre: parts[0] || "",
-        apellidoPaterno: parts.slice(1).join(" ") || "Docente",
+    let docentes = personalRows.map((p: any) => ({
+      id: p.id,
+      nombre: p.nombre || "",
+      apellidoPaterno: p.apellido_paterno || "",
+      apellidoMaterno: p.apellido_materno || "",
+      cargo: p.cargo || "DOCENTE",
+      horasAsignadas: p.horas_base || 20,
+      email: p.email || "",
+    }));
+
+    // Si aún no tiene personal registrado, incluir al director como primer docente sugerido
+    if (docentes.length === 0) {
+      const parts = (teacher.name || "Director").trim().split(" ");
+      docentes = [{
+        id: teacherId,
+        nombre: parts[0] || "Director",
+        apellidoPaterno: parts.slice(1).join(" ") || "Plantel",
         apellidoMaterno: "",
-        cargo: t.role === "director" ? "DIRECTOR"
-             : t.role === "administrador" ? "DIRECTOR"
-             : "DOCENTE",
+        cargo: "DIRECTIVO",
         horasAsignadas: 20,
-        email: t.email,
-      };
-    });
+        email: teacher.email || "",
+      }];
+    }
 
     const aulas = [{ id: "aula-general", nombre: "Aula General", tipo: "REGULAR" }];
 

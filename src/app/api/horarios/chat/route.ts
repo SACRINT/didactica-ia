@@ -43,7 +43,12 @@ export async function POST(req: NextRequest) {
       configRows = await sql()`SELECT * FROM horario_config WHERE teacher_id = ${teacherId}::uuid LIMIT 1`;
       gruposRows = await sql()`SELECT id::text, nombre, semestre FROM horario_grupos WHERE teacher_id = ${teacherId}::uuid ORDER BY semestre, nombre`;
       cargasRows = await sql()`SELECT id::text, grupo_nombre AS "grupoId", uac_name AS "uacName", personal_id AS "personalId", horas_semanales AS "horasSemanales", requiere_aula_esp AS "requiereAulaEspecial" FROM horario_cargas WHERE teacher_id = ${teacherId}::uuid`;
-      docentesRows = await sql()`SELECT id::text, name, email, role, school_name FROM teachers ORDER BY name ASC`;
+      docentesRows = await sql()`
+        SELECT id::text, nombre, apellido_paterno, apellido_materno, cargo, horas_base, email
+        FROM escuela_personal
+        WHERE director_id = ${teacherId}::uuid AND activo = TRUE
+        ORDER BY apellido_paterno ASC, nombre ASC
+      `;
     } catch (e) {
       console.warn("[api/horarios/chat] Error consultando tablas de horarios:", e);
     }
@@ -52,15 +57,22 @@ export async function POST(req: NextRequest) {
     const horasPorDia = configDB?.horas_por_dia ?? 6;
     const diasLectivos = configDB?.dias_lectivos ?? 5;
 
-    const docentes = docentesRows.map((t: any) => {
-      const parts = (t.name || "").trim().split(" ");
-      const hrsAsignadas = clientCeldas.filter((c: any) => c.docenteId === t.id).length;
+    let docentes = docentesRows.map((p: any) => {
+      const hrsAsignadas = clientCeldas.filter((c: any) => c.docenteId === p.id).length;
       return {
-        id: t.id,
-        nombreCompleto: t.name || `${parts[0] || ""} ${parts.slice(1).join(" ")}`.trim(),
-        horasAsignadas: hrsAsignadas > 0 ? hrsAsignadas : 20,
+        id: p.id,
+        nombreCompleto: `${p.nombre || ""} ${p.apellido_paterno || ""}`.trim(),
+        horasAsignadas: hrsAsignadas > 0 ? hrsAsignadas : (p.horas_base || 20),
       };
     });
+
+    if (docentes.length === 0) {
+      docentes = [{
+        id: teacherId,
+        nombreCompleto: teacher.name || "Director Plantel",
+        horasAsignadas: 20,
+      }];
+    }
 
     const materiasSet = new Set<string>();
     clientCeldas.forEach((c: any) => {

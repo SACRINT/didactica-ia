@@ -24,6 +24,15 @@ export default async function PipsDashboardPage({
   const teacher = await getTeacherByEmail(session.user.email);
   if (!teacher) redirect(`/${locale}/login`);
 
+  const isAdmin =
+    teacher.role === 'administrador' ||
+    session.user.email === process.env.ADMIN_EMAIL;
+
+  const isSupervisor = isAdmin || teacher.role === 'supervisor';
+  if (!isSupervisor) {
+    redirect(`/${locale}/dashboard`);
+  }
+
   const sql = neon(process.env.DATABASE_URL!);
   const projects = await sql`
     SELECT id, zona_nombre, zona_clave, supervisor_name,

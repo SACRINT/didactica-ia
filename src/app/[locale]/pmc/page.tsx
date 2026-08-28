@@ -28,6 +28,15 @@ export default async function PmcDashboardPage({
   const teacher = await getTeacherByEmail(session.user.email);
   if (!teacher) redirect(`/${locale}/login`);
 
+  const isAdmin =
+    teacher.role === 'administrador' ||
+    session.user.email === process.env.ADMIN_EMAIL;
+
+  const isDirector = isAdmin || teacher.role === 'director';
+  if (!isDirector) {
+    redirect(`/${locale}/dashboard`);
+  }
+
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL not set');
   const sql = neon(process.env.DATABASE_URL);
   const projects = await sql`

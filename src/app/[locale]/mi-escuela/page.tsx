@@ -2,14 +2,15 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getTeacherByEmail } from '@/lib/db';
 import AppLayout from '@/components/layout/AppLayout';
-import HorariosDashboardClient from './HorariosDashboardClient';
+import MiEscuelaClient from './MiEscuelaClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Generador de Horarios Escolar IA (Directores) · DidactecaIA',
+  title: 'Mi Plantel · DidactecaIA',
+  description: 'Gestión del personal docente y administrativo de tu plantel.',
 };
 
-export default async function HorariosDashboardPage({
+export default async function MiEscuelaPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -32,23 +33,21 @@ export default async function HorariosDashboardPage({
   }
 
   return (
-    <AppLayout locale={locale} activeSection="horarios">
+    <AppLayout locale={locale} activeSection="mi-escuela">
       <div className="page-header">
         <div>
-          <h1 className="page-title">📅 Generador de Horarios Escolar Inteligente</h1>
+          <h1 className="page-title">🏫 Mi Plantel</h1>
           <p className="page-subtitle">
-            Gestión y construcción de plantillas sin empalmes para Directores · DBEPA Puebla
+            Gestión del personal docente y administrativo · {teacher.school_name || 'Tu plantel'}
           </p>
         </div>
       </div>
 
-      <HorariosDashboardClient
-        isDirector={isDirector}
-        isAdmin={isAdmin}
-        teacherName={teacher.name || 'Docente'}
-        teacherId={teacher.id}
+      <MiEscuelaClient
+        teacherName={teacher.name || 'Director'}
         schoolName={teacher.school_name || 'Mi Plantel'}
-        cct={teacher.cct || 'SIN CCT'}
+        cct={teacher.cct || ''}
+        isAdmin={isAdmin}
       />
     </AppLayout>
   );
