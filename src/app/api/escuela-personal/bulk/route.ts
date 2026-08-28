@@ -5,8 +5,8 @@ import { sql, getTeacherByEmail } from '@/lib/db';
 async function getDirectorId(email: string) {
   const teacher = await getTeacherByEmail(email);
   if (!teacher) return null;
-  const isAdmin = teacher.role === 'administrador' || email === process.env.ADMIN_EMAIL;
-  if (teacher.role !== 'director' && !isAdmin) return null;
+  const isAdmin = teacher.role === 'administrador' || teacher.role === 'admin' || email === process.env.ADMIN_EMAIL;
+  if (teacher.role !== 'director' && teacher.role !== 'supervisor' && !isAdmin) return null;
   return teacher.id as string;
 }
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const directorId = await getDirectorId(session.user.email);
     if (!directorId) {
-      return NextResponse.json({ error: 'Solo los directores pueden importar personal' }, { status: 403 });
+      return NextResponse.json({ error: 'Solo los directores y administradores pueden importar personal' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -92,12 +92,36 @@ export async function POST(req: Request) {
       }
     }
 
+    // Obtener la lista completa y actualizada de personal activo
+    let rows: any[] = [];
+    try {
+      rows = await sql()`
+        SELECT id::text, nombre, apellido_paterno, apellido_materno, cargo, horas_base, email
+        FROM escuela_personal
+        WHERE director_id = ${directorId}::uuid AND activo = TRUE
+        ORDER BY apellido_paterno ASC, nombre ASC
+      `;
+    } catch (e) {
+      console.warn('[escuela-personal bulk POST] Error consultando lista final:', e);
+    }
+
+    const personalFormateado = rows.map((p: any) => ({
+      id: p.id,
+      nombre: p.nombre || '',
+      apellidoPaterno: p.apellido_paterno || '',
+      apellidoMaterno: p.apellido_materno || '',
+      cargo: p.cargo || 'DOCENTE',
+      horasAsignadas: p.horas_base || (p.cargo === 'DOCENTE' ? 20 : 0),
+      email: p.email || '',
+    }));
+
     return NextResponse.json({
       success: true,
       totalProcesados: personal.length,
       insertados,
       actualizados,
       errores,
+      docentes: personalFormateado,
     });
   } catch (err: any) {
     console.error('[escuela-personal bulk POST]', err);

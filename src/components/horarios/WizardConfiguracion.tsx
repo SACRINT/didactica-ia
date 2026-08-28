@@ -578,26 +578,32 @@ export default function WizardConfiguracion({
         return;
       }
 
+      if (data.insertados === 0 && data.actualizados === 0 && data.errores && data.errores.length > 0) {
+        toast.error(`Error al importar: ${data.errores[0]}`);
+        return;
+      }
+
       toast.success(`¡Plantilla importada! ${data.insertados} nuevo(s), ${data.actualizados} actualizado(s).`);
 
-      // Recargar personal completo desde el backend
-      const resCat = await fetch(`/api/horarios/catalogos`);
-      const dataCat = await resCat.json();
-      const arrayPersonal = dataCat.docentes || (Array.isArray(dataCat) ? dataCat : []);
+      // Obtener el personal actualizado
+      let arrayPersonal: any[] = data.docentes || [];
+      if (!arrayPersonal || arrayPersonal.length === 0) {
+        const resCat = await fetch(`/api/horarios/catalogos`);
+        const dataCat = await resCat.json();
+        arrayPersonal = dataCat.docentes || (Array.isArray(dataCat) ? dataCat : []);
+      }
+
       setPersonalPlataforma(arrayPersonal);
 
-      // Agregar a la plantilla del paso 2 todos los docentes aptos que no estén ya
-      const nuevosParaPlantilla = arrayPersonal.filter(
-        (p: any) => !docentes.some((d) => d.id === p.id)
-      );
-
+      // Integrar a la plantilla activa del Paso 2
       const mapaHorasActualizado = { ...horasDocentes };
-      nuevosParaPlantilla.forEach((p: any) => {
+      arrayPersonal.forEach((p: any) => {
         const esDocentePuro = p.cargo === "DOCENTE";
-        mapaHorasActualizado[p.id] = p.horasAsignadas !== undefined ? p.horasAsignadas : (esDocentePuro ? 20 : 0);
+        const hrs = p.horasAsignadas !== undefined ? p.horasAsignadas : (p.horas_base !== undefined ? p.horas_base : (esDocentePuro ? 20 : 0));
+        mapaHorasActualizado[p.id] = hrs;
       });
 
-      setDocentes([...docentes, ...nuevosParaPlantilla]);
+      setDocentes(arrayPersonal);
       setHorasDocentes(mapaHorasActualizado);
 
       // Limpiar estados de Excel y cerrar modal

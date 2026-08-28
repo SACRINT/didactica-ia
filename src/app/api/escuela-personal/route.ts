@@ -5,8 +5,8 @@ import { sql, getTeacherByEmail } from '@/lib/db';
 async function getDirectorId(email: string) {
   const teacher = await getTeacherByEmail(email);
   if (!teacher) return null;
-  const isAdmin = teacher.role === 'administrador' || email === process.env.ADMIN_EMAIL;
-  if (teacher.role !== 'director' && !isAdmin) return null;
+  const isAdmin = teacher.role === 'administrador' || teacher.role === 'admin' || email === process.env.ADMIN_EMAIL;
+  if (teacher.role !== 'director' && teacher.role !== 'supervisor' && !isAdmin) return null;
   return teacher.id as string;
 }
 
