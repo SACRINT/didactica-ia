@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Sparkles, Users, BookOpen, Clock, AlertCircle, ShieldCheck, UserCheck, Plus, Trash2, CheckCircle2, UserPlus, Layers, Search, Save, AlertTriangle, FileSpreadsheet, Download, Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import { parsearExcelPersonal, descargarPlantillaExcelDocentes, DocenteImportado } from "@/lib/excel-plantilla";
+import { parsearExcelMatriz, descargarPlantillaMatrizDocente, ResultadoParseoMatriz } from "@/lib/excel-matriz";
 
 interface Props {
   escuelaId: string;
@@ -155,11 +156,18 @@ export default function WizardConfiguracion({
   const [nuevoDocenteEmail, setNuevoDocenteEmail] = useState<string>("");
   const [nuevoDocenteHoras, setNuevoDocenteHoras] = useState<number>(20);
 
-  // Estados para Importación Masiva Excel en Horarios
+  // Estados para Importación Masiva Excel de Personal (Paso 2)
   const [archivoExcelHorarios, setArchivoExcelHorarios] = useState<File | null>(null);
   const [docentesParseadosHorarios, setDocentesParseadosHorarios] = useState<DocenteImportado[]>([]);
   const [cargandoExcelHorarios, setCargandoExcelHorarios] = useState<boolean>(false);
   const fileInputHorariosRef = useRef<HTMLInputElement>(null);
+
+  // Estados para Importación Masiva de Matriz Horaria Excel (Paso 3)
+  const [mostrarModalMatrizExcel, setMostrarModalMatrizExcel] = useState<boolean>(false);
+  const [archivoMatrizExcel, setArchivoMatrizExcel] = useState<File | null>(null);
+  const [resultadoParseoMatriz, setResultadoParseoMatriz] = useState<ResultadoParseoMatriz | null>(null);
+  const [cargandoMatrizExcel, setCargandoMatrizExcel] = useState<boolean>(false);
+  const fileInputMatrizRef = useRef<HTMLInputElement>(null);
 
   // Cargar estado guardado previamente desde localStorage
   useEffect(() => {
@@ -616,6 +624,69 @@ export default function WizardConfiguracion({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCargarArchivoMatrizExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setArchivoMatrizExcel(file);
+    setCargandoMatrizExcel(true);
+    try {
+      const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+      const parseado = await parsearExcelMatriz(file, gruposDelPeriodoActual, getUACsIndividualesGrupo, docentes);
+      setResultadoParseoMatriz(parseado);
+
+      if (parseado.cargas.length === 0) {
+        toast.error("No se encontraron materias ni grupos válidos en el archivo.");
+      } else if (parseado.resumen.asignadasConExito > 0) {
+        toast.success(`Se detectaron ${parseado.resumen.asignadasConExito} asignaciones para ${parseado.gruposDetectados.length} grupo(s).`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Error al procesar el archivo Excel de la Matriz.");
+    } finally {
+      setCargandoMatrizExcel(false);
+    }
+  };
+
+  const handleConfirmarImportacionMatriz = () => {
+    if (!resultadoParseoMatriz || resultadoParseoMatriz.cargas.length === 0) {
+      toast.error("No hay cargas para aplicar.");
+      return;
+    }
+
+    const cargasValidas = resultadoParseoMatriz.cargas.filter(c => c.valido && c.personalId);
+    if (cargasValidas.length === 0) {
+      toast.error("No se encontraron docentes coincidentes para asignar. Verifique los nombres en el archivo.");
+      return;
+    }
+
+    const mapaCargas = new Map<string, any>();
+    // Mantener cargas existentes previas
+    cargas.forEach((c) => {
+      const key = `${c.grupoId}___${c.uacName || c.asignaturaId}`;
+      mapaCargas.set(key, c);
+    });
+
+    // Sobreescribir con las nuevas cargas del archivo Excel
+    cargasValidas.forEach((c) => {
+      const key = `${c.grupoId}___${c.uacName}`;
+      mapaCargas.set(key, {
+        grupoId: c.grupoId,
+        asignaturaId: c.uacName,
+        uacName: c.uacName,
+        personalId: c.personalId,
+        horasSemanales: c.horasSemanales,
+        requiereAulaEspecial: false,
+      });
+    });
+
+    setCargas(Array.from(mapaCargas.values()));
+    toast.success(`¡Matriz actualizada! ${cargasValidas.length} materias asignadas a docentes.`);
+    setMostrarModalMatrizExcel(false);
+    setArchivoMatrizExcel(null);
+    setResultadoParseoMatriz(null);
+    if (fileInputMatrizRef.current) fileInputMatrizRef.current.value = "";
   };
 
   const handleAsignarDocenteMatriz = (grupoId: string, uacObj: any, personalId: string) => {
@@ -1552,7 +1623,51 @@ export default function WizardConfiguracion({
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+                  descargarPlantillaMatrizDocente(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
+                }}
+                style={{
+                  background: "#334155",
+                  color: "#38bdf8",
+                  border: "1px solid #475569",
+                  padding: "0.55rem 0.9rem",
+                  borderRadius: "8px",
+                  fontWeight: 700,
+                  fontSize: "0.8125rem",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem"
+                }}
+              >
+                <Download style={{ width: "15px", height: "15px" }} /> 📄 Formato Matriz Excel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMostrarModalMatrizExcel(true)}
+                style={{
+                  background: "#047857",
+                  color: "#ffffff",
+                  border: "1px solid #10b981",
+                  padding: "0.55rem 1rem",
+                  borderRadius: "8px",
+                  fontWeight: 800,
+                  fontSize: "0.8125rem",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  boxShadow: "0 2px 8px rgba(16,185,129,0.3)"
+                }}
+              >
+                <FileSpreadsheet style={{ width: "16px", height: "16px" }} /> 📥 Cargar Horario Excel
+              </button>
+
               <div style={{ background: "#0f172a", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #334155", textAlign: "right" }}>
                 <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Horas Asignadas en Matriz</div>
                 <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHorasAsignadasMatriz === horasRequeridasPlantel ? "#4ade80" : "#38bdf8" }}>
@@ -2084,6 +2199,163 @@ export default function WizardConfiguracion({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CARGAR MATRIZ HORARIA DESDE EXCEL */}
+      {mostrarModalMatrizExcel && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(4px)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ background: "#0f172a", borderRadius: "16px", padding: "1.5rem", maxWidth: "780px", width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", border: "1px solid #334155" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <FileSpreadsheet style={{ width: "22px", height: "22px", color: "#10b981" }} />
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
+                  Cargar Horario y Matriz de Asignación desde Excel
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setMostrarModalMatrizExcel(false);
+                  setArchivoMatrizExcel(null);
+                  setResultadoParseoMatriz(null);
+                }}
+                style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "#94a3b8" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {/* Dropzone / File input */}
+              <div style={{ border: "2px dashed #475569", borderRadius: "12px", padding: "1.25rem", textAlign: "center", background: "#1e293b" }}>
+                <input
+                  ref={fileInputMatrizRef}
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleCargarArchivoMatrizExcel}
+                  style={{ display: "none" }}
+                  id="excel-matriz-input"
+                />
+                <div style={{ fontSize: "2.25rem", marginBottom: "0.35rem" }}>📑</div>
+                <p style={{ color: "#ffffff", fontWeight: 700, margin: "0 0 0.25rem", fontSize: "0.9375rem" }}>
+                  {archivoMatrizExcel ? archivoMatrizExcel.name : "Seleccione su archivo Excel con la tabla de horarios"}
+                </p>
+                <p style={{ color: "#94a3b8", fontSize: "0.75rem", margin: "0 0 0.85rem" }}>
+                  Formato compatible: Columnas con los nombres de grupos (ej: 1A, 1B, 1C, 2A, 3A...) y nombres de docentes en las celdas.
+                </p>
+
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => fileInputMatrizRef.current?.click()}
+                    style={{ background: "#2563eb", color: "#ffffff", border: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer" }}
+                  >
+                    📁 {archivoMatrizExcel ? "Cambiar Archivo" : "Seleccionar Archivo"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+                      descargarPlantillaMatrizDocente(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
+                    }}
+                    style={{ background: "#334155", color: "#38bdf8", border: "1px solid #475569", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer" }}
+                  >
+                    ⬇️ Descargar Formato Vacío
+                  </button>
+                </div>
+              </div>
+
+              {cargandoMatrizExcel && (
+                <div style={{ textAlign: "center", color: "#38bdf8", fontSize: "0.875rem", fontWeight: 700, padding: "1rem" }}>
+                  ⏳ Analizando tabla de horarios y asociando docentes...
+                </div>
+              )}
+
+              {/* Previsualización de Cargas Encontradas */}
+              {resultadoParseoMatriz && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {/* Banner de resumen */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.5rem" }}>
+                    <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "8px", padding: "0.5rem 0.75rem", textAlign: "center" }}>
+                      <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 700, display: "block" }}>Grupos Detectados</span>
+                      <strong style={{ fontSize: "1rem", color: "#38bdf8" }}>{resultadoParseoMatriz.gruposDetectados.length}</strong>
+                    </div>
+                    <div style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "8px", padding: "0.5rem 0.75rem", textAlign: "center" }}>
+                      <span style={{ fontSize: "0.6875rem", color: "#86efac", fontWeight: 700, display: "block" }}>Asignadas con Éxito</span>
+                      <strong style={{ fontSize: "1rem", color: "#4ade80" }}>{resultadoParseoMatriz.resumen.asignadasConExito}</strong>
+                    </div>
+                    <div style={{ background: resultadoParseoMatriz.resumen.requierenRevision > 0 ? "rgba(245,158,11,0.1)" : "#1e293b", border: "1px solid " + (resultadoParseoMatriz.resumen.requierenRevision > 0 ? "rgba(245,158,11,0.3)" : "#334155"), borderRadius: "8px", padding: "0.5rem 0.75rem", textAlign: "center" }}>
+                      <span style={{ fontSize: "0.6875rem", color: "#fcd34d", fontWeight: 700, display: "block" }}>Docente No Reconocido</span>
+                      <strong style={{ fontSize: "1rem", color: resultadoParseoMatriz.resumen.requierenRevision > 0 ? "#fbbf24" : "#94a3b8" }}>{resultadoParseoMatriz.resumen.requierenRevision}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ maxHeight: "240px", overflowY: "auto", border: "1px solid #334155", borderRadius: "8px", background: "#1e293b" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
+                      <thead>
+                        <tr style={{ background: "#0f172a", borderBottom: "1px solid #334155", position: "sticky", top: 0 }}>
+                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Grupo</th>
+                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Materia (UAC)</th>
+                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Texto en Excel</th>
+                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Docente Asociado</th>
+                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "center", color: "#94a3b8" }}>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resultadoParseoMatriz.cargas.map((c, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #334155", background: c.valido ? "transparent" : "rgba(245,158,11,0.08)" }}>
+                            <td style={{ padding: "0.35rem 0.6rem", color: "#38bdf8", fontWeight: 800 }}>{c.grupoNombre}</td>
+                            <td style={{ padding: "0.35rem 0.6rem", color: "#ffffff", fontWeight: 600 }}>{c.uacName}</td>
+                            <td style={{ padding: "0.35rem 0.6rem", color: "#94a3b8" }}>{c.docenteTextoExcel}</td>
+                            <td style={{ padding: "0.35rem 0.6rem", color: c.valido ? "#4ade80" : "#f87171", fontWeight: 700 }}>
+                              {c.docenteNombreMatch || "No encontrado"}
+                            </td>
+                            <td style={{ padding: "0.35rem 0.6rem", textAlign: "center" }}>
+                              {c.valido ? (
+                                <span style={{ color: "#4ade80", fontWeight: 800 }}>✓ Listo</span>
+                              ) : (
+                                <span style={{ color: "#fbbf24", fontSize: "0.6875rem" }}>⚠️ Sin coincidencia</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarModalMatrizExcel(false);
+                    setArchivoMatrizExcel(null);
+                    setResultadoParseoMatriz(null);
+                  }}
+                  style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1.1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarImportacionMatriz}
+                  disabled={!resultadoParseoMatriz || resultadoParseoMatriz.resumen.asignadasConExito === 0}
+                  style={{
+                    background: (!resultadoParseoMatriz || resultadoParseoMatriz.resumen.asignadasConExito === 0) ? "#334155" : "#10b981",
+                    color: "#ffffff",
+                    padding: "0.5rem 1.4rem",
+                    borderRadius: "8px",
+                    fontWeight: 800,
+                    border: "none",
+                    cursor: (!resultadoParseoMatriz || resultadoParseoMatriz.resumen.asignadasConExito === 0) ? "not-allowed" : "pointer"
+                  }}
+                >
+                  Confirmar e Importar a Matriz
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
