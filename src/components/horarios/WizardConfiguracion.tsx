@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Sparkles, Users, BookOpen, Clock, AlertCircle, ShieldCheck, UserCheck, Plus, Trash2, CheckCircle2, UserPlus, Layers, Search, Save, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Sparkles, Users, BookOpen, Clock, AlertCircle, ShieldCheck, UserCheck, Plus, Trash2, CheckCircle2, UserPlus, Layers, Search, Save, AlertTriangle, FileSpreadsheet, Download, Upload } from "lucide-react";
 import toast from "react-hot-toast";
+import { parsearExcelPersonal, descargarPlantillaExcelDocentes, DocenteImportado } from "@/lib/excel-plantilla";
 
 interface Props {
   escuelaId: string;
@@ -143,14 +144,22 @@ export default function WizardConfiguracion({
 
   // Modal para agregar nuevo docente
   const [mostrarModalDocente, setMostrarModalDocente] = useState<boolean>(false);
-  const [tabModalDocente, setTabModalDocente] = useState<"PLATAFORMA" | "MANUAL">("PLATAFORMA");
+  const [tabModalDocente, setTabModalDocente] = useState<"PLATAFORMA" | "MANUAL" | "EXCEL">("PLATAFORMA");
   const [personalPlataforma, setPersonalPlataforma] = useState<any[]>([]);
   const [busquedaPersonal, setBusquedaPersonal] = useState<string>("");
 
   const [nuevoDocenteNombre, setNuevoDocenteNombre] = useState<string>("");
   const [nuevoDocentePaterno, setNuevoDocentePaterno] = useState<string>("");
   const [nuevoDocenteMaterno, setNuevoDocenteMaterno] = useState<string>("");
+  const [nuevoDocenteCargo, setNuevoDocenteCargo] = useState<string>("DOCENTE");
+  const [nuevoDocenteEmail, setNuevoDocenteEmail] = useState<string>("");
   const [nuevoDocenteHoras, setNuevoDocenteHoras] = useState<number>(20);
+
+  // Estados para Importación Masiva Excel en Horarios
+  const [archivoExcelHorarios, setArchivoExcelHorarios] = useState<File | null>(null);
+  const [docentesParseadosHorarios, setDocentesParseadosHorarios] = useState<DocenteImportado[]>([]);
+  const [cargandoExcelHorarios, setCargandoExcelHorarios] = useState<boolean>(false);
+  const fileInputHorariosRef = useRef<HTMLInputElement>(null);
 
   // Cargar estado guardado previamente desde localStorage
   useEffect(() => {
@@ -503,22 +512,101 @@ export default function WizardConfiguracion({
           nombre: nuevoDocenteNombre.trim(),
           apellidoPaterno: nuevoDocentePaterno.trim(),
           apellidoMaterno: nuevoDocenteMaterno.trim(),
+          cargo: nuevoDocenteCargo,
+          email: nuevoDocenteEmail.trim(),
+          horasBase: nuevoDocenteHoras,
         })
       });
       const data = await res.json();
       if (data.success && data.docente) {
-        toast.success(`Docente ${data.docente.nombre} ${data.docente.apellidoPaterno} registrado y agregado.`);
+        toast.success(`${nuevoDocenteCargo === "DOCENTE" ? "Docente" : "Personal"} ${data.docente.nombre} ${data.docente.apellidoPaterno} registrado y agregado.`);
         setDocentes([...docentes, data.docente]);
         setHorasDocentes({ ...horasDocentes, [data.docente.id]: nuevoDocenteHoras });
         setNuevoDocenteNombre("");
         setNuevoDocentePaterno("");
         setNuevoDocenteMaterno("");
+        setNuevoDocenteEmail("");
+        setNuevoDocenteCargo("DOCENTE");
+        setNuevoDocenteHoras(20);
         setMostrarModalDocente(false);
+        cargarPersonalCompleto();
       } else {
         toast.error(data.error || "Error al registrar docente.");
       }
     } catch (e) {
       toast.error("Error de conexión al agregar docente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCargarArchivoExcelHorarios = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setArchivoExcelHorarios(file);
+    setCargandoExcelHorarios(true);
+    try {
+      const parsed = await parsearExcelPersonal(file);
+      setDocentesParseadosHorarios(parsed);
+      if (parsed.length === 0) {
+        toast.error("No se encontraron registros de docentes en el archivo.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Error al procesar el archivo Excel / CSV.");
+    } finally {
+      setCargandoExcelHorarios(false);
+    }
+  };
+
+  const handleImportarExcelEnHorarios = async () => {
+    const validos = docentesParseadosHorarios.filter(d => d.valido);
+    if (validos.length === 0) {
+      toast.error("No hay registros válidos para importar.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/escuela-personal/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personal: validos }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        toast.error(data.error || "Error al importar personal.");
+        return;
+      }
+
+      toast.success(`¡Plantilla importada! ${data.insertados} nuevo(s), ${data.actualizados} actualizado(s).`);
+
+      // Recargar personal completo desde el backend
+      const resCat = await fetch(`/api/horarios/catalogos`);
+      const dataCat = await resCat.json();
+      const arrayPersonal = dataCat.docentes || (Array.isArray(dataCat) ? dataCat : []);
+      setPersonalPlataforma(arrayPersonal);
+
+      // Agregar a la plantilla del paso 2 todos los docentes aptos que no estén ya
+      const nuevosParaPlantilla = arrayPersonal.filter(
+        (p: any) => !docentes.some((d) => d.id === p.id)
+      );
+
+      const mapaHorasActualizado = { ...horasDocentes };
+      nuevosParaPlantilla.forEach((p: any) => {
+        const esDocentePuro = p.cargo === "DOCENTE";
+        mapaHorasActualizado[p.id] = p.horasAsignadas !== undefined ? p.horasAsignadas : (esDocentePuro ? 20 : 0);
+      });
+
+      setDocentes([...docentes, ...nuevosParaPlantilla]);
+      setHorasDocentes(mapaHorasActualizado);
+
+      // Limpiar estados de Excel y cerrar modal
+      setArchivoExcelHorarios(null);
+      setDocentesParseadosHorarios([]);
+      if (fileInputHorariosRef.current) fileInputHorariosRef.current.value = "";
+      setMostrarModalDocente(false);
+    } catch (e) {
+      toast.error("Error de conexión al importar plantilla.");
     } finally {
       setLoading(false);
     }
@@ -1309,7 +1397,7 @@ export default function WizardConfiguracion({
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
               <div style={{ background: "#0f172a", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #334155", textAlign: "right" }}>
                 <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Plantilla Contratada</div>
                 <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHorasPlantillaDocente >= horasRequeridasPlantel ? "#4ade80" : "#fbbf24" }}>
@@ -1319,10 +1407,34 @@ export default function WizardConfiguracion({
 
               <button
                 type="button"
-                onClick={() => setMostrarModalDocente(true)}
-                style={{ background: "#2563eb", color: "#ffffff", padding: "0.625rem 1.25rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}
+                onClick={() => descargarPlantillaExcelDocentes()}
+                title="Descargar plantilla de Excel de ejemplo"
+                style={{ background: "#1e293b", color: "#38bdf8", border: "1px solid #0284c7", padding: "0.625rem 0.85rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}
               >
-                <UserPlus style={{ width: "16px", height: "16px" }} /> + Agregar Docente / Personal a Plantilla
+                <Download style={{ width: "15px", height: "15px" }} /> Plantilla Excel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTabModalDocente("EXCEL");
+                  setMostrarModalDocente(true);
+                }}
+                title="Subir archivo Excel o CSV con la plantilla docente"
+                style={{ background: "#047857", color: "#ffffff", border: "1px solid #10b981", padding: "0.625rem 1rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", boxShadow: "0 2px 8px rgba(16,185,129,0.3)" }}
+              >
+                <FileSpreadsheet style={{ width: "15px", height: "15px" }} /> 📥 Importar Excel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTabModalDocente("PLATAFORMA");
+                  setMostrarModalDocente(true);
+                }}
+                style={{ background: "#2563eb", color: "#ffffff", padding: "0.625rem 1.1rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}
+              >
+                <UserPlus style={{ width: "16px", height: "16px" }} /> + Agregar Personal
               </button>
             </div>
           </div>
@@ -1628,7 +1740,7 @@ export default function WizardConfiguracion({
       {/* MODAL: AGREGAR DOCENTE / PERSONAL */}
       {mostrarModalDocente && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(4px)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-          <div style={{ background: "#0f172a", borderRadius: "16px", padding: "1.5rem", maxWidth: "520px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", border: "1px solid #334155" }}>
+          <div style={{ background: "#0f172a", borderRadius: "16px", padding: "1.5rem", maxWidth: tabModalDocente === "EXCEL" ? "680px" : "540px", width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", border: "1px solid #334155" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
               <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
                 Agregar Personal a la Plantilla Horaria
@@ -1641,14 +1753,15 @@ export default function WizardConfiguracion({
               </button>
             </div>
 
-            <div style={{ display: "flex", borderBottom: "1px solid #334155", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", borderBottom: "1px solid #334155", marginBottom: "1.25rem", gap: "4px" }}>
               <button
+                type="button"
                 onClick={() => setTabModalDocente("PLATAFORMA")}
                 style={{
                   flex: 1,
-                  padding: "0.5rem",
+                  padding: "0.5rem 0.25rem",
                   fontWeight: 800,
-                  fontSize: "0.8125rem",
+                  fontSize: "0.75rem",
                   border: "none",
                   background: "none",
                   borderBottom: tabModalDocente === "PLATAFORMA" ? "3px solid #38bdf8" : "none",
@@ -1656,15 +1769,16 @@ export default function WizardConfiguracion({
                   cursor: "pointer"
                 }}
               >
-                1. Personal No Agregado ({personalNoAgregado.length})
+                1. Registrados ({personalNoAgregado.length})
               </button>
               <button
+                type="button"
                 onClick={() => setTabModalDocente("MANUAL")}
                 style={{
                   flex: 1,
-                  padding: "0.5rem",
+                  padding: "0.5rem 0.25rem",
                   fontWeight: 800,
-                  fontSize: "0.8125rem",
+                  fontSize: "0.75rem",
                   border: "none",
                   background: "none",
                   borderBottom: tabModalDocente === "MANUAL" ? "3px solid #38bdf8" : "none",
@@ -1672,7 +1786,24 @@ export default function WizardConfiguracion({
                   cursor: "pointer"
                 }}
               >
-                2. Registrar Nuevo Docente Manual
+                2. Nuevo Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabModalDocente("EXCEL")}
+                style={{
+                  flex: 1,
+                  padding: "0.5rem 0.25rem",
+                  fontWeight: 800,
+                  fontSize: "0.75rem",
+                  border: "none",
+                  background: "none",
+                  borderBottom: tabModalDocente === "EXCEL" ? "3px solid #10b981" : "none",
+                  color: tabModalDocente === "EXCEL" ? "#34d399" : "#94a3b8",
+                  cursor: "pointer"
+                }}
+              >
+                3. 📥 Cargar Excel / CSV
               </button>
             </div>
 
@@ -1689,14 +1820,14 @@ export default function WizardConfiguracion({
                   />
                 </div>
 
-                <div style={{ maxHeight: "240px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem", paddingRight: "0.25rem" }}>
+                <div style={{ maxHeight: "260px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem", paddingRight: "0.25rem" }}>
                   {personalDisponibleModal.length === 0 ? (
                     <div style={{ padding: "1.25rem", textAlign: "center", background: "#1e293b", borderRadius: "10px", border: "1px solid #334155" }}>
                       <p style={{ fontSize: "0.8125rem", color: "#94a3b8", margin: 0, fontWeight: 600 }}>
                         {personalPlataforma.length === 0
                           ? "Cargando personal registrado de la escuela..."
                           : personalNoAgregado.length === 0
-                          ? "Todo el personal registrado ya forma parte de la plantilla del Paso 2. Puedes registrar un nuevo docente usando la pestaña '2. Registrar Nuevo Docente Manual'."
+                          ? "Todo el personal registrado ya forma parte de la plantilla del Paso 2. Puedes registrar nuevo personal en '2. Nuevo Manual' o en '3. Cargar Excel'."
                           : "No se encontró personal coincidente con el filtro."}
                       </p>
                     </div>
@@ -1707,9 +1838,16 @@ export default function WizardConfiguracion({
                           <p style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
                             {p.apellidoPaterno} {p.apellidoMaterno || ""} {p.nombre}
                           </p>
-                          <span style={{ fontSize: "0.6875rem", color: p.cargo === "DOCENTE" ? "#60a5fa" : "#fbbf24", fontWeight: 700 }}>
-                            {p.cargo || "DOCENTE"}
-                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "2px" }}>
+                            <span style={{ fontSize: "0.6875rem", color: p.cargo === "DOCENTE" ? "#60a5fa" : "#fbbf24", fontWeight: 700 }}>
+                              {p.cargo || "DOCENTE"}
+                            </span>
+                            {p.horas_base !== undefined && (
+                              <span style={{ fontSize: "0.6875rem", color: "#94a3b8" }}>
+                                • {p.horas_base} hrs base
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <button
@@ -1724,10 +1862,10 @@ export default function WizardConfiguracion({
                   )}
                 </div>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.25rem" }}>
+            ) : tabModalDocente === "MANUAL" ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Nombre(s)</label>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Nombre(s) *</label>
                   <input
                     type="text"
                     placeholder="Ej. Juan Manuel"
@@ -1739,7 +1877,7 @@ export default function WizardConfiguracion({
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Apellido Paterno</label>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Apellido Paterno *</label>
                     <input
                       type="text"
                       placeholder="Ej. Pérez"
@@ -1760,15 +1898,52 @@ export default function WizardConfiguracion({
                   </div>
                 </div>
 
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Cargo / Rol *</label>
+                    <select
+                      value={nuevoDocenteCargo}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNuevoDocenteCargo(val);
+                        if (val !== "DOCENTE" && nuevoDocenteHoras === 20) {
+                          setNuevoDocenteHoras(0);
+                        } else if (val === "DOCENTE" && nuevoDocenteHoras === 0) {
+                          setNuevoDocenteHoras(20);
+                        }
+                      }}
+                      style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 700 }}
+                    >
+                      <option value="DOCENTE">Docente</option>
+                      <option value="DIRECTIVO">Directivo</option>
+                      <option value="PREFECTO">Prefecto</option>
+                      <option value="ORIENTADOR">Orientador</option>
+                      <option value="ADMINISTRATIVO">Administrativo</option>
+                      <option value="OTRO">Otro</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Horas Frente a Grupo</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={40}
+                      value={nuevoDocenteHoras}
+                      onChange={(e) => setNuevoDocenteHoras(Number(e.target.value))}
+                      style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 800 }}
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Horas Frente a Grupo Contratadas</label>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Email Institucional (Opcional)</label>
                   <input
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={nuevoDocenteHoras}
-                    onChange={(e) => setNuevoDocenteHoras(Number(e.target.value))}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 800 }}
+                    type="email"
+                    placeholder="docente@escuela.edu.mx"
+                    value={nuevoDocenteEmail}
+                    onChange={(e) => setNuevoDocenteEmail(e.target.value)}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem" }}
                   />
                 </div>
 
@@ -1783,9 +1958,122 @@ export default function WizardConfiguracion({
                   <button
                     type="button"
                     onClick={handleCrearNuevoDocenteManual}
-                    style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                    style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 1.25rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
                   >
-                    Guardar Docente
+                    Guardar Personal
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* TAB 3: IMPORTAR EXCEL */
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                <div style={{ border: "2px dashed #475569", borderRadius: "12px", padding: "1.25rem", textAlign: "center", background: "#1e293b" }}>
+                  <input
+                    ref={fileInputHorariosRef}
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleCargarArchivoExcelHorarios}
+                    style={{ display: "none" }}
+                    id="excel-horarios-input"
+                  />
+                  <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>📑</div>
+                  <p style={{ color: "#ffffff", fontWeight: 700, margin: "0 0 0.25rem", fontSize: "0.875rem" }}>
+                    {archivoExcelHorarios ? archivoExcelHorarios.name : "Seleccione su archivo Excel (.xlsx, .xls) o CSV"}
+                  </p>
+                  <p style={{ color: "#94a3b8", fontSize: "0.75rem", margin: "0 0 0.75rem" }}>
+                    Columnas detectadas: Nombre, Apellidos, Cargo/Rol, Horas Base y Email.
+                  </p>
+
+                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => fileInputHorariosRef.current?.click()}
+                      style={{ background: "#2563eb", color: "#ffffff", border: "none", padding: "0.45rem 0.85rem", borderRadius: "6px", fontWeight: 700, fontSize: "0.75rem", cursor: "pointer" }}
+                    >
+                      📁 {archivoExcelHorarios ? "Cambiar Archivo" : "Seleccionar Archivo"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => descargarPlantillaExcelDocentes()}
+                      style={{ background: "#334155", color: "#38bdf8", border: "1px solid #475569", padding: "0.45rem 0.85rem", borderRadius: "6px", fontWeight: 700, fontSize: "0.75rem", cursor: "pointer" }}
+                    >
+                      ⬇️ Descargar Formato
+                    </button>
+                  </div>
+                </div>
+
+                {cargandoExcelHorarios && (
+                  <div style={{ textAlign: "center", color: "#38bdf8", fontSize: "0.8rem", fontWeight: 700 }}>
+                    ⏳ Analizando hoja de cálculo...
+                  </div>
+                )}
+
+                {docentesParseadosHorarios.length > 0 && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#ffffff" }}>
+                        Previsualización ({docentesParseadosHorarios.filter(d => d.valido).length} listos de {docentesParseadosHorarios.length})
+                      </span>
+                    </div>
+
+                    <div style={{ maxHeight: "180px", overflowY: "auto", border: "1px solid #334155", borderRadius: "6px", background: "#1e293b" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
+                        <thead>
+                          <tr style={{ background: "#0f172a", borderBottom: "1px solid #334155" }}>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "left", color: "#94a3b8" }}>#</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "left", color: "#94a3b8" }}>Nombre</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "left", color: "#94a3b8" }}>Cargo</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "center", color: "#94a3b8" }}>Horas</th>
+                            <th style={{ padding: "0.35rem 0.5rem", textAlign: "center", color: "#94a3b8" }}>Estatus</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {docentesParseadosHorarios.map((d, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #334155", background: !d.valido ? "rgba(239,68,68,0.1)" : "transparent" }}>
+                              <td style={{ padding: "0.35rem 0.5rem", color: "#64748b" }}>{i + 1}</td>
+                              <td style={{ padding: "0.35rem 0.5rem", color: "#ffffff", fontWeight: 700 }}>
+                                {d.apellidoPaterno} {d.apellidoMaterno} {d.nombre}
+                              </td>
+                              <td style={{ padding: "0.35rem 0.5rem", color: d.cargo === "DOCENTE" ? "#60a5fa" : "#fbbf24" }}>
+                                {d.cargo}
+                              </td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "center", color: "#4ade80", fontWeight: 700 }}>
+                                {d.horasBase}h
+                              </td>
+                              <td style={{ padding: "0.35rem 0.5rem", textAlign: "center" }}>
+                                {d.valido ? <span style={{ color: "#4ade80", fontWeight: 800 }}>✓ Listo</span> : <span style={{ color: "#f87171" }}>⚠️ Incompleto</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarModalDocente(false)}
+                    style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImportarExcelEnHorarios}
+                    disabled={docentesParseadosHorarios.filter(d => d.valido).length === 0}
+                    style={{
+                      background: docentesParseadosHorarios.filter(d => d.valido).length === 0 ? "#334155" : "#10b981",
+                      color: "#ffffff",
+                      padding: "0.5rem 1.25rem",
+                      borderRadius: "8px",
+                      fontWeight: 800,
+                      border: "none",
+                      cursor: docentesParseadosHorarios.filter(d => d.valido).length === 0 ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    Confirmar e Importar a Plantilla
                   </button>
                 </div>
               </div>

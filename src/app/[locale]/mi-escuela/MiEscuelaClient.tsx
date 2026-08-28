@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { parsearExcelPersonal, descargarPlantillaExcelDocentes, DocenteImportado } from '@/lib/excel-plantilla';
 
 interface PersonalItem {
   id: string;
@@ -72,6 +73,15 @@ export default function MiEscuelaClient({ teacherName, schoolName, cct, isAdmin 
   const [filterCargo, setFilterCargo] = useState<string>('TODOS');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // Estados para Importación Masiva Excel / CSV
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [archivoExcel, setArchivoExcel] = useState<File | null>(null);
+  const [docentesParseados, setDocentesParseados] = useState<DocenteImportado[]>([]);
+  const [cargandoArchivo, setCargandoArchivo] = useState(false);
+  const [guardandoBulk, setGuardandoBulk] = useState(false);
+  const [resumenImportacion, setResumenImportacion] = useState<{ total: number; insertados: number; actualizados: number; errores: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchPersonal = useCallback(async () => {
     setLoading(true);
     try {
@@ -134,6 +144,69 @@ export default function MiEscuelaClient({ teacherName, schoolName, cct, isAdmin 
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCargarArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setArchivoExcel(file);
+    setCargandoArchivo(true);
+    setError('');
+    try {
+      const parsed = await parsearExcelPersonal(file);
+      setDocentesParseados(parsed);
+      if (parsed.length === 0) {
+        setError('No se encontraron registros de docentes en el archivo.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError('Error al procesar el archivo Excel/CSV. Verifique el formato.');
+    } finally {
+      setCargandoArchivo(false);
+    }
+  };
+
+  const handleConfirmarImportacion = async () => {
+    const validos = docentesParseados.filter(d => d.valido);
+    if (validos.length === 0) {
+      setError('No hay registros válidos para importar.');
+      return;
+    }
+    setGuardandoBulk(true);
+    setError('');
+    try {
+      const res = await fetch('/api/escuela-personal/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personal: validos }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Error al guardar la plantilla.');
+        return;
+      }
+      setResumenImportacion({
+        total: data.totalProcesados,
+        insertados: data.insertados,
+        actualizados: data.actualizados,
+        errores: data.errores || [],
+      });
+      fetchPersonal();
+      setSuccess(`¡Carga exitosa! ${data.insertados} nuevo(s), ${data.actualizados} actualizado(s).`);
+      setTimeout(() => setSuccess(''), 4000);
+    } catch {
+      setError('Error de conexión al importar personal.');
+    } finally {
+      setGuardandoBulk(false);
+    }
+  };
+
+  const cerrarModalImportacion = () => {
+    setShowImportModal(false);
+    setArchivoExcel(null);
+    setDocentesParseados([]);
+    setResumenImportacion(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDelete = async (id: string) => {
@@ -225,22 +298,68 @@ export default function MiEscuelaClient({ teacherName, schoolName, cct, isAdmin 
           ))}
         </div>
 
-        <button
-          onClick={openNew}
-          style={{
-            padding: '10px 20px',
-            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '10px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            fontSize: '0.9rem',
-            display: 'flex', alignItems: 'center', gap: '8px',
-          }}
-        >
-          ＋ Agregar personal
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => descargarPlantillaExcelDocentes()}
+            title="Descargar plantilla de Excel (.xlsx) con el formato y columnas recomendadas"
+            style={{
+              padding: '9px 14px',
+              background: '#1e293b',
+              color: '#38bdf8',
+              border: '1px solid #0284c7',
+              borderRadius: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              display: 'flex', alignItems: 'center', gap: '6px',
+            }}
+          >
+            📄 Plantilla Excel
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setError('');
+              setShowImportModal(true);
+            }}
+            title="Subir archivo Excel o CSV con la plantilla docente completa"
+            style={{
+              padding: '9px 16px',
+              background: '#047857',
+              color: '#ffffff',
+              border: '1px solid #10b981',
+              borderRadius: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+            }}
+          >
+            📥 Importar Excel / CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={openNew}
+            style={{
+              padding: '9px 18px',
+              background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              boxShadow: '0 2px 8px rgba(59,130,246,0.3)',
+            }}
+          >
+            ＋ Agregar personal
+          </button>
+        </div>
       </div>
 
       {/* ── FEEDBACK ── */}
@@ -488,41 +607,247 @@ export default function MiEscuelaClient({ teacherName, schoolName, cct, isAdmin 
         </div>
       )}
 
-      {/* ── MODAL CONFIRMAR ELIMINAR ── */}
-      {deleteConfirm && (
+      {/* ── MODAL IMPORTAR EXCEL / CSV ── */}
+      {showImportModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1100,
-          background: '#00000090', display: 'flex',
+          background: '#00000095', backdropFilter: 'blur(4px)', display: 'flex',
           alignItems: 'center', justifyContent: 'center', padding: '20px',
         }}>
           <div style={{
             background: '#1e293b', borderRadius: '16px',
-            border: '1px solid #ef4444', padding: '28px',
-            maxWidth: '400px', width: '100%', textAlign: 'center',
+            border: '1px solid #334155', padding: '28px',
+            width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
           }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>⚠️</div>
-            <h3 style={{ color: '#f8fafc', margin: '0 0 10px' }}>¿Eliminar personal?</h3>
-            <p style={{ color: '#94a3b8', margin: '0 0 20px', fontSize: '0.9rem' }}>
-              Esta acción no se puede deshacer. El registro será eliminado permanentemente.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.75rem' }}>📥</span>
+                <div>
+                  <h2 style={{ color: '#f8fafc', margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                    Carga Masiva de Personal Docente
+                  </h2>
+                  <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.8rem' }}>
+                    Sube un archivo Excel (.xlsx, .xls) o CSV con tu plantilla escolar.
+                  </p>
+                </div>
+              </div>
               <button
-                onClick={() => setDeleteConfirm(null)}
-                style={{
-                  padding: '10px 22px', borderRadius: '8px',
-                  background: 'transparent', border: '1px solid #334155',
-                  color: '#94a3b8', cursor: 'pointer', fontWeight: 600,
-                }}
-              >Cancelar</button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                style={{
-                  padding: '10px 22px', borderRadius: '8px',
-                  background: '#ef4444', color: '#fff',
-                  border: 'none', cursor: 'pointer', fontWeight: 700,
-                }}
-              >Sí, eliminar</button>
+                onClick={cerrarModalImportacion}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.25rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
             </div>
+
+            {error && (
+              <div style={{
+                background: '#7f1d1d20', border: '1px solid #ef4444',
+                color: '#fca5a5', borderRadius: '8px', padding: '10px 14px',
+                marginBottom: '16px', fontSize: '0.85rem',
+              }}>{error}</div>
+            )}
+
+            {resumenImportacion ? (
+              <div style={{
+                background: 'rgba(16,185,129,0.1)', border: '1px solid #10b981',
+                borderRadius: '12px', padding: '20px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🎉</div>
+                <h3 style={{ color: '#ffffff', margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800 }}>
+                  ¡Plantilla Importada Correctamente!
+                </h3>
+                <p style={{ color: '#cbd5e1', fontSize: '0.9rem', margin: '0 0 16px' }}>
+                  Se procesaron <strong>{resumenImportacion.total}</strong> registros:
+                  <br />
+                  <span style={{ color: '#4ade80', fontWeight: 700 }}>+{resumenImportacion.insertados} nuevos docentes</span> y{' '}
+                  <span style={{ color: '#38bdf8', fontWeight: 700 }}>{resumenImportacion.actualizados} actualizados</span>.
+                </p>
+                {resumenImportacion.errores.length > 0 && (
+                  <div style={{ textAlign: 'left', background: '#0f172a', padding: '10px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.75rem', color: '#f87171' }}>
+                    <strong>Observaciones:</strong>
+                    <ul style={{ margin: '4px 0 0', paddingLeft: '20px' }}>
+                      {resumenImportacion.errores.map((err, idx) => (
+                        <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <button
+                  onClick={cerrarModalImportacion}
+                  style={{
+                    padding: '10px 24px', borderRadius: '8px',
+                    background: '#10b981', color: '#ffffff',
+                    border: 'none', fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Aceptar y Ver Plantilla
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Zona de Subida y Descarga de plantilla */}
+                <div style={{
+                  border: '2px dashed #475569', borderRadius: '12px',
+                  padding: '24px', textAlign: 'center', background: '#0f172a',
+                }}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleCargarArchivo}
+                    style={{ display: 'none' }}
+                    id="excel-file-input"
+                  />
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📑</div>
+                  <p style={{ color: '#f8fafc', margin: '0 0 6px', fontWeight: 700, fontSize: '0.95rem' }}>
+                    {archivoExcel ? archivoExcel.name : 'Selecciona o arrastra tu archivo Excel / CSV'}
+                  </p>
+                  <p style={{ color: '#94a3b8', margin: '0 0 16px', fontSize: '0.8rem' }}>
+                    Columnas detectadas automáticamente: Nombre, Apellidos, Cargo/Rol, Horas Base y Email.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        padding: '9px 18px', borderRadius: '8px',
+                        background: '#2563eb', color: '#ffffff',
+                        border: 'none', fontWeight: 700, fontSize: '0.85rem',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                      }}
+                    >
+                      📁 {archivoExcel ? 'Cambiar Archivo' : 'Seleccionar Archivo'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => descargarPlantillaExcelDocentes()}
+                      style={{
+                        padding: '9px 16px', borderRadius: '8px',
+                        background: '#334155', color: '#38bdf8',
+                        border: '1px solid #475569', fontWeight: 700, fontSize: '0.85rem',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                      }}
+                    >
+                      ⬇️ Descargar Formato de Ejemplo
+                    </button>
+                  </div>
+                </div>
+
+                {cargandoArchivo && (
+                  <div style={{ textAlign: 'center', color: '#38bdf8', padding: '12px', fontWeight: 600 }}>
+                    ⏳ Leyendo y analizando hoja de cálculo...
+                  </div>
+                )}
+
+                {/* Previsualización de datos leídos */}
+                {docentesParseados.length > 0 && (
+                  <div>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      marginBottom: '8px',
+                    }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc' }}>
+                        Vista Previa ({docentesParseados.filter(d => d.valido).length} válidos de {docentesParseados.length} encontrados)
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Solo se importarán los registros válidos
+                      </span>
+                    </div>
+
+                    <div style={{
+                      maxHeight: '260px', overflowY: 'auto', border: '1px solid #334155',
+                      borderRadius: '8px', background: '#0f172a',
+                    }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                        <thead>
+                          <tr style={{ background: '#1e293b', borderBottom: '1px solid #334155' }}>
+                            <th style={{ padding: '8px 10px', textAlign: 'left', color: '#94a3b8' }}>#</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'left', color: '#94a3b8' }}>Nombre Completo</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'left', color: '#94a3b8' }}>Cargo</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center', color: '#94a3b8' }}>Horas</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'left', color: '#94a3b8' }}>Email</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center', color: '#94a3b8' }}>Estatus</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {docentesParseados.map((d, idx) => (
+                            <tr key={idx} style={{
+                              borderBottom: '1px solid #1e293b',
+                              background: !d.valido ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                            }}>
+                              <td style={{ padding: '8px 10px', color: '#64748b' }}>{idx + 1}</td>
+                              <td style={{ padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>
+                                {d.apellidoPaterno} {d.apellidoMaterno} {d.nombre}
+                              </td>
+                              <td style={{ padding: '8px 10px' }}>
+                                <span style={{
+                                  fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px',
+                                  background: '#1e293b', color: CARGO_COLORS[d.cargo] || '#38bdf8',
+                                  fontWeight: 700, border: '1px solid #334155',
+                                }}>
+                                  {CARGO_LABELS[d.cargo] || d.cargo}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 10px', textAlign: 'center', color: '#4ade80', fontWeight: 700 }}>
+                                {d.horasBase}h
+                              </td>
+                              <td style={{ padding: '8px 10px', color: '#94a3b8' }}>
+                                {d.email || '—'}
+                              </td>
+                              <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                {d.valido ? (
+                                  <span style={{ color: '#4ade80', fontWeight: 800 }}>✓ Listo</span>
+                                ) : (
+                                  <span style={{ color: '#f87171', fontWeight: 700 }} title={d.motivoInvalido}>⚠️ Incompleto</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Acciones */}
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={cerrarModalImportacion}
+                    style={{
+                      padding: '10px 20px', borderRadius: '8px',
+                      background: 'transparent', border: '1px solid #334155',
+                      color: '#94a3b8', cursor: 'pointer', fontWeight: 600,
+                    }}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmarImportacion}
+                    disabled={guardandoBulk || docentesParseados.filter(d => d.valido).length === 0}
+                    style={{
+                      padding: '10px 24px', borderRadius: '8px',
+                      background: guardandoBulk || docentesParseados.filter(d => d.valido).length === 0
+                        ? '#334155'
+                        : 'linear-gradient(135deg, #059669, #10b981)',
+                      color: '#ffffff', border: 'none',
+                      cursor: guardandoBulk || docentesParseados.filter(d => d.valido).length === 0 ? 'not-allowed' : 'pointer',
+                      fontWeight: 800, fontSize: '0.9rem',
+                      boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
+                    }}
+                  >
+                    {guardandoBulk
+                      ? 'Importando a BD...'
+                      : `Confirmar e Importar (${docentesParseados.filter(d => d.valido).length} Docentes)`}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

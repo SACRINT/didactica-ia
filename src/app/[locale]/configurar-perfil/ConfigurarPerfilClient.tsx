@@ -64,6 +64,7 @@ const ROLES_INFO = [
 
 const SUBSYSTEMS = [
   'Bachillerato General Estatal (BGE)',
+  'Bachillerato Tecnológico',
   'Bachillerato General Digital (BGD)',
   'EMSAD',
   'COBAEP',

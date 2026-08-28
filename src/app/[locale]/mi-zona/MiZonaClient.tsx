@@ -13,7 +13,7 @@ interface EscuelaItem {
   activa: boolean;
 }
 
-const SUBSISTEMAS = ['BGE', 'CBTA', 'CBTIS', 'CECyTE', 'COBACH', 'COBAO', 'COLEGIO', 'OTRO'];
+const SUBSISTEMAS = ['BGE', 'Bachillerato Tecnológico', 'CBTA', 'CBTIS', 'CECyTE', 'COBACH', 'COBAO', 'COLEGIO', 'OTRO'];
 
 interface MiZonaClientProps {
   supervisorName: string;

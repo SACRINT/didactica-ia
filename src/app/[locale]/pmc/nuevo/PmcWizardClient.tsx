@@ -196,7 +196,7 @@ const CARGOS_COMUNES = [
   'Otro',
 ];
 
-const SUBSISTEMAS = ['BGE', 'TBC', 'CBTA', 'CECyTE', 'COBACH', 'Preparatoria federal', 'Otro'];
+const SUBSISTEMAS = ['BGE', 'Bachillerato Tecnológico', 'TBC', 'CBTA', 'CECyTE', 'COBACH', 'Preparatoria federal', 'Otro'];
 
 const STEPS = [
   { n: 1, label: 'Datos institucionales' },

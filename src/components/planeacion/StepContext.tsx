@@ -11,6 +11,7 @@ interface Props {
 
 const SUBSYSTEMS = [
   { value: 'bge',     label: 'Bachillerato General Estatal (BGE)' },
+  { value: 'bachillerato_tecnologico', label: 'Bachillerato Tecnológico' },
   { value: 'digital', label: 'Bachillerato Digital' },
   { value: 'emsad',   label: 'EMSAD' },
   { value: 'cecyte',  label: 'CECyTE' },

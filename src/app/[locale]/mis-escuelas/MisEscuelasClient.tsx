@@ -7,7 +7,7 @@ interface School {
   municipality: string | null; subsystem: string; is_primary: boolean; created_at: string;
 }
 
-const SUBSYSTEMS = ['BGE', 'Bachillerato Digital', 'EMSAD', 'COBACH', 'CECYTEP', 'Otro'];
+const SUBSYSTEMS = ['BGE', 'Bachillerato Tecnológico', 'Bachillerato Digital', 'EMSAD', 'COBACH', 'CECYTEP', 'Otro'];
 
 export default function MisEscuelasClient() {
   const [schools, setSchools]     = useState<School[]>([]);
