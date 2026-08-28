@@ -177,7 +177,6 @@ export default function ModalConfiguracionMapaCurricular({
     });
   };
 
-
   const handleSave = async () => {
     setGuardando(true);
     try {
@@ -241,30 +240,30 @@ export default function ModalConfiguracionMapaCurricular({
       right: 0,
       bottom: 0,
       zIndex: 9999,
-      background: "rgba(15, 23, 42, 0.75)",
-      backdropFilter: "blur(6px)",
+      background: "rgba(15, 23, 42, 0.85)",
+      backdropFilter: "blur(8px)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       padding: "1rem"
     }}>
       <div style={{
-        background: "var(--bg)",
+        background: "#0f172a",
         width: "100%",
-        maxWidth: "850px",
+        maxWidth: "880px",
         maxHeight: "90vh",
         borderRadius: "16px",
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        border: "1px solid var(--border)"
+        border: "1px solid #334155"
       }}>
         {/* Header */}
         <div style={{
           padding: "1.25rem 1.5rem",
           background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
-          color: "white",
+          color: "#ffffff",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center"
@@ -283,7 +282,7 @@ export default function ModalConfiguracionMapaCurricular({
               style={{
                 background: "rgba(255,255,255,0.2)",
                 border: "1px solid rgba(255,255,255,0.35)",
-                color: "white",
+                color: "#ffffff",
                 borderRadius: "8px",
                 padding: "6px 12px",
                 cursor: "pointer",
@@ -303,7 +302,7 @@ export default function ModalConfiguracionMapaCurricular({
         </div>
 
         {/* Stepper Tabs */}
-        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
+        <div style={{ display: "flex", borderBottom: "1px solid #334155", background: "#1e293b" }}>
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); setPaso(1); }}
@@ -311,8 +310,8 @@ export default function ModalConfiguracionMapaCurricular({
               flex: 1,
               padding: "0.85rem",
               border: "none",
-              background: paso === 1 ? "var(--bg)" : "transparent",
-              color: paso === 1 ? "#2563eb" : "var(--text-muted)",
+              background: paso === 1 ? "#0f172a" : "transparent",
+              color: paso === 1 ? "#38bdf8" : "#94a3b8",
               fontWeight: 800,
               fontSize: "0.875rem",
               cursor: "pointer",
@@ -320,7 +319,7 @@ export default function ModalConfiguracionMapaCurricular({
               alignItems: "center",
               justifyContent: "center",
               gap: "0.5rem",
-              borderBottom: paso === 1 ? "3px solid #2563eb" : "none"
+              borderBottom: paso === 1 ? "3px solid #38bdf8" : "none"
             }}
           >
             <Layers size={16} /> 1. Estructura de Grupos ({g1 + g2 + g3} grupos)
@@ -332,8 +331,8 @@ export default function ModalConfiguracionMapaCurricular({
               flex: 1,
               padding: "0.85rem",
               border: "none",
-              background: paso === 2 ? "var(--bg)" : "transparent",
-              color: paso === 2 ? "#2563eb" : "var(--text-muted)",
+              background: paso === 2 ? "#0f172a" : "transparent",
+              color: paso === 2 ? "#38bdf8" : "#94a3b8",
               fontWeight: 800,
               fontSize: "0.875rem",
               cursor: "pointer",
@@ -341,7 +340,7 @@ export default function ModalConfiguracionMapaCurricular({
               alignItems: "center",
               justifyContent: "center",
               gap: "0.5rem",
-              borderBottom: paso === 2 ? "3px solid #2563eb" : "none"
+              borderBottom: paso === 2 ? "3px solid #38bdf8" : "none"
             }}
           >
             <BookOpen size={16} /> 2. Formaciones Laborales & Optativas FFE
@@ -349,22 +348,30 @@ export default function ModalConfiguracionMapaCurricular({
         </div>
 
         {/* Body scrollable */}
-        <div style={{ padding: "1.5rem", overflowY: "auto", flex: 1 }}>
+        <div style={{ padding: "1.5rem", overflowY: "auto", flex: 1, background: "#0f172a" }}>
 
           {/* PASO 1: Estructura de Grupos por Año */}
           {paso === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "1rem", borderRadius: "12px", display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                <AlertCircle size={24} color="#2563eb" />
-                <div style={{ fontSize: "0.85rem", color: "#1e3a8a", lineHeight: 1.4 }}>
-                  <strong>Paso 1: Confirme los grupos activos en su plantel.</strong><br />
+              <div style={{
+                background: "rgba(37, 99, 235, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.35)",
+                padding: "1rem",
+                borderRadius: "12px",
+                display: "flex",
+                gap: "0.75rem",
+                alignItems: "center"
+              }}>
+                <AlertCircle size={24} color="#38bdf8" />
+                <div style={{ fontSize: "0.85rem", color: "#bfdbfe", lineHeight: 1.4 }}>
+                  <strong style={{ color: "#ffffff" }}>Paso 1: Confirme los grupos activos en su plantel.</strong><br />
                   Escriba la cantidad de grupos activos por grado/año. Esta información se usará para construir automáticamente las listas en Horarios IA y Planeaciones Didácticas.
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.25rem" }}>
-                <div className="card" style={{ padding: "1.25rem", border: "1px solid var(--border)", textAlign: "center" }}>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+                <div style={{ padding: "1.25rem", border: "1px solid #334155", background: "#1e293b", borderRadius: "12px", textAlign: "center" }}>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.5rem" }}>
                     1.er Año (1.º y 2.º Semestre)
                   </label>
                   <input
@@ -373,15 +380,25 @@ export default function ModalConfiguracionMapaCurricular({
                     max={10}
                     value={g1}
                     onChange={(e) => setG1(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ width: "100%", fontSize: "1.5rem", fontWeight: 800, textAlign: "center", padding: "0.5rem", borderRadius: "8px", border: "2px solid #2563eb" }}
+                    style={{
+                      width: "100%",
+                      fontSize: "1.5rem",
+                      fontWeight: 800,
+                      textAlign: "center",
+                      padding: "0.5rem",
+                      borderRadius: "8px",
+                      border: "2px solid #3b82f6",
+                      background: "#0f172a",
+                      color: "#ffffff"
+                    }}
                   />
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.5rem" }}>
                     Genera: 1º A {g1 > 1 ? `hasta 1º ${String.fromCharCode(64 + g1)}` : ""}
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: "1.25rem", border: "1px solid var(--border)", textAlign: "center" }}>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+                <div style={{ padding: "1.25rem", border: "1px solid #334155", background: "#1e293b", borderRadius: "12px", textAlign: "center" }}>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.5rem" }}>
                     2.º Año (3.er y 4.º Semestre)
                   </label>
                   <input
@@ -390,15 +407,25 @@ export default function ModalConfiguracionMapaCurricular({
                     max={10}
                     value={g2}
                     onChange={(e) => setG2(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ width: "100%", fontSize: "1.5rem", fontWeight: 800, textAlign: "center", padding: "0.5rem", borderRadius: "8px", border: "2px solid #2563eb" }}
+                    style={{
+                      width: "100%",
+                      fontSize: "1.5rem",
+                      fontWeight: 800,
+                      textAlign: "center",
+                      padding: "0.5rem",
+                      borderRadius: "8px",
+                      border: "2px solid #3b82f6",
+                      background: "#0f172a",
+                      color: "#ffffff"
+                    }}
                   />
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.5rem" }}>
                     Genera: 3º A {g2 > 1 ? `hasta 3º ${String.fromCharCode(64 + g2)}` : ""}
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: "1.25rem", border: "1px solid var(--border)", textAlign: "center" }}>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
+                <div style={{ padding: "1.25rem", border: "1px solid #334155", background: "#1e293b", borderRadius: "12px", textAlign: "center" }}>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.5rem" }}>
                     3.er Año (5.º y 6.º Semestre)
                   </label>
                   <input
@@ -407,9 +434,19 @@ export default function ModalConfiguracionMapaCurricular({
                     max={10}
                     value={g3}
                     onChange={(e) => setG3(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ width: "100%", fontSize: "1.5rem", fontWeight: 800, textAlign: "center", padding: "0.5rem", borderRadius: "8px", border: "2px solid #2563eb" }}
+                    style={{
+                      width: "100%",
+                      fontSize: "1.5rem",
+                      fontWeight: 800,
+                      textAlign: "center",
+                      padding: "0.5rem",
+                      borderRadius: "8px",
+                      border: "2px solid #3b82f6",
+                      background: "#0f172a",
+                      color: "#ffffff"
+                    }}
                   />
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.5rem" }}>
                     Genera: 5º A {g3 > 1 ? `hasta 5º ${String.fromCharCode(64 + g3)}` : ""}
                   </div>
                 </div>
@@ -418,9 +455,19 @@ export default function ModalConfiguracionMapaCurricular({
               <div style={{ textAlign: "right" }}>
                 <button
                   type="button"
-                  className="btn btn-primary"
                   onClick={(e) => { e.preventDefault(); setPaso(2); }}
-                  style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontWeight: 700, padding: "0.6rem 1.25rem" }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontWeight: 700,
+                    padding: "0.65rem 1.25rem",
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    borderRadius: "8px",
+                    border: "none",
+                    cursor: "pointer"
+                  }}
                 >
                   Continuar al Mapa Curricular por Grupo <ChevronRight size={18} />
                 </button>
@@ -431,8 +478,15 @@ export default function ModalConfiguracionMapaCurricular({
           {/* PASO 2: Asignación por Grupo */}
           {paso === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              <div style={{ background: "#f8fafc", border: "1px solid var(--border)", padding: "0.85rem 1rem", borderRadius: "10px", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                <strong>Paso 2: Configure la Formación Laboral, Optativas FFE y Socioemocional por Grupo.</strong><br />
+              <div style={{
+                background: "#1e293b",
+                border: "1px solid #334155",
+                padding: "0.85rem 1rem",
+                borderRadius: "10px",
+                fontSize: "0.8rem",
+                color: "#cbd5e1"
+              }}>
+                <strong style={{ color: "#38bdf8" }}>Paso 2: Configure la Formación Laboral, Optativas FFE y Socioemocional por Grupo.</strong><br />
                 Para cada grupo de 3.º y 5.º semestre, seleccione las asignaturas correspondientes a su oferta educativa.
               </div>
 
@@ -450,27 +504,34 @@ export default function ModalConfiguracionMapaCurricular({
                     ffeoSocioemocional: rawCfg?.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1])
                   };
 
-
                   return (
-                    <div key={g.id} className="card" style={{ padding: "1.25rem", border: "1px solid var(--border)", background: "var(--bg)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border)" }}>
+                    <div key={g.id} style={{ padding: "1.25rem", border: "1px solid #334155", background: "#1e293b", borderRadius: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "0.5rem", borderBottom: "1px solid #334155" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           <span style={{ width: "28px", height: "28px", borderRadius: "6px", background: "#2563eb", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.85rem" }}>
                             {g.nombre.split(" ")[0]}
                           </span>
-                          <span style={{ fontWeight: 800, fontSize: "1rem", color: "var(--text)" }}>
+                          <span style={{ fontWeight: 800, fontSize: "1rem", color: "#ffffff" }}>
                             Grupo {g.nombre} ({g.semestre}° Semestre)
                           </span>
                         </div>
 
-                        <span style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.2rem 0.6rem", borderRadius: "12px", background: "#eff6ff", color: "#1d4ed8" }}>
+                        <span style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          padding: "0.2rem 0.6rem",
+                          borderRadius: "12px",
+                          background: g.semestre === 1 ? "rgba(16, 185, 129, 0.2)" : g.semestre === 3 ? "rgba(59, 130, 246, 0.2)" : "rgba(139, 92, 246, 0.2)",
+                          color: g.semestre === 1 ? "#34d399" : g.semestre === 3 ? "#60a5fa" : "#a78bfa",
+                          border: `1px solid ${g.semestre === 1 ? "rgba(52, 211, 153, 0.3)" : g.semestre === 3 ? "rgba(96, 165, 246, 0.3)" : "rgba(167, 139, 250, 0.3)"}`
+                        }}>
                           {g.semestre === 1 ? "100% Fundamental Universal" : g.semestre === 3 ? "Laboral (9 UACs)" : "Laboral + FFE (10 UACs)"}
                         </span>
                       </div>
 
                       {/* Grupos de 1º Semestre */}
                       {g.semestre === 1 && (
-                        <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                        <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontStyle: "italic" }}>
                           ✓ Asignaturas del Currículum Fundamental MCCEMS 100% universales (Ciencias Naturales, Experimentales y Tecnología I, Pensamiento Matemático I, Humanidades I, Lenguaje y Comunicación I, etc.).
                         </div>
                       )}
@@ -486,44 +547,62 @@ export default function ModalConfiguracionMapaCurricular({
                           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
                               <div>
-                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>
-                                  Formación Laboral (Capacitación del Grupo):
+                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                  FORMACIÓN LABORAL (CAPACITACIÓN DEL GRUPO):
                                 </label>
                                 <select
                                   className="form-control"
                                   value={cfg.capacitacionNombre}
                                   onChange={(e) => handleUpdateGrupoConfig(g.nombre, "capacitacionNombre", e.target.value)}
-                                  style={{ fontSize: "0.85rem", fontWeight: 700 }}
+                                  style={{
+                                    fontSize: "0.85rem",
+                                    fontWeight: 700,
+                                    background: "#0f172a",
+                                    color: "#ffffff",
+                                    border: "1px solid #475569",
+                                    borderRadius: "8px",
+                                    padding: "0.5rem 0.75rem",
+                                    width: "100%"
+                                  }}
                                 >
                                   {FORMACIONES_LABORALES.map(cap => (
-                                    <option key={cap} value={cap}>{cap}</option>
+                                    <option key={cap} value={cap} style={{ background: "#0f172a", color: "#ffffff" }}>{cap}</option>
                                   ))}
                                 </select>
                               </div>
 
                               <div>
-                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>
-                                  Formación Socioemocional (Opción 1 - 3.er Semestre):
+                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                  FORMACIÓN SOCIOEMOCIONAL (OPCIÓN 1 - 3.ER SEMESTRE):
                                 </label>
                                 <select
                                   className="form-control"
                                   value={cfg.ffeoSocioemocional}
                                   onChange={(e) => handleUpdateGrupoConfig(g.nombre, "ffeoSocioemocional", e.target.value)}
-                                  style={{ fontSize: "0.85rem", fontWeight: 700 }}
+                                  style={{
+                                    fontSize: "0.85rem",
+                                    fontWeight: 700,
+                                    background: "#0f172a",
+                                    color: "#ffffff",
+                                    border: "1px solid #475569",
+                                    borderRadius: "8px",
+                                    padding: "0.5rem 0.75rem",
+                                    width: "100%"
+                                  }}
                                 >
                                   {FORMACIONES_SOCIOEMOCIONALES.map(soc => (
-                                    <option key={soc} value={soc}>{soc}</option>
+                                    <option key={soc} value={soc} style={{ background: "#0f172a", color: "#ffffff" }}>{soc}</option>
                                   ))}
                                 </select>
                               </div>
                             </div>
 
                             {/* 📗 Bloque informativo: Semestre B (4.º Semestre automático) */}
-                            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.75rem 1rem", borderRadius: "10px" }}>
-                              <div style={{ fontSize: "0.78125rem", fontWeight: 800, color: "#15803d", marginBottom: "0.3rem" }}>
+                            <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "0.75rem 1rem", borderRadius: "10px" }}>
+                              <div style={{ fontSize: "0.78125rem", fontWeight: 800, color: "#34d399", marginBottom: "0.3rem" }}>
                                 📗 Semestre B Correspondiente (4.º Semestre - Grupo 4° {letra})
                               </div>
-                              <div style={{ fontSize: "0.725rem", color: "#166534", lineHeight: 1.4 }}>
+                              <div style={{ fontSize: "0.725rem", color: "#86efac", lineHeight: 1.4 }}>
                                 • <strong>Laboral:</strong> Submódulos 3 y 4 de <em>{cfg.capacitacionNombre}</em> (Automático)<br />
                                 • <strong>Socioemocional:</strong> <em>{socio4y6}</em> (Automático)
                               </div>
@@ -550,133 +629,257 @@ export default function ModalConfiguracionMapaCurricular({
                           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
                               <div>
-                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>
-                                  Formación Laboral (Capacitación):
+                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                  FORMACIÓN LABORAL (CAPACITACIÓN):
                                 </label>
                                 <select
                                   className="form-control"
                                   value={cfg.capacitacionNombre}
                                   onChange={(e) => handleUpdateGrupoConfig(g.nombre, "capacitacionNombre", e.target.value)}
-                                  style={{ fontSize: "0.85rem", fontWeight: 700 }}
+                                  style={{
+                                    fontSize: "0.85rem",
+                                    fontWeight: 700,
+                                    background: "#0f172a",
+                                    color: "#ffffff",
+                                    border: "1px solid #475569",
+                                    borderRadius: "8px",
+                                    padding: "0.5rem 0.75rem",
+                                    width: "100%"
+                                  }}
                                 >
                                   {FORMACIONES_LABORALES.map(cap => (
-                                    <option key={cap} value={cap}>{cap}</option>
+                                    <option key={cap} value={cap} style={{ background: "#0f172a", color: "#ffffff" }}>{cap}</option>
                                   ))}
                                 </select>
                               </div>
 
                               <div>
-                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>
-                                  Formación Socioemocional (Opción 2 - 5.º Semestre):
+                                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                  FORMACIÓN SOCIOEMOCIONAL (OPCIÓN 2 - 5.º SEMESTRE):
                                 </label>
                                 <select
                                   className="form-control"
                                   value={socio5Actual}
                                   onChange={(e) => handleUpdateGrupoConfig(g.nombre, "ffeoSocioemocional", e.target.value)}
-                                  style={{ fontSize: "0.85rem", fontWeight: 700 }}
+                                  style={{
+                                    fontSize: "0.85rem",
+                                    fontWeight: 700,
+                                    background: "#0f172a",
+                                    color: "#ffffff",
+                                    border: "1px solid #475569",
+                                    borderRadius: "8px",
+                                    padding: "0.5rem 0.75rem",
+                                    width: "100%"
+                                  }}
                                 >
                                   {opcionesSocio5.map(soc => (
-                                    <option key={soc} value={soc}>{soc}</option>
+                                    <option key={soc} value={soc} style={{ background: "#0f172a", color: "#ffffff" }}>{soc}</option>
                                   ))}
                                 </select>
-                                <div style={{ fontSize: "0.725rem", color: "#15803d", marginTop: "0.3rem", fontWeight: 700, background: "#f0fdf4", padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                                  ⚡ Opción de 3.er semestre: <strong>{socio3}</strong><br />
-                                  ℹ️ 4.º y 6.º Semestre llevarán automáticamente: <strong>{socio4y6}</strong>
+                                <div style={{ fontSize: "0.725rem", color: "#86efac", marginTop: "0.4rem", fontWeight: 700, background: "rgba(16, 185, 129, 0.12)", padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                                  ⚡ Opción de 3.er semestre: <strong style={{ color: "#ffffff" }}>{socio3}</strong><br />
+                                  ℹ️ 4.º y 6.º Semestre llevarán automáticamente: <strong style={{ color: "#ffffff" }}>{socio4y6}</strong>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Optativas FFE Divididas por Categoría */}
-                            <div style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--border)" }}>
-                              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)", marginBottom: "0.75rem" }}>
-                                Optativas FFE (2 Recurso Sociocognitivo + 2 Área de Conocimiento):
+                            {/* ── Optativas FFE Divididas por Categoría (Alto Contraste) ── */}
+                            <div style={{
+                              background: "#0b132b",
+                              padding: "1.1rem",
+                              borderRadius: "12px",
+                              border: "1px solid #334155",
+                              boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)"
+                            }}>
+                              <label style={{
+                                display: "block",
+                                fontSize: "0.85rem",
+                                fontWeight: 800,
+                                color: "#38bdf8",
+                                marginBottom: "0.85rem",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.03em"
+                              }}>
+                                ✨ Optativas FFE (2 Recursos Sociocognitivos + 2 Áreas de Conocimiento):
                               </label>
 
                               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
                                 {/* Bloque 1: Recursos Sociocognitivos */}
-                                <div style={{ background: "var(--card-bg, #fff)", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-                                    Recursos Sociocognitivos (Optativas 1 y 2):
+                                <div style={{
+                                  background: "#1e293b",
+                                  padding: "0.9rem",
+                                  borderRadius: "10px",
+                                  border: "1.5px solid #3b82f6",
+                                  boxShadow: "0 4px 12px rgba(0,0,0,0.25)"
+                                }}>
+                                  <div style={{
+                                    fontSize: "0.8rem",
+                                    fontWeight: 800,
+                                    color: "#93c5fd",
+                                    marginBottom: "0.6rem",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem"
+                                  }}>
+                                    📘 Recursos Sociocognitivos (Optativas 1 y 2):
                                   </div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                    <select
-                                      className="form-control"
-                                      value={optRecurso1}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[0] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_RECURSOS_SOCIOCOGNITIVOS.map(opt => (
-                                        <option key={opt} value={opt}>Optativa 1 (Recurso): {opt}</option>
-                                      ))}
-                                    </select>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                                    <div>
+                                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#60a5fa", marginBottom: "0.25rem" }}>
+                                        Optativa 1 (Recurso):
+                                      </label>
+                                      <select
+                                        className="form-control"
+                                        value={optRecurso1}
+                                        onChange={(e) => {
+                                          const copia = [...cfg.ffeOptativas];
+                                          copia[0] = e.target.value;
+                                          handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
+                                        }}
+                                        style={{
+                                          background: "#0f172a",
+                                          color: "#ffffff",
+                                          border: "1px solid #3b82f6",
+                                          borderRadius: "6px",
+                                          padding: "0.5rem 0.65rem",
+                                          fontSize: "0.8rem",
+                                          fontWeight: 600,
+                                          width: "100%"
+                                        }}
+                                      >
+                                        {FFE_RECURSOS_SOCIOCOGNITIVOS.map(opt => (
+                                          <option key={opt} value={opt} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                            {opt}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
 
-                                    <select
-                                      className="form-control"
-                                      value={optRecurso2}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[1] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_RECURSOS_SOCIOCOGNITIVOS.filter(o => o !== optRecurso1).map(opt => (
-                                        <option key={opt} value={opt}>Optativa 2 (Recurso): {opt}</option>
-                                      ))}
-                                    </select>
+                                    <div>
+                                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#60a5fa", marginBottom: "0.25rem" }}>
+                                        Optativa 2 (Recurso):
+                                      </label>
+                                      <select
+                                        className="form-control"
+                                        value={optRecurso2}
+                                        onChange={(e) => {
+                                          const copia = [...cfg.ffeOptativas];
+                                          copia[1] = e.target.value;
+                                          handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
+                                        }}
+                                        style={{
+                                          background: "#0f172a",
+                                          color: "#ffffff",
+                                          border: "1px solid #3b82f6",
+                                          borderRadius: "6px",
+                                          padding: "0.5rem 0.65rem",
+                                          fontSize: "0.8rem",
+                                          fontWeight: 600,
+                                          width: "100%"
+                                        }}
+                                      >
+                                        {FFE_RECURSOS_SOCIOCOGNITIVOS.filter(o => o !== optRecurso1).map(opt => (
+                                          <option key={opt} value={opt} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                            {opt}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
                                   </div>
                                 </div>
 
                                 {/* Bloque 2: Áreas de Conocimiento */}
-                                <div style={{ background: "var(--card-bg, #fff)", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-                                    Áreas de Conocimiento (Optativas 3 y 4):
+                                <div style={{
+                                  background: "#1e293b",
+                                  padding: "0.9rem",
+                                  borderRadius: "10px",
+                                  border: "1.5px solid #a855f7",
+                                  boxShadow: "0 4px 12px rgba(0,0,0,0.25)"
+                                }}>
+                                  <div style={{
+                                    fontSize: "0.8rem",
+                                    fontWeight: 800,
+                                    color: "#d8b4fe",
+                                    marginBottom: "0.6rem",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem"
+                                  }}>
+                                    🔬 Áreas de Conocimiento (Optativas 3 y 4):
                                   </div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                    <select
-                                      className="form-control"
-                                      value={optArea3}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[2] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_AREAS_CONOCIMIENTO.map(opt => (
-                                        <option key={opt} value={opt}>Optativa 3 (Área): {opt}</option>
-                                      ))}
-                                    </select>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                                    <div>
+                                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#c084fc", marginBottom: "0.25rem" }}>
+                                        Optativa 3 (Área):
+                                      </label>
+                                      <select
+                                        className="form-control"
+                                        value={optArea3}
+                                        onChange={(e) => {
+                                          const copia = [...cfg.ffeOptativas];
+                                          copia[2] = e.target.value;
+                                          handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
+                                        }}
+                                        style={{
+                                          background: "#0f172a",
+                                          color: "#ffffff",
+                                          border: "1px solid #a855f7",
+                                          borderRadius: "6px",
+                                          padding: "0.5rem 0.65rem",
+                                          fontSize: "0.8rem",
+                                          fontWeight: 600,
+                                          width: "100%"
+                                        }}
+                                      >
+                                        {FFE_AREAS_CONOCIMIENTO.map(opt => (
+                                          <option key={opt} value={opt} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                            {opt}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
 
-                                    <select
-                                      className="form-control"
-                                      value={optArea4}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[3] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_AREAS_CONOCIMIENTO.filter(o => o !== optArea3).map(opt => (
-                                        <option key={opt} value={opt}>Optativa 4 (Área): {opt}</option>
-                                      ))}
-                                    </select>
+                                    <div>
+                                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#c084fc", marginBottom: "0.25rem" }}>
+                                        Optativa 4 (Área):
+                                      </label>
+                                      <select
+                                        className="form-control"
+                                        value={optArea4}
+                                        onChange={(e) => {
+                                          const copia = [...cfg.ffeOptativas];
+                                          copia[3] = e.target.value;
+                                          handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
+                                        }}
+                                        style={{
+                                          background: "#0f172a",
+                                          color: "#ffffff",
+                                          border: "1px solid #a855f7",
+                                          borderRadius: "6px",
+                                          padding: "0.5rem 0.65rem",
+                                          fontSize: "0.8rem",
+                                          fontWeight: 600,
+                                          width: "100%"
+                                        }}
+                                      >
+                                        {FFE_AREAS_CONOCIMIENTO.filter(o => o !== optArea3).map(opt => (
+                                          <option key={opt} value={opt} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                            {opt}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
 
                             {/* 📗 Bloque informativo: Semestre B (6.º Semestre automático) */}
-                            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.75rem 1rem", borderRadius: "10px" }}>
-                              <div style={{ fontSize: "0.78125rem", fontWeight: 800, color: "#15803d", marginBottom: "0.3rem" }}>
+                            <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "0.75rem 1rem", borderRadius: "10px" }}>
+                              <div style={{ fontSize: "0.78125rem", fontWeight: 800, color: "#34d399", marginBottom: "0.3rem" }}>
                                 📗 Semestre B Correspondiente (6.º Semestre - Grupo 6° {letra})
                               </div>
-                              <div style={{ fontSize: "0.725rem", color: "#166534", lineHeight: 1.4 }}>
+                              <div style={{ fontSize: "0.725rem", color: "#86efac", lineHeight: 1.4 }}>
                                 • <strong>Laboral:</strong> Submódulos 5 y 6 de <em>{cfg.capacitacionNombre}</em> (Automático)<br />
                                 • <strong>Socioemocional:</strong> <em>{socio4y6}</em> (Automático)<br />
                                 • <strong>Optativas FFE:</strong> Mantiene las 4 optativas FFE de 5.º Semestre (Automático)
@@ -697,31 +900,34 @@ export default function ModalConfiguracionMapaCurricular({
         {/* Footer */}
         <div style={{
           padding: "1rem 1.5rem",
-          background: "var(--bg-secondary)",
-          borderTop: "1px solid var(--border)",
+          background: "#1e293b",
+          borderTop: "1px solid #334155",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center"
         }}>
-          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            Total de grupos a registrar: <strong>{g1 + g2 + g3} grupos</strong>
+          <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+            Total de grupos a registrar: <strong style={{ color: "#ffffff" }}>{g1 + g2 + g3} grupos</strong>
           </span>
 
           <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
             {isAdmin && onClose && (
               <button
                 type="button"
-                className="btn btn-outline"
                 onClick={onClose}
                 disabled={guardando}
                 style={{
                   fontSize: "0.85rem",
                   fontWeight: 700,
-                  borderColor: "rgba(239, 68, 68, 0.4)",
-                  color: "#ef4444",
+                  border: "1px solid rgba(239, 68, 68, 0.5)",
+                  background: "rgba(239, 68, 68, 0.15)",
+                  color: "#fca5a5",
+                  borderRadius: "8px",
+                  padding: "0.5rem 0.9rem",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "0.35rem"
+                  gap: "0.35rem",
+                  cursor: "pointer"
                 }}
               >
                 <X size={16} /> Cerrar sin guardar (Admin)
@@ -730,20 +936,39 @@ export default function ModalConfiguracionMapaCurricular({
 
             {paso === 2 && (
               <button
-                className="btn btn-outline"
                 onClick={() => setPaso(1)}
                 disabled={guardando}
-                style={{ fontSize: "0.85rem", fontWeight: 700 }}
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  background: "#334155",
+                  color: "#f8fafc",
+                  border: "1px solid #475569",
+                  borderRadius: "8px",
+                  padding: "0.5rem 0.9rem",
+                  cursor: "pointer"
+                }}
               >
                 Regresar a Grupos
               </button>
             )}
 
             <button
-              className="btn btn-primary"
               onClick={handleSave}
               disabled={guardando}
-              style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", fontWeight: 700, background: "#16a34a", borderColor: "#16a34a" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "0.5rem 1.1rem",
+                cursor: guardando ? "not-allowed" : "pointer"
+              }}
             >
               {guardando ? (
                 <>
