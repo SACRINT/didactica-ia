@@ -833,16 +833,16 @@ export default function WizardConfiguracion({
   });
 
   return (
-    <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "1.5rem", boxShadow: "0 4px 20px rgba(0,0,0,0.05)", maxWidth: "1250px", margin: "0 auto" }}>
+    <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "16px", padding: "1.5rem", boxShadow: "0 10px 30px rgba(0,0,0,0.3)", maxWidth: "1250px", margin: "0 auto" }}>
 
       {/* PASO 1: Estructura Abierta de Grupos y Selección Curricular por Grupo */}
       {paso === 1 && (
         <>
         {/* Selector de Período Semestral */}
-        <div style={{ background: "#f0f9ff", border: "2px solid #38bdf8", borderRadius: "14px", padding: "1rem 1.25rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap" }}>
+        <div style={{ background: "#1e293b", border: "2px solid #38bdf8", borderRadius: "14px", padding: "1rem 1.25rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: "0.8125rem", fontWeight: 900, color: "#0369a1", marginBottom: "0.2rem" }}>📅 Período Semestral a Configurar</div>
-            <div style={{ fontSize: "0.72rem", color: "#0c4a6e" }}>Seleccione qué semestre desea configurar. El Semestre A es Agosto-Enero (1°,3°,5°) y el Semestre B es Febrero-Julio (2°,4°,6°).</div>
+            <div style={{ fontSize: "0.8125rem", fontWeight: 900, color: "#38bdf8", marginBottom: "0.2rem" }}>📅 Período Semestral a Configurar</div>
+            <div style={{ fontSize: "0.75rem", color: "#cbd5e1" }}>Seleccione qué semestre desea configurar. El Semestre A es Agosto-Enero (1°,3°,5°) y el Semestre B es Febrero-Julio (2°,4°,6°).</div>
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button
@@ -853,10 +853,11 @@ export default function WizardConfiguracion({
                 borderRadius: "10px",
                 fontWeight: 800,
                 fontSize: "0.9rem",
-                border: "2px solid " + (periodoActivo === "A" ? "#0284c7" : "#cbd5e1"),
-                background: periodoActivo === "A" ? "#0284c7" : "#ffffff",
-                color: periodoActivo === "A" ? "#ffffff" : "#64748b",
-                cursor: "pointer"
+                border: "2px solid " + (periodoActivo === "A" ? "#38bdf8" : "#475569"),
+                background: periodoActivo === "A" ? "#0284c7" : "#0f172a",
+                color: periodoActivo === "A" ? "#ffffff" : "#cbd5e1",
+                cursor: "pointer",
+                transition: "all 0.2s"
               }}
             >
               📘 Semestre A (1°, 3°, 5°)
@@ -869,24 +870,25 @@ export default function WizardConfiguracion({
                 borderRadius: "10px",
                 fontWeight: 800,
                 fontSize: "0.9rem",
-                border: "2px solid " + (periodoActivo === "B" ? "#7c3aed" : "#cbd5e1"),
-                background: periodoActivo === "B" ? "#7c3aed" : "#ffffff",
-                color: periodoActivo === "B" ? "#ffffff" : "#64748b",
-                cursor: "pointer"
+                border: "2px solid " + (periodoActivo === "B" ? "#a78bfa" : "#475569"),
+                background: periodoActivo === "B" ? "#7c3aed" : "#0f172a",
+                color: periodoActivo === "B" ? "#ffffff" : "#cbd5e1",
+                cursor: "pointer",
+                transition: "all 0.2s"
               }}
             >
               📗 Semestre B (2°, 4°, 6°)
             </button>
           </div>
-          <div style={{ background: periodoActivo === "A" ? "#e0f2fe" : "#ede9fe", padding: "0.4rem 0.85rem", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 800, color: periodoActivo === "A" ? "#0369a1" : "#6d28d9" }}>
+          <div style={{ background: periodoActivo === "A" ? "rgba(2,132,199,0.2)" : "rgba(124,58,237,0.2)", border: `1px solid ${periodoActivo === "A" ? "rgba(56,189,248,0.3)" : "rgba(167,139,250,0.3)"}`, padding: "0.4rem 0.85rem", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 800, color: periodoActivo === "A" ? "#38bdf8" : "#c084fc" }}>
             {periodoActivo === "A" ? "⚙️ Configurando: Agosto-Enero" : "⚙️ Configurando: Febrero-Julio"}
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* Banner Selector de Modo de Carga */}
-          <div style={{ background: "#ffffff", padding: "1.25rem", borderRadius: "14px", border: "1px solid #cbd5e1", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-            <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#1e293b", margin: "0 0 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <Layers style={{ width: "18px", height: "18px", color: "#2563eb" }} /> Seleccione el Modo de Generación de Horarios:
+          <div style={{ background: "#1e293b", padding: "1.25rem", borderRadius: "14px", border: "1px solid #334155", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Layers style={{ width: "18px", height: "18px", color: "#38bdf8" }} /> Seleccione el Modo de Generación de Horarios:
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <button
@@ -896,15 +898,15 @@ export default function WizardConfiguracion({
                   textAlign: "left",
                   padding: "1rem",
                   borderRadius: "10px",
-                  border: "2px solid " + (modoConfiguracion === "SEMIAUTOMATICO" ? "#2563eb" : "#e2e8f0"),
-                  background: modoConfiguracion === "SEMIAUTOMATICO" ? "#eff6ff" : "#ffffff",
+                  border: "2px solid " + (modoConfiguracion === "SEMIAUTOMATICO" ? "#38bdf8" : "#334155"),
+                  background: modoConfiguracion === "SEMIAUTOMATICO" ? "rgba(37,99,235,0.2)" : "#0f172a",
                   cursor: "pointer"
                 }}
               >
-                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: modoConfiguracion === "SEMIAUTOMATICO" ? "#1d4ed8" : "#1e293b" }}>
+                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: modoConfiguracion === "SEMIAUTOMATICO" ? "#60a5fa" : "#f8fafc" }}>
                   🏫 Modo Semiautomático (SEP Bachillerato General Predeterminado)
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
                   Precarga automáticamente el Mapa Curricular Oficial (MCCEMS 2025-2027), UACs universales, capacitaciones laborales y catálogo de docentes.
                 </div>
               </button>
@@ -916,15 +918,15 @@ export default function WizardConfiguracion({
                   textAlign: "left",
                   padding: "1rem",
                   borderRadius: "10px",
-                  border: "2px solid " + (modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#d97706" : "#e2e8f0"),
-                  background: modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#fffbeb" : "#ffffff",
+                  border: "2px solid " + (modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#f59e0b" : "#334155"),
+                  background: modoConfiguracion === "MANUAL_TECNOLOGICO" ? "rgba(217,119,6,0.2)" : "#0f172a",
                   cursor: "pointer"
                 }}
               >
-                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#b45309" : "#1e293b" }}>
+                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#fbbf24" : "#f8fafc" }}>
                   ⚙️ Modo Manual Libre (Bachilleratos Tecnológicos / CBTIS)
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
                   Configuración 100% personalizada. Permite ingresar nombres libres de asignaturas, carreras técnicas, horas semanales libres y docentes manuales.
                 </div>
               </button>
@@ -932,9 +934,9 @@ export default function WizardConfiguracion({
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-            <div style={{ background: "#eff6ff", padding: "1rem", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Users style={{ width: "15px", height: "15px", color: "#2563eb", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e293b", padding: "1rem", borderRadius: "12px", border: "1px solid #334155" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.4rem" }}>
+                <Users style={{ width: "15px", height: "15px", color: "#38bdf8", display: "inline", marginRight: "5px" }} />
                 1.er Año ({periodoActivo === "A" ? "1.º Semestre" : "2.º Semestre"})
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -944,17 +946,17 @@ export default function WizardConfiguracion({
                   max={20}
                   value={g1}
                   onChange={(e) => { setG1(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
-                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #2563eb", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b" }}
+                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#ffffff" }}
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#1d4ed8" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8" }}>
                   Genera {periodoActivo === "A" ? "1°" : "2°"} A a {periodoActivo === "A" ? "1°" : "2°"} {String.fromCharCode(64 + Math.min(g1, 26))}
                 </span>
               </div>
             </div>
 
-            <div style={{ background: "#eff6ff", padding: "1rem", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Users style={{ width: "15px", height: "15px", color: "#2563eb", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e293b", padding: "1rem", borderRadius: "12px", border: "1px solid #334155" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.4rem" }}>
+                <Users style={{ width: "15px", height: "15px", color: "#38bdf8", display: "inline", marginRight: "5px" }} />
                 2.º Año ({periodoActivo === "A" ? "3.er Semestre" : "4.º Semestre"})
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -964,17 +966,17 @@ export default function WizardConfiguracion({
                   max={20}
                   value={g2}
                   onChange={(e) => { setG2(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
-                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #2563eb", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b" }}
+                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#ffffff" }}
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#1d4ed8" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8" }}>
                   Genera {periodoActivo === "A" ? "3°" : "4°"} A a {periodoActivo === "A" ? "3°" : "4°"} {String.fromCharCode(64 + Math.min(g2, 26))}
                 </span>
               </div>
             </div>
 
-            <div style={{ background: "#eff6ff", padding: "1rem", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Users style={{ width: "15px", height: "15px", color: "#2563eb", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e293b", padding: "1rem", borderRadius: "12px", border: "1px solid #334155" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.4rem" }}>
+                <Users style={{ width: "15px", height: "15px", color: "#38bdf8", display: "inline", marginRight: "5px" }} />
                 3.er Año ({periodoActivo === "A" ? "5.º Semestre" : "6.º Semestre"})
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -984,44 +986,44 @@ export default function WizardConfiguracion({
                   max={20}
                   value={g3}
                   onChange={(e) => { setG3(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
-                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #2563eb", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#1e293b" }}
+                  style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#ffffff" }}
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#1d4ed8" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8" }}>
                   Genera {periodoActivo === "A" ? "5°" : "6°"} A a {periodoActivo === "A" ? "5°" : "6°"} {String.fromCharCode(64 + Math.min(g3, 26))}
                 </span>
               </div>
             </div>
 
-            <div style={{ background: "#f0fdf4", padding: "1rem", borderRadius: "12px", border: "1px solid #bbf7d0" }}>
-              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.4rem" }}>
-                <Clock style={{ width: "15px", height: "15px", color: "#16a34a", display: "inline", marginRight: "5px" }} />
+            <div style={{ background: "#1e293b", padding: "1rem", borderRadius: "12px", border: "1px solid #334155" }}>
+              <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.4rem" }}>
+                <Clock style={{ width: "15px", height: "15px", color: "#4ade80", display: "inline", marginRight: "5px" }} />
                 Jornada Escolar (BGE)
               </label>
               <select
                 value={numPeriodos}
                 onChange={(e) => setNumPeriodos(Number(e.target.value))}
-                style={{ width: "100%", padding: "0.45rem", borderRadius: "8px", border: "2px solid #22c55e", background: "#ffffff", fontWeight: 800, fontSize: "0.8125rem", color: "#1e293b" }}
+                style={{ width: "100%", padding: "0.45rem", borderRadius: "8px", border: "2px solid #22c55e", background: "#0f172a", fontWeight: 800, fontSize: "0.8125rem", color: "#ffffff" }}
               >
-                <option value={6}>6 Horas diarias (30 hrs/sem)</option>
-                <option value={5}>5 Horas diarias (25 hrs/sem)</option>
-                <option value={7}>7 Horas diarias (35 hrs/sem)</option>
-                <option value={8}>8 Horas diarias (40 hrs/sem)</option>
+                <option value={6} style={{ background: "#0f172a", color: "#ffffff" }}>6 Horas diarias (30 hrs/sem)</option>
+                <option value={5} style={{ background: "#0f172a", color: "#ffffff" }}>5 Horas diarias (25 hrs/sem)</option>
+                <option value={7} style={{ background: "#0f172a", color: "#ffffff" }}>7 Horas diarias (35 hrs/sem)</option>
+                <option value={8} style={{ background: "#0f172a", color: "#ffffff" }}>8 Horas diarias (40 hrs/sem)</option>
               </select>
             </div>
           </div>
 
           {modoConfiguracion === "MANUAL_TECNOLOGICO" ? (
-            <div style={{ border: "1px solid #d97706", borderRadius: "12px", padding: "1.25rem", background: "#fffbeb" }}>
-              <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#b45309", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <ShieldCheck style={{ width: "18px", height: "18px", color: "#d97706" }} /> Asignaturas y Módulos del Subsistema Tecnológico / CBTIS
+            <div style={{ border: "1px solid #f59e0b", borderRadius: "12px", padding: "1.25rem", background: "#1e293b" }}>
+              <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#fbbf24", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <ShieldCheck style={{ width: "18px", height: "18px", color: "#f59e0b" }} /> Asignaturas y Módulos del Subsistema Tecnológico / CBTIS
               </h3>
-              <p style={{ fontSize: "0.8125rem", color: "#78350f", margin: "0 0 1rem" }}>
+              <p style={{ fontSize: "0.8125rem", color: "#cbd5e1", margin: "0 0 1rem" }}>
                 Configure las asignaturas de <strong>cada grupo de manera independiente</strong>.
               </p>
 
               {Math.max(g1, g2, g3) > 1 && (
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.25rem", padding: "0.75rem 1rem", background: "#fef3c7", borderRadius: "10px", border: "1px solid #fcd34d", alignItems: "center" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#92400e", marginRight: "0.25rem" }}>Configurar Grupo:</span>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.25rem", padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "10px", border: "1px solid #334155", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24", marginRight: "0.25rem" }}>Configurar Grupo:</span>
                   {["A","B","C","D","E","F","G","H","I","J"].slice(0, Math.max(g1, g2, g3)).map(letra => (
                     <button
                       key={letra}
@@ -1032,11 +1034,11 @@ export default function WizardConfiguracion({
                         borderRadius: "8px",
                         fontWeight: 800,
                         fontSize: "0.8125rem",
-                        border: "none",
+                        border: "1px solid " + (grupoActivoManual === letra ? "#f59e0b" : "#475569"),
                         cursor: "pointer",
-                        background: grupoActivoManual === letra ? "#d97706" : "#ffffff",
-                        color: grupoActivoManual === letra ? "#ffffff" : "#92400e",
-                        boxShadow: grupoActivoManual === letra ? "0 2px 8px rgba(217,119,6,0.4)" : "0 1px 3px rgba(0,0,0,0.1)"
+                        background: grupoActivoManual === letra ? "#d97706" : "#1e293b",
+                        color: "#ffffff",
+                        boxShadow: grupoActivoManual === letra ? "0 2px 8px rgba(217,119,6,0.4)" : "none"
                       }}
                     >
                       Grupo {letra}
@@ -1061,9 +1063,9 @@ export default function WizardConfiguracion({
                   const key = `${sem}_${grupoActivoManual}`;
                   const lista: any[] = curriculoManualPorGrupo[key] || [];
                   return (
-                    <div key={sem} style={{ background: "#ffffff", border: "1px solid #fcd34d", borderRadius: "12px", padding: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #fef3c7", paddingBottom: "0.5rem", marginBottom: "0.75rem" }}>
-                        <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#b45309", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                    <div key={sem} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "1rem", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #334155", paddingBottom: "0.5rem", marginBottom: "0.75rem" }}>
+                        <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#fbbf24", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
                           {label}
                           {Math.max(g1, g2, g3) > 1 && (
                             <span style={{ fontSize: "0.7rem", fontWeight: 700, background: "#d97706", color: "#fff", padding: "0.15rem 0.5rem", borderRadius: "20px" }}>
@@ -1071,7 +1073,7 @@ export default function WizardConfiguracion({
                             </span>
                           )}
                         </span>
-                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, background: "#fef3c7", color: "#b45309", padding: "0.25rem 0.5rem", borderRadius: "6px", whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, background: "#1e293b", color: "#fbbf24", border: "1px solid #f59e0b", padding: "0.25rem 0.5rem", borderRadius: "6px", whiteSpace: "nowrap" }}>
                           {lista.reduce((sum: number, m: any) => sum + Number(m.horasSemanales || 0), 0)} hrs/sem
                         </span>
                       </div>
@@ -1084,7 +1086,7 @@ export default function WizardConfiguracion({
                               value={m.uacName}
                               onChange={(e) => handleActualizarMateriaManual(sem, grupoActivoManual, mIdx, "uacName", e.target.value)}
                               placeholder="Nombre de la Asignatura / Módulo"
-                              style={{ flex: 1, padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.8125rem", fontWeight: 700, color: "#0f172a" }}
+                              style={{ flex: 1, padding: "0.45rem 0.6rem", borderRadius: "6px", border: "1px solid #475569", background: "#1e293b", fontSize: "0.8125rem", fontWeight: 700, color: "#ffffff" }}
                             />
                             <input
                               type="number"
@@ -1092,13 +1094,13 @@ export default function WizardConfiguracion({
                               max={25}
                               value={m.horasSemanales}
                               onChange={(e) => handleActualizarMateriaManual(sem, grupoActivoManual, mIdx, "horasSemanales", Math.max(1, Number(e.target.value)))}
-                              style={{ width: "55px", padding: "0.45rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.8125rem", fontWeight: 800, textAlign: "center", color: "#0f172a" }}
+                              style={{ width: "55px", padding: "0.45rem", borderRadius: "6px", border: "1px solid #475569", background: "#1e293b", fontSize: "0.8125rem", fontWeight: 800, textAlign: "center", color: "#ffffff" }}
                             />
-                            <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b" }}>hrs</span>
+                            <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8" }}>hrs</span>
                             <button
                               type="button"
                               onClick={() => handleEliminarMateriaManual(sem, grupoActivoManual, mIdx)}
-                              style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", padding: "0.4rem", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center" }}
+                              style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", padding: "0.4rem", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center" }}
                               title="Eliminar asignatura"
                             >
                               <Trash2 style={{ width: "14px", height: "14px" }} />
@@ -1110,7 +1112,7 @@ export default function WizardConfiguracion({
                       <button
                         type="button"
                         onClick={() => handleAgregarMateriaManual(sem, grupoActivoManual)}
-                        style={{ marginTop: "0.85rem", width: "100%", padding: "0.5rem", borderRadius: "6px", border: "1px dashed #d97706", background: "#fffbeb", color: "#b45309", fontSize: "0.75rem", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem" }}
+                        style={{ marginTop: "0.85rem", width: "100%", padding: "0.5rem", borderRadius: "6px", border: "1px dashed #f59e0b", background: "rgba(217,119,6,0.15)", color: "#fbbf24", fontSize: "0.75rem", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem" }}
                       >
                         <Plus style={{ width: "14px", height: "14px" }} /> + Agregar Asignatura a {sem}° Semestre{Math.max(g1, g2, g3) > 1 ? ` – Grupo ${grupoActivoManual}` : ""}
                       </button>
@@ -1120,9 +1122,9 @@ export default function WizardConfiguracion({
               </div>
             </div>
           ) : (
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: "12px", padding: "1.25rem", background: "#f8fafc" }}>
-              <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#1e293b", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <ShieldCheck style={{ width: "18px", height: "18px", color: "#2563eb" }} /> Configuración Curricular Individual por Grupo
+            <div style={{ border: "1px solid #334155", borderRadius: "12px", padding: "1.25rem", background: "#1e293b" }}>
+              <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#ffffff", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <ShieldCheck style={{ width: "18px", height: "18px", color: "#38bdf8" }} /> Configuración Curricular Individual por Grupo
               </h3>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -1138,8 +1140,8 @@ export default function WizardConfiguracion({
                   if (gruposTrack.length === 0) return null;
 
                   return (
-                    <div key={letra} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "1rem", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>
-                      <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "#1d4ed8", margin: "0 0 0.85rem", borderBottom: "2px solid #eff6ff", paddingBottom: "0.4rem" }}>
+                    <div key={letra} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "1rem", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+                      <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "#38bdf8", margin: "0 0 0.85rem", borderBottom: "1px solid #334155", paddingBottom: "0.4rem" }}>
                         📌 Track de Grupos Letra "{letra}" ({gruposTrack.map(g => g.nombre).join(" | ")})
                       </h4>
 
@@ -1148,43 +1150,43 @@ export default function WizardConfiguracion({
                           const idx = grupos.findIndex((grp) => grp.nombre === g.nombre && grp.semestre === g.semestre);
 
                           return (
-                            <div key={g.nombre} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "0.85rem" }}>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.4rem", marginBottom: "0.6rem" }}>
-                                <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1d4ed8" }}>
+                            <div key={g.nombre} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #334155", paddingBottom: "0.4rem", marginBottom: "0.6rem" }}>
+                                <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>
                                   Grupo {g.nombre} ({g.semestre}° Semestre)
                                 </span>
-                                <span style={{ fontSize: "0.6875rem", fontWeight: 700, background: "#eff6ff", color: "#2563eb", padding: "0.2rem 0.4rem", borderRadius: "6px" }}>
+                                <span style={{ fontSize: "0.6875rem", fontWeight: 700, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)", padding: "0.2rem 0.4rem", borderRadius: "6px" }}>
                                   {g.semestre === 1 ? "Universal (8 UACs • 25 hrs)" : (g.semestre === 2 ? "Universal (10 UACs • 30 hrs)" : (g.semestre === 3 || g.semestre === 4) ? "Laboral (9 UACs • 30 hrs)" : "Laboral + FFE (10 UACs • 30 hrs)")}
                                 </span>
                               </div>
 
                               <div style={{ marginBottom: "0.65rem" }}>
-                                <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#334155", marginBottom: "0.2rem" }}>
+                                <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.2rem" }}>
                                   Jornada Diaria del Grupo (Horas por día)
                                 </label>
                                 <select
                                   value={g.horasPorDia || (g.semestre === 1 ? 5 : 6)}
                                   onChange={(e) => handleActualizarConfigGrupo(idx, "horasPorDia", Number(e.target.value))}
-                                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #94a3b8", fontSize: "0.75rem", fontWeight: 700, color: "#0f172a" }}
+                                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.75rem", fontWeight: 700, color: "#ffffff" }}
                                 >
-                                  <option value={5}>5 horas por día (25 hrs / semana)</option>
-                                  <option value={6}>6 horas por día (30 hrs / semana)</option>
-                                  <option value={7}>7 horas por día (35 hrs / semana)</option>
+                                  <option value={5} style={{ background: "#0f172a", color: "#ffffff" }}>5 horas por día (25 hrs / semana)</option>
+                                  <option value={6} style={{ background: "#0f172a", color: "#ffffff" }}>6 horas por día (30 hrs / semana)</option>
+                                  <option value={7} style={{ background: "#0f172a", color: "#ffffff" }}>7 horas por día (35 hrs / semana)</option>
                                 </select>
                               </div>
 
                               {g.semestre >= 3 && (
                                 <div style={{ marginBottom: "0.65rem" }}>
-                                  <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#334155", marginBottom: "0.2rem" }}>
+                                  <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.2rem" }}>
                                     Formación Laboral (Capacitación del Grupo)
                                   </label>
                                   <select
                                     value={g.capacitacionNombre || FORMACIONES_LABORALES[0]}
                                     onChange={(e) => handleActualizarConfigGrupo(idx, "capacitacionNombre", e.target.value)}
-                                    style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #94a3b8", fontSize: "0.78125rem", fontWeight: 700, color: "#0f172a" }}
+                                    style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.78125rem", fontWeight: 700, color: "#ffffff" }}
                                   >
                                     {FORMACIONES_LABORALES.map((cap) => (
-                                      <option key={cap} value={cap}>
+                                      <option key={cap} value={cap} style={{ background: "#0f172a", color: "#ffffff" }}>
                                         {cap}
                                       </option>
                                     ))}
@@ -1204,17 +1206,17 @@ export default function WizardConfiguracion({
 
                                 return (
                                   <div style={{ marginBottom: "0.65rem" }}>
-                                    <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#334155", marginBottom: "0.2rem" }}>
+                                    <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.2rem" }}>
                                       Currículum Ampliado / Formación Socioemocional (FFEO) {esAuto && "(Automático Semestre B)"}
                                     </label>
                                     <select
                                       disabled={esAuto}
                                       value={g.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1])}
                                       onChange={(e) => handleActualizarConfigGrupo(idx, "ffeoSocioemocional", e.target.value)}
-                                      style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #94a3b8", fontSize: "0.72rem", fontWeight: 700, color: "#0f172a", opacity: esAuto ? 0.8 : 1 }}
+                                      style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.72rem", fontWeight: 700, color: "#ffffff", opacity: esAuto ? 0.8 : 1 }}
                                     >
                                       {opcionesDisponibles.map((ffeo) => (
-                                        <option key={ffeo} value={ffeo}>
+                                        <option key={ffeo} value={ffeo} style={{ background: "#0f172a", color: "#ffffff" }}>
                                           {ffeo}
                                         </option>
                                       ))}
@@ -1225,7 +1227,7 @@ export default function WizardConfiguracion({
 
                               {g.semestre === 5 && (
                                 <div>
-                                  <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#334155", marginBottom: "0.3rem" }}>
+                                  <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.3rem" }}>
                                     Optativas FFE (Selección libre de 4 asignaturas del catálogo oficial MCCEMS)
                                   </label>
                                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
@@ -1235,24 +1237,24 @@ export default function WizardConfiguracion({
 
                                       return (
                                         <div key={optIdx}>
-                                          <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#64748b", display: "block" }}>
+                                          <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#94a3b8", display: "block" }}>
                                             Optativa FFE {optIdx + 1}
                                           </span>
                                           <select
                                             value={valorActual}
                                             onChange={(e) => handleActualizarOptativaGrupo(idx, optIdx, e.target.value)}
-                                            style={{ width: "100%", padding: "0.35rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.6875rem", fontWeight: 700, color: "#0f172a" }}
+                                            style={{ width: "100%", padding: "0.35rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.6875rem", fontWeight: 700, color: "#ffffff" }}
                                           >
-                                            <optgroup label="Recursos Sociocognitivos">
+                                            <optgroup label="Recursos Sociocognitivos" style={{ background: "#0f172a", color: "#38bdf8" }}>
                                               {FFE_RECURSO_SOCIOCOGNITIVO.map((mat) => (
-                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)}>
+                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)} style={{ background: "#0f172a", color: "#ffffff" }}>
                                                   {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
                                                 </option>
                                               ))}
                                             </optgroup>
-                                            <optgroup label="Áreas de Conocimiento">
+                                            <optgroup label="Áreas de Conocimiento" style={{ background: "#0f172a", color: "#a78bfa" }}>
                                               {FFE_AREA_CONOCIMIENTO.map((mat) => (
-                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)}>
+                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)} style={{ background: "#0f172a", color: "#ffffff" }}>
                                                   {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
                                                 </option>
                                               ))}
@@ -1266,8 +1268,8 @@ export default function WizardConfiguracion({
                               )}
 
                               {g.semestre === 1 && (
-                                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", padding: "0.5rem", marginTop: "0.4rem" }}>
-                                  <p style={{ fontSize: "0.72rem", color: "#166534", margin: 0, fontWeight: 700 }}>
+                                <div style={{ background: "rgba(22,163,74,0.15)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: "6px", padding: "0.5rem", marginTop: "0.4rem" }}>
+                                  <p style={{ fontSize: "0.72rem", color: "#4ade80", margin: 0, fontWeight: 700 }}>
                                     ✓ 1.er Semestre: 8 Asignaturas Fundamentales Oficiales (5 horas diarias = 25 hrs/semana).
                                   </p>
                                 </div>
@@ -1286,7 +1288,7 @@ export default function WizardConfiguracion({
           <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "1rem" }}>
             <button
               onClick={() => setPaso(2)}
-              style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.75rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer" }}
+              style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.75rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}
             >
               Siguiente: Plantilla Docente →
             </button>
@@ -1297,20 +1299,20 @@ export default function WizardConfiguracion({
       {/* PASO 2: Plantilla Docente & Contador de Horas del Plantel */}
       {paso === 2 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", background: "#f8fafc", padding: "1.25rem", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", background: "#1e293b", padding: "1.25rem", borderRadius: "12px", border: "1px solid #334155" }}>
             <div>
-              <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#1e293b", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <UserCheck style={{ width: "18px", height: "18px", color: "#2563eb" }} /> Carga Horaria de la Plantilla Docente Frente a Grupo
+              <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#ffffff", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <UserCheck style={{ width: "18px", height: "18px", color: "#38bdf8" }} /> Carga Horaria de la Plantilla Docente Frente a Grupo
               </h3>
-              <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem", margin: 0 }}>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem", margin: 0 }}>
                 Administrativos, Apoyo y Responsables inician con 0 hrs. Asigne únicamente las horas frente a grupo reales.
               </p>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <div style={{ background: "#ffffff", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #cbd5e1", textAlign: "right" }}>
-                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Plantilla Contratada</div>
-                <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHorasPlantillaDocente >= horasRequeridasPlantel ? "#16a34a" : "#d97706" }}>
+              <div style={{ background: "#0f172a", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #334155", textAlign: "right" }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Plantilla Contratada</div>
+                <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHorasPlantillaDocente >= horasRequeridasPlantel ? "#4ade80" : "#fbbf24" }}>
                   {totalHorasPlantillaDocente} / {horasRequeridasPlantel} hrs
                 </div>
               </div>
@@ -1318,7 +1320,7 @@ export default function WizardConfiguracion({
               <button
                 type="button"
                 onClick={() => setMostrarModalDocente(true)}
-                style={{ background: "#2563eb", color: "#ffffff", padding: "0.625rem 1.25rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}
+                style={{ background: "#2563eb", color: "#ffffff", padding: "0.625rem 1.25rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}
               >
                 <UserPlus style={{ width: "16px", height: "16px" }} /> + Agregar Docente / Personal a Plantilla
               </button>
@@ -1326,9 +1328,9 @@ export default function WizardConfiguracion({
           </div>
 
           {docentes.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", background: "#f8fafc", border: "2px dashed #cbd5e1", borderRadius: "12px" }}>
+            <div style={{ padding: "2rem", textAlign: "center", background: "#1e293b", border: "2px dashed #334155", borderRadius: "12px" }}>
               <AlertCircle style={{ width: "32px", height: "32px", color: "#94a3b8", margin: "0 auto 0.5rem" }} />
-              <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "#1e293b" }}>No se encontraron docentes activos en la plantilla del horario.</p>
+              <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "#ffffff" }}>No se encontraron docentes activos en la plantilla del horario.</p>
               <button
                 onClick={() => setMostrarModalDocente(true)}
                 style={{ marginTop: "0.75rem", background: "#2563eb", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, fontSize: "0.8125rem", border: "none", cursor: "pointer" }}
@@ -1348,25 +1350,25 @@ export default function WizardConfiguracion({
                     key={d.id}
                     style={{
                       padding: "0.85rem",
-                      border: "1px solid " + (esExcedido ? "#fca5a5" : "#cbd5e1"),
+                      border: "1px solid " + (esExcedido ? "#ef4444" : "#334155"),
                       borderRadius: "10px",
-                      background: esExcedido ? "#fef2f2" : "#ffffff",
+                      background: esExcedido ? "rgba(239, 68, 68, 0.15)" : "#1e293b",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
                     }}
                   >
                     <div style={{ flex: 1, paddingRight: "0.5rem" }}>
-                      <p style={{ fontSize: "0.875rem", fontWeight: 800, color: esExcedido ? "#dc2626" : "#1e293b", margin: 0 }}>
+                      <p style={{ fontSize: "0.875rem", fontWeight: 800, color: esExcedido ? "#f87171" : "#ffffff", margin: 0 }}>
                         {d.apellidoPaterno} {d.apellidoMaterno || ""} {d.nombre}
                       </p>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.2rem" }}>
-                        <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: d.cargo === "DOCENTE" ? "#2563eb" : "#d97706", background: "#f8fafc", padding: "0.1rem 0.4rem", borderRadius: "4px", border: "1px solid #cbd5e1" }}>
+                        <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: d.cargo === "DOCENTE" ? "#60a5fa" : "#fbbf24", background: "#0f172a", padding: "0.1rem 0.4rem", borderRadius: "4px", border: "1px solid #334155" }}>
                           {d.cargo || "DOCENTE"}
                         </span>
                         {hrsAsignadasMatriz > 0 && (
-                          <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: esExcedido ? "#dc2626" : "#16a34a" }}>
+                          <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: esExcedido ? "#f87171" : "#4ade80" }}>
                             Asignadas: {hrsAsignadasMatriz}/{hrsContratadas}h {esExcedido ? "⚠️ EXCEDIDO" : ""}
                           </span>
                         )}
@@ -1381,16 +1383,16 @@ export default function WizardConfiguracion({
                           max={30}
                           value={horasDocentes[d.id] !== undefined ? horasDocentes[d.id] : (d.cargo === "DOCENTE" ? 20 : 0)}
                           onChange={(e) => setHorasDocentes({ ...horasDocentes, [d.id]: Math.max(0, Number(e.target.value)) })}
-                          style={{ width: "60px", padding: "0.35rem", borderRadius: "6px", border: "2px solid " + (esExcedido ? "#ef4444" : "#3b82f6"), fontWeight: 800, textAlign: "center", fontSize: "0.875rem", color: "#1e293b" }}
+                          style={{ width: "60px", padding: "0.35rem", borderRadius: "6px", border: "2px solid " + (esExcedido ? "#ef4444" : "#3b82f6"), background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "0.875rem", color: "#ffffff" }}
                         />
-                        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b" }}>hrs</span>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8" }}>hrs</span>
                       </div>
 
                       <button
                         type="button"
                         title="Remover docente de la plantilla activa"
                         onClick={() => handleEliminarDocentePlantilla(d.id)}
-                        style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", padding: "0.4rem", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center" }}
+                        style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", padding: "0.4rem", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center" }}
                       >
                         <Trash2 style={{ width: "16px", height: "16px" }} />
                       </button>
@@ -1404,13 +1406,13 @@ export default function WizardConfiguracion({
           <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "1rem" }}>
             <button
               onClick={() => setPaso(1)}
-              style={{ background: "#f1f5f9", color: "#1e293b", padding: "0.75rem 1.5rem", borderRadius: "10px", fontWeight: 700, border: "none", cursor: "pointer" }}
+              style={{ background: "#334155", color: "#ffffff", padding: "0.75rem 1.5rem", borderRadius: "10px", fontWeight: 700, border: "none", cursor: "pointer" }}
             >
               ← Atrás
             </button>
             <button
               onClick={() => setPaso(3)}
-              style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.75rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer" }}
+              style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.75rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}
             >
               Siguiente: Matriz por Semestre →
             </button>
@@ -1422,20 +1424,20 @@ export default function WizardConfiguracion({
       {paso === 3 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* Banner Resumen de Cargas Horarias del Plantel */}
-          <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "1rem 1.25rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+          <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "1rem 1.25rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
             <div>
-              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#1e293b", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <BookOpen style={{ width: "20px", height: "20px", color: "#2563eb" }} /> Matriz de Asignación Docente por Grupo (UACs Específicas)
+              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <BookOpen style={{ width: "20px", height: "20px", color: "#38bdf8" }} /> Matriz de Asignación Docente por Grupo (UACs Específicas)
               </h3>
-              <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "0.25rem 0 0" }}>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: "0.25rem 0 0" }}>
                 Seleccione el docente responsable para cada UAC. Las opciones con exceso de horas contratadas se deshabilitan automáticamente.
               </p>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <div style={{ background: "#ffffff", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #cbd5e1", textAlign: "right" }}>
-                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Horas Asignadas en Matriz</div>
-                <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHorasAsignadasMatriz === horasRequeridasPlantel ? "#16a34a" : "#2563eb" }}>
+              <div style={{ background: "#0f172a", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #334155", textAlign: "right" }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Horas Asignadas en Matriz</div>
+                <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHorasAsignadasMatriz === horasRequeridasPlantel ? "#4ade80" : "#38bdf8" }}>
                   {totalHorasAsignadasMatriz} / {horasRequeridasPlantel} hrs
                 </div>
               </div>
@@ -1444,8 +1446,8 @@ export default function WizardConfiguracion({
 
           {/* Alertas de Sobrecarga de Docentes */}
           {docentes.some((d) => getHorasConsumidasDocente(d.id) > (horasDocentes[d.id] !== undefined ? horasDocentes[d.id] : (d.cargo === "DOCENTE" ? 20 : 0))) && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "10px", padding: "0.85rem 1.25rem", color: "#991b1b", fontSize: "0.8125rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.6rem" }}>
-              <AlertTriangle style={{ width: "20px", height: "20px", color: "#dc2626", flexShrink: 0 }} />
+            <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", borderRadius: "10px", padding: "0.85rem 1.25rem", color: "#fca5a5", fontSize: "0.8125rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <AlertTriangle style={{ width: "20px", height: "20px", color: "#ef4444", flexShrink: 0 }} />
               <div>
                 <strong>⚠️ Advertencia de Sobre-asignación:</strong> Hay docente(s) que superan las horas contratadas en la plantilla. Ajuste las selecciones resaltadas en rojo para evitar empalmes.
               </div>
@@ -1466,10 +1468,10 @@ export default function WizardConfiguracion({
             };
 
             return (
-              <div key={sem} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                <div style={{ background: "#1e293b", color: "#ffffff", padding: "0.625rem 1rem", borderRadius: "8px", fontWeight: 800, fontSize: "0.875rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span>{labelSem[sem] || `${sem}° Semestre`}</span>
-                  <span style={{ fontSize: "0.75rem", background: "#334155", padding: "0.25rem 0.5rem", borderRadius: "4px" }}>
+              <div key={sem} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                <div style={{ background: "#0f172a", color: "#ffffff", padding: "0.625rem 1rem", borderRadius: "8px", fontWeight: 800, fontSize: "0.875rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #334155" }}>
+                  <span style={{ color: "#38bdf8" }}>{labelSem[sem] || `${sem}° Semestre`}</span>
+                  <span style={{ fontSize: "0.75rem", background: "#334155", color: "#e2e8f0", padding: "0.25rem 0.5rem", borderRadius: "4px" }}>
                     {gruposSemestre.length} Grupo(s) activo(s)
                   </span>
                 </div>
@@ -1479,13 +1481,13 @@ export default function WizardConfiguracion({
                     const uacsEspecificas = getUACsIndividualesGrupo(g);
 
                     return (
-                      <div key={g.id} style={{ border: "1px solid #cbd5e1", borderRadius: "10px", overflow: "hidden", background: "#ffffff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-                        <div style={{ background: "#eff6ff", padding: "0.75rem 1rem", borderBottom: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: "0.9375rem", fontWeight: 900, color: "#1d4ed8" }}>
+                      <div key={g.id} style={{ border: "1px solid #334155", borderRadius: "10px", overflow: "hidden", background: "#0f172a", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+                        <div style={{ background: "#1e293b", padding: "0.75rem 1rem", borderBottom: "1px solid #334155", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: "0.9375rem", fontWeight: 900, color: "#60a5fa" }}>
                             Grupo {g.nombre}
                           </span>
                           {g.capacitacionNombre && (
-                            <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#2563eb", background: "#ffffff", padding: "0.2rem 0.6rem", borderRadius: "6px", border: "1px solid #bfdbfe" }}>
+                            <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#38bdf8", background: "#0f172a", padding: "0.2rem 0.6rem", borderRadius: "6px", border: "1px solid #334155" }}>
                               {g.capacitacionNombre}
                             </span>
                           )}
@@ -1493,10 +1495,10 @@ export default function WizardConfiguracion({
 
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78125rem" }}>
                           <thead>
-                            <tr style={{ background: "#f8fafc", borderBottom: "1px solid #cbd5e1" }}>
-                              <th style={{ padding: "0.5rem 0.625rem", textAlign: "left", fontWeight: 800, color: "#334155", width: "55%" }}>Materia (UAC)</th>
-                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#2563eb", width: "15%" }}>Horas</th>
-                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#1e293b", width: "30%" }}>Docente Asignado</th>
+                            <tr style={{ background: "#1e293b", borderBottom: "1px solid #334155" }}>
+                              <th style={{ padding: "0.5rem 0.625rem", textAlign: "left", fontWeight: 800, color: "#cbd5e1", width: "55%" }}>Materia (UAC)</th>
+                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#38bdf8", width: "15%" }}>Horas</th>
+                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#cbd5e1", width: "30%" }}>Docente Asignado</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1509,54 +1511,54 @@ export default function WizardConfiguracion({
                               const esDocenteExcedido = docenteActualId && hrsConDocenteConEsta > hrsMaxDocenteActual;
 
                               return (
-                                <tr key={uac.id || uacIdx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                                  <td style={{ padding: "0.5rem 0.625rem", fontWeight: 700, color: "#1e293b", lineHeight: 1.35 }}>
+                                <tr key={uac.id || uacIdx} style={{ borderBottom: "1px solid #1e293b" }}>
+                                  <td style={{ padding: "0.5rem 0.625rem", fontWeight: 700, color: "#f8fafc", lineHeight: 1.35 }}>
                                     {uac.tipo?.startsWith("LABORAL") ? (
                                       <div>
-                                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", display: "block" }}>
+                                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", display: "block" }}>
                                           Formación Laboral {uac.tipo === "LABORAL_A" ? '"A"' : '"B"'} ({(uac as any).capNombre})
                                         </span>
-                                        <span style={{ color: "#d97706", fontWeight: 900, fontSize: "0.8125rem" }}>
+                                        <span style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.8125rem" }}>
                                           {uac.uacName}
                                         </span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#2563eb", marginLeft: "0.35rem" }}>
+                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#60a5fa", marginLeft: "0.35rem" }}>
                                           ({uac.abrev})
                                         </span>
                                       </div>
                                     ) : uac.tipo === "AMPLIADO" ? (
                                       <div>
-                                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#0284c7", display: "block" }}>
+                                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#38bdf8", display: "block" }}>
                                           Currículum Ampliado (FFEO)
                                         </span>
-                                        <span style={{ color: "#0369a1", fontWeight: 800 }}>
+                                        <span style={{ color: "#7dd3fc", fontWeight: 800 }}>
                                           {uac.uacName}
                                         </span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", marginLeft: "0.35rem" }}>
+                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", marginLeft: "0.35rem" }}>
                                           ({uac.abrev})
                                         </span>
                                       </div>
                                     ) : uac.tipo?.startsWith("FFE_") ? (
                                       <div>
-                                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#7c3aed", display: "block" }}>
+                                        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#c084fc", display: "block" }}>
                                           Formación Fundamental Extendida (Optativa FFE)
                                         </span>
-                                        <span style={{ color: "#6d28d9", fontWeight: 800 }}>
+                                        <span style={{ color: "#d8b4fe", fontWeight: 800 }}>
                                           {uac.uacName}
                                         </span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", marginLeft: "0.35rem" }}>
+                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", marginLeft: "0.35rem" }}>
                                           ({uac.abrev})
                                         </span>
                                       </div>
                                     ) : (
                                       <div>
-                                        <span>{uac.uacName}</span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", marginLeft: "0.35rem" }}>
+                                        <span style={{ color: "#f8fafc" }}>{uac.uacName}</span>
+                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#38bdf8", marginLeft: "0.35rem" }}>
                                           ({uac.abrev})
                                         </span>
                                       </div>
                                     )}
                                   </td>
-                                  <td style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#2563eb" }}>
+                                  <td style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#38bdf8" }}>
                                     {uac.horasSemanales || 3}h
                                   </td>
                                   <td style={{ padding: "0.35rem" }}>
@@ -1567,15 +1569,15 @@ export default function WizardConfiguracion({
                                         width: "100%",
                                         padding: "0.4rem 0.5rem",
                                         borderRadius: "6px",
-                                        border: "2px solid " + (esDocenteExcedido ? "#ef4444" : docenteActualId ? "#16a34a" : "#cbd5e1"),
-                                        background: esDocenteExcedido ? "#fef2f2" : docenteActualId ? "#f0fdf4" : "#ffffff",
+                                        border: "2px solid " + (esDocenteExcedido ? "#ef4444" : docenteActualId ? "#22c55e" : "#475569"),
+                                        background: esDocenteExcedido ? "#450a0a" : docenteActualId ? "#0f172a" : "#1e293b",
                                         fontSize: "0.72rem",
                                         fontWeight: 800,
-                                        color: esDocenteExcedido ? "#dc2626" : docenteActualId ? "#15803d" : "#64748b",
+                                        color: esDocenteExcedido ? "#f87171" : docenteActualId ? "#4ade80" : "#cbd5e1",
                                         outline: "none"
                                       }}
                                     >
-                                      <option value="">-- Sin Asignar --</option>
+                                      <option value="" style={{ background: "#0f172a", color: "#ffffff" }}>-- Sin Asignar --</option>
                                       {docentesAptosParaHorario.map((d) => {
                                         const hrsMax = horasDocentes[d.id] !== undefined ? horasDocentes[d.id] : (d.cargo === "DOCENTE" ? 20 : 0);
                                         const hrsConsumidasSinEstaCelda = getHorasConsumidasDocente(d.id, g.id, uac.id);
@@ -1584,7 +1586,7 @@ export default function WizardConfiguracion({
                                         const excedeHoras = hrsTrasAsignar > hrsMax && !esSeleccionado;
 
                                         return (
-                                          <option key={d.id} value={d.id} disabled={excedeHoras}>
+                                          <option key={d.id} value={d.id} disabled={excedeHoras} style={{ background: "#0f172a", color: excedeHoras ? "#64748b" : "#ffffff" }}>
                                             {d.apellidoPaterno} {d.nombre} ({hrsConsumidasSinEstaCelda + (esSeleccionado ? (uac.horasSemanales || 3) : 0)}/{hrsMax}h) {excedeHoras ? `⚠️ EXCEDE LÍMITE (${hrsTrasAsignar}h > ${hrsMax}h)` : ""}
                                           </option>
                                         );
@@ -1607,7 +1609,7 @@ export default function WizardConfiguracion({
           <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "1rem" }}>
             <button
               onClick={() => setPaso(2)}
-              style={{ background: "#f1f5f9", color: "#1e293b", padding: "0.75rem 1.5rem", borderRadius: "10px", fontWeight: 700, border: "none", cursor: "pointer" }}
+              style={{ background: "#334155", color: "#ffffff", padding: "0.75rem 1.5rem", borderRadius: "10px", fontWeight: 700, border: "none", cursor: "pointer" }}
             >
               ← Atrás
             </button>
@@ -1625,21 +1627,21 @@ export default function WizardConfiguracion({
 
       {/* MODAL: AGREGAR DOCENTE / PERSONAL */}
       {mostrarModalDocente && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-          <div style={{ background: "white", borderRadius: "16px", padding: "1.5rem", maxWidth: "520px", width: "100%", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(4px)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ background: "#0f172a", borderRadius: "16px", padding: "1.5rem", maxWidth: "520px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", border: "1px solid #334155" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#1e293b", margin: 0 }}>
+              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
                 Agregar Personal a la Plantilla Horaria
               </h3>
               <button
                 onClick={() => setMostrarModalDocente(false)}
-                style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "#64748b" }}
+                style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "#94a3b8" }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: "flex", borderBottom: "1px solid #e2e8f0", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", borderBottom: "1px solid #334155", marginBottom: "1.25rem" }}>
               <button
                 onClick={() => setTabModalDocente("PLATAFORMA")}
                 style={{
@@ -1649,8 +1651,8 @@ export default function WizardConfiguracion({
                   fontSize: "0.8125rem",
                   border: "none",
                   background: "none",
-                  borderBottom: tabModalDocente === "PLATAFORMA" ? "3px solid #2563eb" : "none",
-                  color: tabModalDocente === "PLATAFORMA" ? "#2563eb" : "#64748b",
+                  borderBottom: tabModalDocente === "PLATAFORMA" ? "3px solid #38bdf8" : "none",
+                  color: tabModalDocente === "PLATAFORMA" ? "#38bdf8" : "#94a3b8",
                   cursor: "pointer"
                 }}
               >
@@ -1665,8 +1667,8 @@ export default function WizardConfiguracion({
                   fontSize: "0.8125rem",
                   border: "none",
                   background: "none",
-                  borderBottom: tabModalDocente === "MANUAL" ? "3px solid #2563eb" : "none",
-                  color: tabModalDocente === "MANUAL" ? "#2563eb" : "#64748b",
+                  borderBottom: tabModalDocente === "MANUAL" ? "3px solid #38bdf8" : "none",
+                  color: tabModalDocente === "MANUAL" ? "#38bdf8" : "#94a3b8",
                   cursor: "pointer"
                 }}
               >
@@ -1683,14 +1685,14 @@ export default function WizardConfiguracion({
                     placeholder="Buscar por nombre o cargo (Docente, Administrativo...)..."
                     value={busquedaPersonal}
                     onChange={(e) => setBusquedaPersonal(e.target.value)}
-                    style={{ width: "100%", padding: "0.45rem 0.6rem 0.45rem 2.2rem", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.8125rem" }}
+                    style={{ width: "100%", padding: "0.45rem 0.6rem 0.45rem 2.2rem", borderRadius: "8px", border: "1px solid #475569", background: "#1e293b", color: "#ffffff", fontSize: "0.8125rem" }}
                   />
                 </div>
 
                 <div style={{ maxHeight: "240px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem", paddingRight: "0.25rem" }}>
                   {personalDisponibleModal.length === 0 ? (
-                    <div style={{ padding: "1.25rem", textAlign: "center", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                      <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: 0, fontWeight: 600 }}>
+                    <div style={{ padding: "1.25rem", textAlign: "center", background: "#1e293b", borderRadius: "10px", border: "1px solid #334155" }}>
+                      <p style={{ fontSize: "0.8125rem", color: "#94a3b8", margin: 0, fontWeight: 600 }}>
                         {personalPlataforma.length === 0
                           ? "Cargando personal registrado de la escuela..."
                           : personalNoAgregado.length === 0
@@ -1700,12 +1702,12 @@ export default function WizardConfiguracion({
                     </div>
                   ) : (
                     personalDisponibleModal.map((p) => (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0.75rem", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#ffffff" }}>
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0.75rem", border: "1px solid #334155", borderRadius: "8px", background: "#1e293b" }}>
                         <div>
-                          <p style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#1e293b", margin: 0 }}>
+                          <p style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
                             {p.apellidoPaterno} {p.apellidoMaterno || ""} {p.nombre}
                           </p>
-                          <span style={{ fontSize: "0.6875rem", color: p.cargo === "DOCENTE" ? "#2563eb" : "#d97706", fontWeight: 700 }}>
+                          <span style={{ fontSize: "0.6875rem", color: p.cargo === "DOCENTE" ? "#60a5fa" : "#fbbf24", fontWeight: 700 }}>
                             {p.cargo || "DOCENTE"}
                           </span>
                         </div>
@@ -1725,48 +1727,48 @@ export default function WizardConfiguracion({
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.25rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#1e293b", marginBottom: "0.25rem" }}>Nombre(s)</label>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Nombre(s)</label>
                   <input
                     type="text"
                     placeholder="Ej. Juan Manuel"
                     value={nuevoDocenteNombre}
                     onChange={(e) => setNuevoDocenteNombre(e.target.value)}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700 }}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 700 }}
                   />
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#1e293b", marginBottom: "0.25rem" }}>Apellido Paterno</label>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Apellido Paterno</label>
                     <input
                       type="text"
                       placeholder="Ej. Pérez"
                       value={nuevoDocentePaterno}
                       onChange={(e) => setNuevoDocentePaterno(e.target.value)}
-                      style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700 }}
+                      style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 700 }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#1e293b", marginBottom: "0.25rem" }}>Apellido Materno</label>
+                    <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Apellido Materno</label>
                     <input
                       type="text"
                       placeholder="Ej. Gómez"
                       value={nuevoDocenteMaterno}
                       onChange={(e) => setNuevoDocenteMaterno(e.target.value)}
-                      style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700 }}
+                      style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 700 }}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#1e293b", marginBottom: "0.25rem" }}>Horas Frente a Grupo Contratadas</label>
+                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.25rem" }}>Horas Frente a Grupo Contratadas</label>
                   <input
                     type="number"
                     min={0}
                     max={30}
                     value={nuevoDocenteHoras}
                     onChange={(e) => setNuevoDocenteHoras(Number(e.target.value))}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "2px solid #2563eb", fontSize: "0.875rem", fontWeight: 800 }}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#1e293b", color: "#ffffff", fontSize: "0.875rem", fontWeight: 800 }}
                   />
                 </div>
 
@@ -1774,7 +1776,7 @@ export default function WizardConfiguracion({
                   <button
                     type="button"
                     onClick={() => setMostrarModalDocente(false)}
-                    style={{ background: "#f1f5f9", color: "#1e293b", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                    style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
                   >
                     Cancelar
                   </button>

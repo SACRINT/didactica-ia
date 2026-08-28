@@ -257,7 +257,7 @@ export default function HorariosDashboardClient({
           <button
             onClick={handleReiniciarMapaCurricular}
             style={{
-              background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5',
+              background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)',
               padding: '0.45rem 0.85rem', borderRadius: '8px', fontWeight: 800, fontSize: '0.78125rem',
               cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
             }}
@@ -269,7 +269,7 @@ export default function HorariosDashboardClient({
             <button
               onClick={handleEliminarHorario}
               style={{
-                background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5',
+                background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)',
                 padding: '0.45rem 0.85rem', borderRadius: '8px', fontWeight: 800, fontSize: '0.78125rem',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
               }}

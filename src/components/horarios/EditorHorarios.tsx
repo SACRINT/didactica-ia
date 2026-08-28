@@ -39,14 +39,14 @@ interface Props {
 }
 
 const PALETA_ESTILOS: Record<string, { bg: string; text: string; border: string }> = {
-  blue: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
-  green: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
-  yellow: { bg: "#fefce8", text: "#a16207", border: "#fef08a" },
-  orange: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
-  pink: { bg: "#fdf2f8", text: "#be185d", border: "#fbcfe8" },
-  purple: { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
-  teal: { bg: "#f0fdfa", text: "#0f766e", border: "#99f6e4" },
-  cyan: { bg: "#ecfeff", text: "#0e7490", border: "#a5f3fc" }
+  blue: { bg: "rgba(37, 99, 235, 0.25)", text: "#93c5fd", border: "#3b82f6" },
+  green: { bg: "rgba(22, 163, 74, 0.25)", text: "#86efac", border: "#22c55e" },
+  yellow: { bg: "rgba(202, 138, 4, 0.25)", text: "#fef08a", border: "#eab308" },
+  orange: { bg: "rgba(234, 88, 12, 0.25)", text: "#fed7aa", border: "#f97316" },
+  pink: { bg: "rgba(219, 39, 119, 0.25)", text: "#fbcfe8", border: "#ec4899" },
+  purple: { bg: "rgba(147, 51, 234, 0.25)", text: "#e9d5ff", border: "#a855f7" },
+  teal: { bg: "rgba(13, 148, 136, 0.25)", text: "#99f6e4", border: "#14b8a6" },
+  cyan: { bg: "rgba(8, 145, 178, 0.25)", text: "#a5f3fc", border: "#06b6d4" }
 };
 
 const ESTILOS_ARRAY = Object.values(PALETA_ESTILOS);
@@ -569,29 +569,81 @@ export default function EditorHorarios({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", width: "100%" }}>
       {/* Barra de Controles Superior */}
-      <div style={{ background: "white", padding: "1rem", borderRadius: "12px", border: "1px solid var(--border)", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+      <div style={{ background: "#0f172a", padding: "1rem", borderRadius: "12px", border: "1px solid #334155", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <button
             onClick={() => setVistaTab("GRUPO")}
-            className={`horario-tab-btn ${vistaTab === "GRUPO" ? "active" : ""}`}
+            style={{
+              padding: "0.45rem 0.9rem",
+              borderRadius: "8px",
+              border: vistaTab === "GRUPO" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "GRUPO" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "GRUPO" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "GRUPO" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }}
           >
             <Users style={{ width: "16px", height: "16px" }} /> Por Grupo
           </button>
           <button
             onClick={() => setVistaTab("DOCENTE")}
-            className={`horario-tab-btn ${vistaTab === "DOCENTE" ? "active" : ""}`}
+            style={{
+              padding: "0.45rem 0.9rem",
+              borderRadius: "8px",
+              border: vistaTab === "DOCENTE" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "DOCENTE" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "DOCENTE" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "DOCENTE" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }}
           >
             <UserCheck style={{ width: "16px", height: "16px" }} /> Por Docente
           </button>
           <button
             onClick={() => setVistaTab("AULA")}
-            className={`horario-tab-btn ${vistaTab === "AULA" ? "active" : ""}`}
+            style={{
+              padding: "0.45rem 0.9rem",
+              borderRadius: "8px",
+              border: vistaTab === "AULA" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "AULA" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "AULA" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "AULA" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }}
           >
             <Building2 style={{ width: "16px", height: "16px" }} /> Por Aula
           </button>
           <button
             onClick={() => setVistaTab("SUMARIO")}
-            className={`horario-tab-btn ${vistaTab === "SUMARIO" ? "active" : ""}`}
+            style={{
+              padding: "0.45rem 0.9rem",
+              borderRadius: "8px",
+              border: vistaTab === "SUMARIO" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "SUMARIO" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "SUMARIO" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "SUMARIO" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }}
           >
             <Grid style={{ width: "16px", height: "16px" }} /> Sumario Maestro
           </button>
@@ -601,10 +653,10 @@ export default function EditorHorarios({
           <button
             onClick={() => setMostrarChat(!mostrarChat)}
             style={{
-              background: mostrarChat ? "#eff6ff" : "#ffffff",
-              color: "#2563eb",
-              border: "1px solid #bfdbfe",
-              padding: "0.4rem 0.85rem",
+              background: mostrarChat ? "rgba(37, 99, 235, 0.2)" : "#1e293b",
+              color: mostrarChat ? "#60a5fa" : "#cbd5e1",
+              border: "1px solid " + (mostrarChat ? "#3b82f6" : "#334155"),
+              padding: "0.45rem 0.85rem",
               borderRadius: "8px",
               fontWeight: 700,
               fontSize: "0.8125rem",
@@ -619,8 +671,7 @@ export default function EditorHorarios({
 
           <button
             onClick={onVolverAWizard}
-            className="btn"
-            style={{ background: "var(--bg)", color: "var(--text)", padding: "0.4rem 0.85rem", fontSize: "0.8125rem", minHeight: "auto" }}
+            style={{ background: "#1e293b", color: "#cbd5e1", border: "1px solid #334155", padding: "0.45rem 0.85rem", fontSize: "0.8125rem", borderRadius: "8px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}
           >
             <Sliders style={{ width: "15px", height: "15px" }} /> Reconfigurar
           </button>
@@ -629,9 +680,9 @@ export default function EditorHorarios({
             onClick={handleGuardarHorarioDB}
             disabled={guardandoCambios || !hayCambiosSinGuardar}
             style={{
-              background: hayCambiosSinGuardar ? "#16a34a" : "#f1f5f9",
-              color: hayCambiosSinGuardar ? "#ffffff" : "#94a3b8",
-              border: hayCambiosSinGuardar ? "1px solid #15803d" : "1px solid #cbd5e1",
+              background: hayCambiosSinGuardar ? "#16a34a" : "#1e293b",
+              color: hayCambiosSinGuardar ? "#ffffff" : "#64748b",
+              border: hayCambiosSinGuardar ? "1px solid #22c55e" : "1px solid #334155",
               padding: "0.5rem 1rem",
               borderRadius: "8px",
               fontWeight: 800,
@@ -658,8 +709,7 @@ export default function EditorHorarios({
 
           <button
             onClick={() => setMostrarModalExportar(true)}
-            className="btn btn-primary"
-            style={{ padding: "0.5rem 1rem", fontSize: "0.8125rem", minHeight: "auto", display: "flex", alignItems: "center", gap: "0.4rem" }}
+            style={{ background: "#2563eb", color: "#ffffff", border: "1px solid #3b82f6", padding: "0.5rem 1rem", fontSize: "0.8125rem", borderRadius: "8px", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem", boxShadow: "0 2px 6px rgba(37,99,235,0.3)" }}
           >
             <Download style={{ width: "15px", height: "15px" }} /> Exportar Horarios (PDF/Excel)
           </button>
@@ -667,11 +717,11 @@ export default function EditorHorarios({
       </div>
 
       {/* Selectores de elemento según Tab activa */}
-      <div style={{ padding: "0.75rem 1.25rem", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Filtrar Vista:</span>
+      <div style={{ padding: "0.75rem 1.25rem", background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Filtrar Vista:</span>
         {vistaTab === "GRUPO" && (
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", gap: "0.25rem", background: "var(--bg-secondary)", padding: "0.2rem", borderRadius: "8px" }}>
+            <div style={{ display: "flex", gap: "0.25rem", background: "#0f172a", padding: "0.2rem", borderRadius: "8px", border: "1px solid #334155" }}>
               <button
                 type="button"
                 onClick={() => {
@@ -687,7 +737,7 @@ export default function EditorHorarios({
                   fontWeight: 800,
                   cursor: "pointer",
                   background: periodoFiltro === "A" ? "#2563eb" : "transparent",
-                  color: periodoFiltro === "A" ? "white" : "var(--text-muted)"
+                  color: periodoFiltro === "A" ? "white" : "#94a3b8"
                 }}
               >
                 📅 Semestre A (1º, 3º, 5º)
@@ -716,7 +766,7 @@ export default function EditorHorarios({
                   fontWeight: 800,
                   cursor: "pointer",
                   background: periodoFiltro === "B" ? "#2563eb" : "transparent",
-                  color: periodoFiltro === "B" ? "white" : "var(--text-muted)"
+                  color: periodoFiltro === "B" ? "white" : "#94a3b8"
                 }}
               >
                 📅 Semestre B (2º, 4º, 6º)
@@ -726,10 +776,10 @@ export default function EditorHorarios({
             <select
               value={grupoSeleccionadoId}
               onChange={(e) => setGrupoSeleccionadoId(e.target.value)}
-              style={{ padding: "0.4rem 0.75rem", borderRadius: "8px", border: "1px solid var(--border)", background: "white", fontSize: "0.875rem", fontWeight: 700, color: "var(--text)" }}
+              style={{ padding: "0.45rem 0.85rem", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}
             >
               {gruposVisibles.map((g) => (
-                <option key={g.id} value={g.id}>Grupo {g.nombre}</option>
+                <option key={g.id} value={g.id} style={{ background: "#0f172a", color: "#ffffff" }}>Grupo {g.nombre}</option>
               ))}
             </select>
           </div>
@@ -739,10 +789,10 @@ export default function EditorHorarios({
           <select
             value={docenteSeleccionadoId}
             onChange={(e) => setDocenteSeleccionadoId(e.target.value)}
-            style={{ padding: "0.4rem 0.75rem", borderRadius: "8px", border: "1px solid var(--border)", background: "white", fontSize: "0.875rem", fontWeight: 700, color: "var(--text)" }}
+            style={{ padding: "0.45rem 0.85rem", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}
           >
             {docentes.map((d) => (
-              <option key={d.id} value={d.id}>{d.nombre} {d.apellidoPaterno || ""}</option>
+              <option key={d.id} value={d.id} style={{ background: "#0f172a", color: "#ffffff" }}>{d.nombre} {d.apellidoPaterno || ""}</option>
             ))}
           </select>
         )}
@@ -751,10 +801,10 @@ export default function EditorHorarios({
           <select
             value={aulaSeleccionadaId}
             onChange={(e) => setAulaSeleccionadaId(e.target.value)}
-            style={{ padding: "0.4rem 0.75rem", borderRadius: "8px", border: "1px solid var(--border)", background: "white", fontSize: "0.875rem", fontWeight: 700, color: "var(--text)" }}
+            style={{ padding: "0.45rem 0.85rem", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}
           >
             {aulas.map((a) => (
-              <option key={a.id} value={a.id}>{a.nombre} ({a.tipo})</option>
+              <option key={a.id} value={a.id} style={{ background: "#0f172a", color: "#ffffff" }}>{a.nombre} ({a.tipo})</option>
             ))}
           </select>
         )}
@@ -763,29 +813,29 @@ export default function EditorHorarios({
       {/* Retícula Principal y Panel Lateral de Chat */}
       <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start", width: "100%" }}>
         {/* PANEL IZQUIERDO: Cuadrícula interactiva completa */}
-        <div style={{ flex: 1, minWidth: 0, background: "white", borderRadius: "16px", border: "1px solid var(--border)", padding: "1.25rem", boxShadow: "var(--shadow)" }}>
+        <div style={{ flex: 1, minWidth: 0, background: "#0f172a", borderRadius: "16px", border: "1px solid #334155", padding: "1.25rem", boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>
           
           {/* TARJETA EJECUTIVA DE METADATOS DEL GRUPO / DOCENTE */}
           {vistaTab === "GRUPO" && grupoActivoObj && (
-            <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+            <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                 <div style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
                   {grupoActivoObj.nombre}
                 </div>
                 <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>
                     {grupoActivoObj.semestre}° Semestre • Bachillerato General Estatal
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
-                    <span>⏱️ Jornada: <strong style={{ color: "#1e3a8a" }}>{horasGrupoActual} hrs/día ({horasGrupoActual * 5} hrs/sem)</strong></span>
-                    {grupoActivoObj.capacitacionNombre && <span>💼 Capacitación: <strong>{grupoActivoObj.capacitacionNombre}</strong></span>}
-                    {grupoActivoObj.ffeoSocioemocional && <span>🌱 FFEO: <strong>{grupoActivoObj.ffeoSocioemocional}</strong></span>}
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
+                    <span>⏱️ Jornada: <strong style={{ color: "#38bdf8" }}>{horasGrupoActual} hrs/día ({horasGrupoActual * 5} hrs/sem)</strong></span>
+                    {grupoActivoObj.capacitacionNombre && <span>💼 Capacitación: <strong style={{ color: "#fbbf24" }}>{grupoActivoObj.capacitacionNombre}</strong></span>}
+                    {grupoActivoObj.ffeoSocioemocional && <span>🌱 FFEO: <strong style={{ color: "#4ade80" }}>{grupoActivoObj.ffeoSocioemocional}</strong></span>}
                   </div>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Asignaturas en Retícula</div>
-                <div style={{ fontSize: "1rem", fontWeight: 900, color: "#1e3a8a" }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Asignaturas en Retícula</div>
+                <div style={{ fontSize: "1rem", fontWeight: 900, color: "#38bdf8" }}>
                   {(horario?.celdas || []).filter((c: any) => c.grupoId === grupoSeleccionadoId).length} / {horasGrupoActual * 5} hrs asignadas
                 </div>
               </div>
@@ -799,25 +849,25 @@ export default function EditorHorarios({
             const gruposDoc = Array.from(new Set(celdasDoc.map((c: any) => { const grp = grupos.find((g: any) => g.id === c.grupoId); return grp ? grp.nombre : c.grupoId; })));
 
             return (
-              <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+              <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{ background: "#1e3a8a", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
+                  <div style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
                     👨‍🏫
                   </div>
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>
                       Prof. {docenteActivoObj.nombre} {docenteActivoObj.apellidoPaterno || ""}
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
-                      <span>💼 Cargo: <strong>{docenteActivoObj.cargo || "Docente"}</strong></span>
-                      <span>👥 Grupos: <strong>{gruposDoc.length > 0 ? gruposDoc.join(", ") : "Ninguno"}</strong></span>
-                      <span>📚 Materias distintas: <strong>{materiasDoc.length}</strong></span>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
+                      <span>💼 Cargo: <strong style={{ color: "#60a5fa" }}>{docenteActivoObj.cargo || "Docente"}</strong></span>
+                      <span>👥 Grupos: <strong style={{ color: "#cbd5e1" }}>{gruposDoc.length > 0 ? gruposDoc.join(", ") : "Ninguno"}</strong></span>
+                      <span>📚 Materias distintas: <strong style={{ color: "#38bdf8" }}>{materiasDoc.length}</strong></span>
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Carga Frente a Grupo</div>
-                  <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHrsDoc > 0 ? "#16a34a" : "#64748b" }}>
+                  <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Carga Frente a Grupo</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHrsDoc > 0 ? "#4ade80" : "#94a3b8" }}>
                     {totalHrsDoc} hrs / semana
                   </div>
                 </div>
@@ -826,12 +876,12 @@ export default function EditorHorarios({
           })()}
 
           {!tieneHorarioGeneradoParaGrupo && vistaTab === "GRUPO" ? (
-            <div style={{ padding: "3.5rem 2rem", textAlign: "center", background: "#f8fafc", borderRadius: "16px", border: "2px dashed #cbd5e1", margin: "1rem 0" }}>
-              <Grid style={{ width: "48px", height: "48px", color: "#94a3b8", margin: "0 auto 1rem" }} />
-              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.5rem" }}>
+            <div style={{ padding: "3.5rem 2rem", textAlign: "center", background: "#1e293b", borderRadius: "16px", border: "2px dashed #475569", margin: "1rem 0" }}>
+              <Grid style={{ width: "48px", height: "48px", color: "#64748b", margin: "0 auto 1rem" }} />
+              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", marginBottom: "0.5rem" }}>
                 Horario del Semestre {periodoFiltro} ({periodoFiltro === "A" ? "1.º, 3.º, 5.º" : "2.º, 4.º, 6.º"}) aún no generado
               </h3>
-              <p style={{ fontSize: "0.875rem", color: "#64748b", maxWidth: "520px", margin: "0 auto 1.5rem", lineHeight: 1.5 }}>
+              <p style={{ fontSize: "0.875rem", color: "#94a3b8", maxWidth: "520px", margin: "0 auto 1.5rem", lineHeight: 1.5 }}>
                 El horario que visualizas en la plataforma fue generado para el <strong>Semestre {periodoFiltro === "A" ? "B" : "A"}</strong>. Para generar el horario oficial de los grupos del Semestre {periodoFiltro}, diríjase al Asistente de Configuración.
               </p>
               <button
@@ -846,16 +896,16 @@ export default function EditorHorarios({
             <table className="horario-grid-table" style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  <th style={{ width: "12%", padding: "0.6rem 0.5rem" }}>Periodo</th>
+                  <th style={{ width: "12%", padding: "0.6rem 0.5rem", background: "#1e293b", color: "#cbd5e1", border: "1px solid #334155", fontWeight: 800 }}>Periodo</th>
                   {diasLectivos.map((d, i) => (
-                    <th key={i} style={{ width: "17.6%", padding: "0.6rem 0.5rem" }}>{d}</th>
+                    <th key={i} style={{ width: "17.6%", padding: "0.6rem 0.5rem", background: "#1e293b", color: "#ffffff", border: "1px solid #334155", fontWeight: 800 }}>{d}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {periodosVisibles.map((p) => (
                   <tr key={p}>
-                    <td style={{ background: "var(--bg)", textAlign: "center", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text)", border: "1px solid #cbd5e1" }}>
+                    <td style={{ background: "#1e293b", textAlign: "center", fontWeight: 800, fontSize: "0.8125rem", color: "#38bdf8", border: "1px solid #334155" }}>
                       Hora {p}
                     </td>
                     {[1, 2, 3, 4, 5].map((dia) => {
@@ -868,7 +918,7 @@ export default function EditorHorarios({
                           key={dia}
                           onDragOver={handleDragOver}
                           onDrop={() => handleDropOnSlot(dia, p)}
-                          style={{ border: "1px solid #cbd5e1", height: "75px", padding: "0.3rem", verticalAlign: "top", background: celda ? "transparent" : "#fafafa" }}
+                          style={{ border: "1px solid #334155", height: "75px", padding: "0.3rem", verticalAlign: "top", background: celda ? "transparent" : "#0b1120" }}
                         >
                           {celda ? (
                             <div
@@ -881,11 +931,11 @@ export default function EditorHorarios({
                                 flexDirection: "column",
                                 justifyContent: "space-between",
                                 background: estiloColor.bg,
-                                border: `1px solid ${celda.esBloqueado ? "#d97706" : estiloColor.border}`,
+                                border: `1px solid ${celda.esBloqueado ? "#f59e0b" : estiloColor.border}`,
                                 padding: "0.35rem",
                                 borderRadius: "6px",
                                 cursor: celda.esBloqueado ? "not-allowed" : "grab",
-                                boxShadow: celda.esBloqueado ? "0 0 0 1px #d97706" : "none"
+                                boxShadow: celda.esBloqueado ? "0 0 0 1px #f59e0b" : "none"
                               }}
                             >
                               <div>
@@ -897,7 +947,7 @@ export default function EditorHorarios({
                                     onClick={(e) => toggleBloquearCelda(celda, e)}
                                     title={celda.esBloqueado ? "🔒 Celda protegida con candado (Clic para desbloquear)" : "Clic para fijar con candado"}
                                     style={{
-                                      background: celda.esBloqueado ? "#fef3c7" : "transparent",
+                                      background: celda.esBloqueado ? "rgba(245, 158, 11, 0.25)" : "transparent",
                                       borderRadius: "4px",
                                       border: celda.esBloqueado ? "1px solid #f59e0b" : "none",
                                       cursor: "pointer",
@@ -907,17 +957,17 @@ export default function EditorHorarios({
                                     }}
                                   >
                                     {celda.esBloqueado ? (
-                                      <Lock style={{ width: "12px", height: "12px", color: "#d97706" }} />
+                                      <Lock style={{ width: "12px", height: "12px", color: "#fbbf24" }} />
                                     ) : (
-                                      <Unlock style={{ width: "11px", height: "11px", color: "#94a3b8", opacity: 0.3 }} />
+                                      <Unlock style={{ width: "11px", height: "11px", color: "#64748b", opacity: 0.5 }} />
                                     )}
                                   </button>
                                 </div>
-                                <p style={{ fontSize: "0.7rem", fontWeight: 800, color: "#1e293b", margin: "0.15rem 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <p style={{ fontSize: "0.7rem", fontWeight: 800, color: "#f8fafc", margin: "0.15rem 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {vistaTab === "DOCENTE" ? `Grupo ${celda.grupo?.nombre || ""}` : getNombreDocenteCelda(celda)}
                                 </p>
                                 {vistaTab === "SUMARIO" && (
-                                  <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "#64748b", margin: 0 }}>
+                                  <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "#94a3b8", margin: 0 }}>
                                     Grupo {celda.grupo?.nombre}
                                   </p>
                                 )}
@@ -934,9 +984,9 @@ export default function EditorHorarios({
                               <div
                                 className="horario-celda-libre"
                                 style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontStyle: "italic", position: "relative",
-                                  color: estaBloqueado ? "#d97706" : "#94a3b8",
-                                  background: estaBloqueado ? "#fffbeb" : "transparent",
-                                  border: estaBloqueado ? "1px dashed #d97706" : "none",
+                                  color: estaBloqueado ? "#fbbf24" : "#475569",
+                                  background: estaBloqueado ? "rgba(245, 158, 11, 0.15)" : "transparent",
+                                  border: estaBloqueado ? "1px dashed #f59e0b" : "none",
                                   borderRadius: estaBloqueado ? "6px" : "0",
                                   cursor: "pointer"
                                 }}
@@ -945,7 +995,7 @@ export default function EditorHorarios({
                               >
                                 {estaBloqueado ? (
                                   <>
-                                    <Lock style={{ width: "13px", height: "13px", marginRight: "4px", color: "#d97706" }} />
+                                    <Lock style={{ width: "13px", height: "13px", marginRight: "4px", color: "#fbbf24" }} />
                                     <span>Bloqueado</span>
                                   </>
                                 ) : (
@@ -1092,42 +1142,42 @@ export default function EditorHorarios({
 
       {/* MODAL DE EXPORTACIÓN AVANZADA */}
       {mostrarModalExportar && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "1rem" }}>
-          <div style={{ background: "white", borderRadius: "16px", padding: "1.75rem", maxWidth: "620px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", border: "1px solid #cbd5e1", maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e2e8f0", paddingBottom: "1rem", marginBottom: "1.25rem" }}>
-              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#1e293b", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
-                <FileText style={{ width: "22px", height: "22px", color: "#2563eb" }} /> Opciones de Exportación Oficial
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "1rem" }}>
+          <div style={{ background: "#0f172a", borderRadius: "16px", padding: "1.75rem", maxWidth: "620px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", border: "1px solid #334155", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #334155", paddingBottom: "1rem", marginBottom: "1.25rem" }}>
+              <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                <FileText style={{ width: "22px", height: "22px", color: "#38bdf8" }} /> Opciones de Exportación Oficial
               </h3>
-              <button onClick={() => setMostrarModalExportar(false)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer" }}>
+              <button onClick={() => setMostrarModalExportar(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
                 <X style={{ width: "20px", height: "20px" }} />
               </button>
             </div>
 
-            <p style={{ fontSize: "0.8125rem", color: "#64748b", marginBottom: "1.25rem" }}>
+            <p style={{ fontSize: "0.8125rem", color: "#94a3b8", marginBottom: "1.25rem" }}>
               Seleccione el formato y alcance. Los botones <b>Word</b> generan archivos editables (.docx).
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
               {/* Opción 1: Vista Actual */}
-              <div style={{ border: "1px solid #cbd5e1", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc" }}>
+              <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1e293b" }}>
                 <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>📄 Vista Actual en Pantalla</div>
-                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Exporta exactamente el filtro visible ({vistaTab})</div>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>📄 Vista Actual en Pantalla</div>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Exporta exactamente el filtro visible ({vistaTab})</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "PDF")} style={{ background: "#2563eb", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>PDF</button>
-                  <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "EXCEL")} style={{ background: "#10b981", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Excel</button>
+                  <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "EXCEL")} style={{ background: "#16a34a", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Excel</button>
                   <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "DOCX")} style={{ background: "#7c3aed", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Word</button>
                 </div>
               </div>
 
               {/* Opción 2: Paquete Completo por Docente */}
-              <div style={{ border: "1px solid #cbd5e1", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc" }}>
+              <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1e293b" }}>
                 <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <Package style={{ width: "16px", height: "16px", color: "#d97706" }} /> Paquete por Docente (Multi-página)
+                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <Package style={{ width: "16px", height: "16px", color: "#fbbf24" }} /> Paquete por Docente (Multi-página)
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>1 hoja individual por cada maestro del plantel</div>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>1 hoja individual por cada maestro del plantel</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <button onClick={() => ejecutarExportacion("PAQUETE_DOCENTES", "PDF")} style={{ background: "#2563eb", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>PDF</button>
@@ -1136,12 +1186,12 @@ export default function EditorHorarios({
               </div>
 
               {/* Opción 3: Paquete Completo por Grupo */}
-              <div style={{ border: "1px solid #cbd5e1", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc" }}>
+              <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1e293b" }}>
                 <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <Package style={{ width: "16px", height: "16px", color: "#d97706" }} /> Paquete por Grupo (Multi-página)
+                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <Package style={{ width: "16px", height: "16px", color: "#fbbf24" }} /> Paquete por Grupo (Multi-página)
                   </div>
-                  <div style={{ fontSize: "0.75rem", color: "#64748b" }}>1 hoja individual por cada grupo para alumnos</div>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>1 hoja individual por cada grupo para alumnos</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <button onClick={() => ejecutarExportacion("PAQUETE_GRUPOS", "PDF")} style={{ background: "#2563eb", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>PDF</button>
@@ -1150,25 +1200,25 @@ export default function EditorHorarios({
               </div>
 
               {/* Separador */}
-              <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "0.85rem" }}>
-                <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#475569", marginBottom: "0.6rem" }}>📊 Exportaciones Compactas (una sola tabla)</div>
+              <div style={{ borderTop: "1px dashed #334155", paddingTop: "0.85rem" }}>
+                <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#94a3b8", marginBottom: "0.6rem" }}>📊 Exportaciones Compactas (una sola tabla)</div>
 
                 {/* Sumario Maestro */}
-                <div style={{ border: "1px solid #a5b4fc", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#eef2ff", marginBottom: "0.6rem" }}>
+                <div style={{ border: "1px solid #4f46e5", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(79, 70, 229, 0.15)", marginBottom: "0.6rem" }}>
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#3730a3" }}>👨‍🏫 Sumario Maestro</div>
-                    <div style={{ fontSize: "0.72rem", color: "#4f46e5" }}>Todos los docentes en filas · Lun/H1 … Vie/H6 en columnas</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#c7d2fe" }}>👨‍🏫 Sumario Maestro</div>
+                    <div style={{ fontSize: "0.72rem", color: "#a5b4fc" }}>Todos los docentes en filas · Lun/H1 … Vie/H6 en columnas</div>
                   </div>
-                  <button onClick={() => ejecutarExportacion("SUMARIO_MAESTRO", "EXCEL")} style={{ background: "#4338ca", color: "white", border: "none", padding: "0.4rem 0.85rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>
+                  <button onClick={() => ejecutarExportacion("SUMARIO_MAESTRO", "EXCEL")} style={{ background: "#4f46e5", color: "white", border: "none", padding: "0.4rem 0.85rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>
                     Excel
                   </button>
                 </div>
 
                 {/* Sumario Grupo */}
-                <div style={{ border: "1px solid #6ee7b7", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#ecfdf5" }}>
+                <div style={{ border: "1px solid #059669", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(5, 150, 105, 0.15)" }}>
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#065f46" }}>🏫 Sumario por Grupo</div>
-                    <div style={{ fontSize: "0.72rem", color: "#059669" }}>Todos los grupos en filas · Lun/H1 … Vie/H6 en columnas</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#a7f3d0" }}>🏫 Sumario por Grupo</div>
+                    <div style={{ fontSize: "0.72rem", color: "#6ee7b7" }}>Todos los grupos en filas · Lun/H1 … Vie/H6 en columnas</div>
                   </div>
                   <button onClick={() => ejecutarExportacion("SUMARIO_GRUPO", "EXCEL")} style={{ background: "#059669", color: "white", border: "none", padding: "0.4rem 0.85rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>
                     Excel
