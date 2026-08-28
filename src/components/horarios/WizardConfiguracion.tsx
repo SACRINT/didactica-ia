@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Sparkles, Users, BookOpen, Clock, AlertCircle, ShieldCheck, UserCheck, Plus, Trash2, CheckCircle2, UserPlus, Layers, Search, Save, AlertTriangle, FileSpreadsheet, Download, Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import { parsearExcelPersonal, descargarPlantillaExcelDocentes, DocenteImportado } from "@/lib/excel-plantilla";
-import { parsearExcelMatriz, descargarPlantillaMatrizDocente, ResultadoParseoMatriz } from "@/lib/excel-matriz";
+import { parsearExcelMatriz, parsearLibroIntegralExcel, descargarPlantillaIntegralHorarios, descargarPlantillaMatrizDocente, ResultadoParseoMatriz, ResultadoLibroIntegral } from "@/lib/excel-matriz";
 
 interface Props {
   escuelaId: string;
@@ -554,10 +554,20 @@ export default function WizardConfiguracion({
     setArchivoExcelHorarios(file);
     setCargandoExcelHorarios(true);
     try {
-      const parsed = await parsearExcelPersonal(file);
-      setDocentesParseadosHorarios(parsed);
-      if (parsed.length === 0) {
-        toast.error("No se encontraron registros de docentes en el archivo.");
+      const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+      const resIntegral = await parsearLibroIntegralExcel(file, gruposDelPeriodoActual, getUACsIndividualesGrupo, personalPlataforma);
+
+      setDocentesParseadosHorarios(resIntegral.docentes);
+      if (resIntegral.tieneMatriz) {
+        setResultadoParseoMatriz(resIntegral.matriz);
+      }
+
+      if (resIntegral.docentes.length === 0 && !resIntegral.tieneMatriz) {
+        toast.error("No se encontraron datos válidos de personal ni horarios en el archivo.");
+      } else if (resIntegral.tienePersonal && resIntegral.tieneMatriz) {
+        toast.success(`¡Libro Integral detectado! ${resIntegral.docentes.filter(d => d.valido).length} docentes y ${resIntegral.matriz.resumen.asignadasConExito} materias.`);
+      } else if (resIntegral.tienePersonal) {
+        toast.success(`Se encontraron ${resIntegral.docentes.filter(d => d.valido).length} registros de personal.`);
       }
     } catch (err: any) {
       console.error(err);
@@ -569,50 +579,72 @@ export default function WizardConfiguracion({
 
   const handleImportarExcelEnHorarios = async () => {
     const validos = docentesParseadosHorarios.filter(d => d.valido);
-    if (validos.length === 0) {
-      toast.error("No hay registros válidos para importar.");
-      return;
-    }
     setLoading(true);
     try {
-      const res = await fetch("/api/escuela-personal/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personal: validos }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        toast.error(data.error || "Error al importar personal.");
-        return;
+      let arrayPersonal = [...personalPlataforma];
+
+      if (validos.length > 0) {
+        const res = await fetch("/api/escuela-personal/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ personal: validos }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          toast.error(data.error || "Error al importar personal.");
+          return;
+        }
+
+        arrayPersonal = data.docentes || [];
+        if (!arrayPersonal || arrayPersonal.length === 0) {
+          const resCat = await fetch(`/api/horarios/catalogos`);
+          const dataCat = await resCat.json();
+          arrayPersonal = dataCat.docentes || (Array.isArray(dataCat) ? dataCat : []);
+        }
+
+        setPersonalPlataforma(arrayPersonal);
+
+        const mapaHorasActualizado = { ...horasDocentes };
+        arrayPersonal.forEach((p: any) => {
+          const esDocentePuro = p.cargo === "DOCENTE";
+          const hrs = p.horasAsignadas !== undefined ? p.horasAsignadas : (p.horas_base !== undefined ? p.horas_base : (esDocentePuro ? 20 : 0));
+          mapaHorasActualizado[p.id] = hrs;
+        });
+
+        setDocentes(arrayPersonal);
+        setHorasDocentes(mapaHorasActualizado);
       }
 
-      if (data.insertados === 0 && data.actualizados === 0 && data.errores && data.errores.length > 0) {
-        toast.error(`Error al importar: ${data.errores[0]}`);
-        return;
+      // Si el archivo también incluía la Hoja de Matriz Horaria, aplicarla
+      if (resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0) {
+        const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+        // Reparsear la matriz con los IDs de docentes actualizados de la base de datos
+        if (archivoExcelHorarios) {
+          const reparseado = await parsearExcelMatriz(archivoExcelHorarios, gruposDelPeriodoActual, getUACsIndividualesGrupo, arrayPersonal);
+          const cargasValidas = reparseado.cargas.filter(c => c.valido && c.personalId);
+          if (cargasValidas.length > 0) {
+            const mapaCargas = new Map<string, any>();
+            cargas.forEach(c => mapaCargas.set(`${c.grupoId}___${c.uacName || c.asignaturaId}`, c));
+            cargasValidas.forEach(c => {
+              mapaCargas.set(`${c.grupoId}___${c.uacName}`, {
+                grupoId: c.grupoId,
+                asignaturaId: c.uacName,
+                uacName: c.uacName,
+                personalId: c.personalId,
+                horasSemanales: c.horasSemanales,
+                requiereAulaEspecial: false,
+              });
+            });
+            setCargas(Array.from(mapaCargas.values()));
+          }
+        }
       }
 
-      toast.success(`¡Plantilla importada! ${data.insertados} nuevo(s), ${data.actualizados} actualizado(s).`);
-
-      // Obtener el personal actualizado
-      let arrayPersonal: any[] = data.docentes || [];
-      if (!arrayPersonal || arrayPersonal.length === 0) {
-        const resCat = await fetch(`/api/horarios/catalogos`);
-        const dataCat = await resCat.json();
-        arrayPersonal = dataCat.docentes || (Array.isArray(dataCat) ? dataCat : []);
-      }
-
-      setPersonalPlataforma(arrayPersonal);
-
-      // Integrar a la plantilla activa del Paso 2
-      const mapaHorasActualizado = { ...horasDocentes };
-      arrayPersonal.forEach((p: any) => {
-        const esDocentePuro = p.cargo === "DOCENTE";
-        const hrs = p.horasAsignadas !== undefined ? p.horasAsignadas : (p.horas_base !== undefined ? p.horas_base : (esDocentePuro ? 20 : 0));
-        mapaHorasActualizado[p.id] = hrs;
-      });
-
-      setDocentes(arrayPersonal);
-      setHorasDocentes(mapaHorasActualizado);
+      toast.success(
+        resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0
+          ? "¡Plantilla de personal y matriz horaria importadas con éxito!"
+          : "¡Plantilla de personal importada con éxito!"
+      );
 
       // Limpiar estados de Excel y cerrar modal
       setArchivoExcelHorarios(null);
@@ -633,13 +665,19 @@ export default function WizardConfiguracion({
     setCargandoMatrizExcel(true);
     try {
       const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
-      const parseado = await parsearExcelMatriz(file, gruposDelPeriodoActual, getUACsIndividualesGrupo, docentes);
-      setResultadoParseoMatriz(parseado);
+      const resIntegral = await parsearLibroIntegralExcel(file, gruposDelPeriodoActual, getUACsIndividualesGrupo, docentes);
 
-      if (parseado.cargas.length === 0) {
+      setResultadoParseoMatriz(resIntegral.matriz);
+      if (resIntegral.tienePersonal) {
+        setDocentesParseadosHorarios(resIntegral.docentes);
+      }
+
+      if (resIntegral.matriz.cargas.length === 0 && resIntegral.docentes.length === 0) {
         toast.error("No se encontraron materias ni grupos válidos en el archivo.");
-      } else if (parseado.resumen.asignadasConExito > 0) {
-        toast.success(`Se detectaron ${parseado.resumen.asignadasConExito} asignaciones para ${parseado.gruposDetectados.length} grupo(s).`);
+      } else if (resIntegral.tienePersonal && resIntegral.tieneMatriz) {
+        toast.success(`¡Libro Integral detectado! ${resIntegral.docentes.filter(d => d.valido).length} docentes y ${resIntegral.matriz.resumen.asignadasConExito} asignaciones.`);
+      } else if (resIntegral.matriz.resumen.asignadasConExito > 0) {
+        toast.success(`Se detectaron ${resIntegral.matriz.resumen.asignadasConExito} asignaciones para ${resIntegral.matriz.gruposDetectados.length} grupo(s).`);
       }
     } catch (err: any) {
       console.error(err);
@@ -649,44 +687,75 @@ export default function WizardConfiguracion({
     }
   };
 
-  const handleConfirmarImportacionMatriz = () => {
+  const handleConfirmarImportacionMatriz = async () => {
     if (!resultadoParseoMatriz || resultadoParseoMatriz.cargas.length === 0) {
       toast.error("No hay cargas para aplicar.");
       return;
     }
 
-    const cargasValidas = resultadoParseoMatriz.cargas.filter(c => c.valido && c.personalId);
-    if (cargasValidas.length === 0) {
-      toast.error("No se encontraron docentes coincidentes para asignar. Verifique los nombres en el archivo.");
-      return;
-    }
+    setLoading(true);
+    try {
+      let arrayPersonal = [...docentes];
 
-    const mapaCargas = new Map<string, any>();
-    // Mantener cargas existentes previas
-    cargas.forEach((c) => {
-      const key = `${c.grupoId}___${c.uacName || c.asignaturaId}`;
-      mapaCargas.set(key, c);
-    });
+      // 1. Si el archivo tenía docentes en la Hoja 1 no guardados, registrarlos primero en bulk
+      const docentesValidos = docentesParseadosHorarios.filter(d => d.valido);
+      if (docentesValidos.length > 0) {
+        const res = await fetch("/api/escuela-personal/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ personal: docentesValidos }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.docentes) {
+          arrayPersonal = data.docentes;
+          setPersonalPlataforma(arrayPersonal);
+          setDocentes(arrayPersonal);
+        }
+      }
 
-    // Sobreescribir con las nuevas cargas del archivo Excel
-    cargasValidas.forEach((c) => {
-      const key = `${c.grupoId}___${c.uacName}`;
-      mapaCargas.set(key, {
-        grupoId: c.grupoId,
-        asignaturaId: c.uacName,
-        uacName: c.uacName,
-        personalId: c.personalId,
-        horasSemanales: c.horasSemanales,
-        requiereAulaEspecial: false,
+      // 2. Reparsear con los IDs definitivos de docentes
+      const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+      const reparseado = archivoMatrizExcel
+        ? await parsearExcelMatriz(archivoMatrizExcel, gruposDelPeriodoActual, getUACsIndividualesGrupo, arrayPersonal)
+        : resultadoParseoMatriz;
+
+      const cargasValidas = reparseado.cargas.filter(c => c.valido && c.personalId);
+      if (cargasValidas.length === 0) {
+        toast.error("No se encontraron docentes coincidentes para asignar. Verifique los nombres en el archivo.");
+        return;
+      }
+
+      const mapaCargas = new Map<string, any>();
+      // Mantener cargas existentes previas
+      cargas.forEach((c) => {
+        const key = `${c.grupoId}___${c.uacName || c.asignaturaId}`;
+        mapaCargas.set(key, c);
       });
-    });
 
-    setCargas(Array.from(mapaCargas.values()));
-    toast.success(`¡Matriz actualizada! ${cargasValidas.length} materias asignadas a docentes.`);
-    setMostrarModalMatrizExcel(false);
-    setArchivoMatrizExcel(null);
-    setResultadoParseoMatriz(null);
-    if (fileInputMatrizRef.current) fileInputMatrizRef.current.value = "";
+      // Sobreescribir con las nuevas cargas del archivo Excel
+      cargasValidas.forEach((c) => {
+        const key = `${c.grupoId}___${c.uacName}`;
+        mapaCargas.set(key, {
+          grupoId: c.grupoId,
+          asignaturaId: c.uacName,
+          uacName: c.uacName,
+          personalId: c.personalId,
+          horasSemanales: c.horasSemanales,
+          requiereAulaEspecial: false,
+        });
+      });
+
+      setCargas(Array.from(mapaCargas.values()));
+      toast.success(`¡Matriz actualizada! ${cargasValidas.length} materias asignadas a docentes.`);
+      setMostrarModalMatrizExcel(false);
+      setArchivoMatrizExcel(null);
+      setResultadoParseoMatriz(null);
+      if (fileInputMatrizRef.current) fileInputMatrizRef.current.value = "";
+    } catch (e) {
+      toast.error("Error al procesar la importación de matriz.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAsignarDocenteMatriz = (grupoId: string, uacObj: any, personalId: string) => {
@@ -1484,11 +1553,14 @@ export default function WizardConfiguracion({
 
               <button
                 type="button"
-                onClick={() => descargarPlantillaExcelDocentes()}
-                title="Descargar plantilla de Excel de ejemplo"
+                onClick={() => {
+                  const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+                  descargarPlantillaIntegralHorarios(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
+                }}
+                title="Descargar libro de Excel unificado (Personal + Horarios)"
                 style={{ background: "#1e293b", color: "#38bdf8", border: "1px solid #0284c7", padding: "0.625rem 0.85rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}
               >
-                <Download style={{ width: "15px", height: "15px" }} /> Plantilla Excel
+                <Download style={{ width: "15px", height: "15px" }} /> 📑 Plantilla Integral (.xlsx)
               </button>
 
               <button
@@ -2172,10 +2244,23 @@ export default function WizardConfiguracion({
                   </div>
                 )}
 
+                {resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0 && (
+                  <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.4)", borderRadius: "8px", padding: "0.6rem 0.85rem", color: "#86efac", fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span>📑</span>
+                    <div>
+                      <strong>¡Libro Integral Detectado!</strong> Se detectó también la hoja de <strong>Matriz de Horarios</strong> con {resultadoParseoMatriz.resumen.asignadasConExito} asignaciones para {resultadoParseoMatriz.gruposDetectados.length} grupo(s). Al confirmar, se importará el personal y se preparará la matriz de horarios automáticamente.
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
                   <button
                     type="button"
-                    onClick={() => setMostrarModalDocente(false)}
+                    onClick={() => {
+                      setMostrarModalDocente(false);
+                      setArchivoExcelHorarios(null);
+                      setDocentesParseadosHorarios([]);
+                    }}
                     style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
                   >
                     Cancelar
@@ -2194,7 +2279,7 @@ export default function WizardConfiguracion({
                       cursor: docentesParseadosHorarios.filter(d => d.valido).length === 0 ? "not-allowed" : "pointer"
                     }}
                   >
-                    Confirmar e Importar a Plantilla
+                    {resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0 ? "Confirmar e Importar Libro Completo" : "Confirmar e Importar a Plantilla"}
                   </button>
                 </div>
               </div>
@@ -2290,6 +2375,15 @@ export default function WizardConfiguracion({
                       <strong style={{ fontSize: "1rem", color: resultadoParseoMatriz.resumen.requierenRevision > 0 ? "#fbbf24" : "#94a3b8" }}>{resultadoParseoMatriz.resumen.requierenRevision}</strong>
                     </div>
                   </div>
+
+                  {docentesParseadosHorarios.filter(d => d.valido).length > 0 && (
+                    <div style={{ background: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.4)", borderRadius: "8px", padding: "0.5rem 0.85rem", color: "#7dd3fc", fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span>👥</span>
+                      <div>
+                        <strong>Personal Detectado en Libro:</strong> Se sincronizarán {docentesParseadosHorarios.filter(d => d.valido).length} docentes del archivo con el catálogo de su escuela.
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ maxHeight: "240px", overflowY: "auto", border: "1px solid #334155", borderRadius: "8px", background: "#1e293b" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>

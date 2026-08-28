@@ -383,11 +383,158 @@ export async function parsearExcelMatriz(
   };
 }
 
+export interface ResultadoLibroIntegral {
+  docentes: DocenteImportado[];
+  matriz: ResultadoParseoMatriz;
+  tienePersonal: boolean;
+  tieneMatriz: boolean;
+}
+
+import { DocenteImportado, normalizarCargo } from './excel-plantilla';
+
+function buscarValorColumnaFila(row: Record<string, any>, palabrasClave: string[]): any {
+  const keys = Object.keys(row);
+  for (const k of keys) {
+    const kNorm = k.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (const kw of palabrasClave) {
+      if (kNorm === kw || kNorm.includes(kw)) {
+        if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+          return row[k];
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
+function separarNombre(nombreCompleto: string) {
+  const partes = nombreCompleto.trim().split(/\s+/);
+  if (partes.length === 1) return { nombre: partes[0], apellidoPaterno: '.', apellidoMaterno: '' };
+  if (partes.length === 2) return { nombre: partes[0], apellidoPaterno: partes[1], apellidoMaterno: '' };
+  if (partes.length === 3) return { nombre: partes[0], apellidoPaterno: partes[1], apellidoMaterno: partes[2] };
+  if (partes.length === 4) return { nombre: `${partes[0]} ${partes[1]}`, apellidoPaterno: partes[2], apellidoMaterno: partes[3] };
+  const apellidoMaterno = partes[partes.length - 1];
+  const apellidoPaterno = partes[partes.length - 2];
+  const nombre = partes.slice(0, partes.length - 2).join(' ');
+  return { nombre, apellidoPaterno, apellidoMaterno };
+}
+
 /**
- * Genera y descarga un archivo Excel (.xlsx) con el formato de Matriz por Semestre
- * adaptado exactamente a los grupos y materias del plantel
+ * Parsea un Libro de Excel Integral (que puede contener Hoja 1: Personal y Hoja 2: Matriz Horaria)
  */
-export function descargarPlantillaMatrizDocente(
+export async function parsearLibroIntegralExcel(
+  file: File,
+  gruposActivos: any[],
+  getUACsGrupoFn: (grupo: any) => any[],
+  personalExistente: any[] = []
+): Promise<ResultadoLibroIntegral> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  let docentesImportados: DocenteImportado[] = [];
+  let tienePersonal = false;
+
+  // 1. Buscar y parsear Hoja de Personal
+  const sheetPersonalName = workbook.SheetNames.find(name => {
+    const n = limpiarTexto(name);
+    return n.includes('PERSONAL') || n.includes('DOCENTE') || n.includes('PLANTILLA') || n.includes('PROFESOR');
+  });
+
+  // Si encontramos una hoja explícita de personal o la primera hoja contiene columnas de personal
+  const sheetPersonalTarget = sheetPersonalName ? workbook.Sheets[sheetPersonalName] : (workbook.SheetNames.length === 1 ? workbook.Sheets[workbook.SheetNames[0]] : null);
+
+  if (sheetPersonalTarget) {
+    const rawRows: any[] = XLSX.utils.sheet_to_json(sheetPersonalTarget, { defval: '' });
+    for (const row of rawRows) {
+      const nombreDirecto = buscarValorColumnaFila(row, ['nombre(s)', 'nombres', 'nombre', 'first name']);
+      const paternoDirecto = buscarValorColumnaFila(row, ['apellido paterno', 'primer apellido', 'paterno', 'last name', 'apellido 1']);
+      const maternoDirecto = buscarValorColumnaFila(row, ['apellido materno', 'segundo apellido', 'materno', 'apellido 2']);
+      const nombreCompleto = buscarValorColumnaFila(row, ['nombre completo', 'docente', 'profesor', 'personal', 'maestro', 'empleado']);
+      const cargoRaw = buscarValorColumnaFila(row, ['cargo', 'rol', 'puesto', 'funcion', 'tipo']);
+      const horasRaw = buscarValorColumnaFila(row, ['horas base', 'horas contratadas', 'horas asignadas', 'horas frente a grupo', 'horas semana', 'horas', 'hrs']);
+      const emailRaw = buscarValorColumnaFila(row, ['correo electronico', 'correo', 'email', 'e-mail']);
+
+      let nombre = '';
+      let apellidoPaterno = '';
+      let apellidoMaterno = '';
+
+      if (nombreDirecto && paternoDirecto) {
+        nombre = String(nombreDirecto).trim();
+        apellidoPaterno = String(paternoDirecto).trim();
+        apellidoMaterno = maternoDirecto ? String(maternoDirecto).trim() : '';
+      } else if (nombreDirecto && !paternoDirecto) {
+        const sep = separarNombre(String(nombreDirecto));
+        nombre = sep.nombre;
+        apellidoPaterno = sep.apellidoPaterno;
+        apellidoMaterno = maternoDirecto ? String(maternoDirecto).trim() : sep.apellidoMaterno;
+      } else if (nombreCompleto) {
+        const sep = separarNombre(String(nombreCompleto));
+        nombre = sep.nombre;
+        apellidoPaterno = sep.apellidoPaterno;
+        apellidoMaterno = sep.apellidoMaterno;
+      }
+
+      if (nombre || apellidoPaterno) {
+        const cargo = normalizarCargo(cargoRaw);
+        let horas = Number(horasRaw);
+        if (isNaN(horas) || horas < 0) horas = cargo === 'DOCENTE' ? 20 : 0;
+        if (horas > 50) horas = 50;
+
+        const valido = Boolean(nombre && apellidoPaterno && apellidoPaterno !== '.');
+        docentesImportados.push({
+          nombre,
+          apellidoPaterno,
+          apellidoMaterno,
+          cargo,
+          horasBase: horas,
+          email: emailRaw ? String(emailRaw).trim() : '',
+          valido,
+          motivoInvalido: !valido ? (!nombre ? 'Falta el nombre' : 'Falta el apellido paterno') : undefined,
+        });
+      }
+    }
+
+    if (docentesImportados.length > 0) {
+      tienePersonal = true;
+    }
+  }
+
+  // 2. Combinar personal existente + nuevos del Excel para la resolución de la Matriz
+  const personalCombinado = [...personalExistente];
+  docentesImportados.filter(d => d.valido).forEach((d, idx) => {
+    const yaExiste = personalCombinado.some(
+      pe => limpiarTexto(`${pe.nombre} ${pe.apellidoPaterno}`) === limpiarTexto(`${d.nombre} ${d.apellidoPaterno}`)
+    );
+    if (!yaExiste) {
+      personalCombinado.push({
+        id: `temp_excel_${idx}_${Date.now()}`,
+        nombre: d.nombre,
+        apellidoPaterno: d.apellidoPaterno,
+        apellidoMaterno: d.apellidoMaterno,
+        cargo: d.cargo,
+        horas_base: d.horasBase,
+        horasAsignadas: d.horasBase,
+      });
+    }
+  });
+
+  // 3. Parsear Matriz Horaria
+  const matriz = await parsearExcelMatriz(file, gruposActivos, getUACsGrupoFn, personalCombinado);
+  const tieneMatriz = matriz.cargas.length > 0;
+
+  return {
+    docentes: docentesImportados,
+    matriz,
+    tienePersonal,
+    tieneMatriz,
+  };
+}
+
+/**
+ * Genera y descarga un Libro de Excel Integral (Personal + Matriz por Grupos + Instrucciones)
+ * personalizado con los grupos, materias y docentes del plantel
+ */
+export function descargarPlantillaIntegralHorarios(
   grupos: any[],
   periodoActivo: 'A' | 'B',
   getUACsGrupoFn: (grupo: any) => any[],
@@ -395,81 +542,122 @@ export function descargarPlantillaMatrizDocente(
 ) {
   const wb = XLSX.utils.book_new();
 
-  const semestres = periodoActivo === 'A' ? [1, 3, 5] : [2, 4, 6];
-  const filasExcel: any[][] = [];
+  // -------------------------------------------------------------
+  // HOJA 1: PLANTILLA DE PERSONAL (Docentes, Directivos, Administrativos)
+  // -------------------------------------------------------------
+  const filasPersonal: any[][] = [
+    ['Nombre(s)', 'Apellido Paterno', 'Apellido Materno', 'Cargo / Rol', 'Horas Base', 'Correo Electrónico'],
+  ];
 
-  // Título principal
-  filasExcel.push([`MATRIZ DE ASIGNACIÓN DOCENTE POR GRUPO - PERÍODO ${periodoActivo === 'A' ? 'A (1º, 3º, 5º)' : 'B (2º, 4º, 6º)'}`]);
-  filasExcel.push(['Instrucciones: En cada columna de grupo, escriba el nombre o apellidos del docente que impartirá la materia.']);
-  filasExcel.push([]);
+  if (docentesDisponibles.length > 0) {
+    docentesDisponibles.forEach(d => {
+      filasPersonal.push([
+        d.nombre || '',
+        d.apellidoPaterno || d.apellido_paterno || '',
+        d.apellidoMaterno || d.apellido_materno || '',
+        d.cargo || 'Docente',
+        d.horasAsignadas ?? d.horas_base ?? (d.cargo === 'DIRECTIVO' || d.cargo === 'ADMINISTRATIVO' ? 0 : 20),
+        d.email || '',
+      ]);
+    });
+  } else {
+    // Filas de ejemplo si la escuela aún no tiene personal
+    filasPersonal.push(['Juan Carlos', 'Pérez', 'González', 'Docente', 20, 'juan.perez@escuela.edu.mx']);
+    filasPersonal.push(['María Elena', 'Hernández', 'López', 'Docente', 30, 'maria.hernandez@escuela.edu.mx']);
+    filasPersonal.push(['Carlos Alberto', 'Rodríguez', 'Sánchez', 'Docente', 15, 'carlos.rodriguez@escuela.edu.mx']);
+    filasPersonal.push(['Rosa María', 'Martínez', 'Torres', 'Directivo', 0, 'directora@escuela.edu.mx']);
+    filasPersonal.push(['Fernando', 'Gómez', 'Ramírez', 'Administrativo', 0, 'admin@escuela.edu.mx']);
+  }
+
+  const wsPersonal = XLSX.utils.aoa_to_sheet(filasPersonal);
+  wsPersonal['!cols'] = [
+    { wch: 22 }, // Nombre
+    { wch: 18 }, // Paterno
+    { wch: 18 }, // Materno
+    { wch: 16 }, // Cargo
+    { wch: 14 }, // Horas
+    { wch: 30 }, // Correo
+  ];
+  XLSX.utils.book_append_sheet(wb, wsPersonal, '1_Plantilla_Personal');
+
+  // -------------------------------------------------------------
+  // HOJA 2: MATRIZ DE HORARIOS (Configurada según los grupos del Paso 1)
+  // -------------------------------------------------------------
+  const semestres = periodoActivo === 'A' ? [1, 3, 5] : [2, 4, 6];
+  const filasMatriz: any[][] = [];
+
+  filasMatriz.push([`MATRIZ DE ASIGNACIÓN DOCENTE POR GRUPO - PERÍODO ${periodoActivo === 'A' ? 'A (1º, 3º, 5º)' : 'B (2º, 4º, 6º)'}`]);
+  filasMatriz.push(['Instrucciones: En cada columna de grupo, escriba el nombre o apellidos del docente que impartirá la materia.']);
+  filasMatriz.push([]);
 
   for (const sem of semestres) {
     const gruposSem = grupos.filter(g => g.semestre === sem);
     if (gruposSem.length === 0) continue;
 
-    // Encabezado del semestre
     const headerFila = ['Materia (UAC)', 'Horas'];
     gruposSem.forEach(g => {
       headerFila.push(g.nombre);
     });
 
-    filasExcel.push([`--- ${sem}° SEMESTRE ---`]);
-    filasExcel.push(headerFila);
+    filasMatriz.push([`--- ${sem}° SEMESTRE ---`]);
+    filasMatriz.push(headerFila);
 
-    // Obtener las materias del primer grupo como referencia base
     const uacsBase = getUACsGrupoFn(gruposSem[0]);
 
     uacsBase.forEach((uac, uacIdx) => {
       const filaMateria: any[] = [uac.uacName, `${uac.horasSemanales || 3}h`];
-
       gruposSem.forEach((g) => {
         const uacsG = getUACsGrupoFn(g);
         const uacG = uacsG[uacIdx] || uac;
         filaMateria.push('');
       });
-
-      filasExcel.push(filaMateria);
+      filasMatriz.push(filaMateria);
     });
 
-    filasExcel.push([]); // Espacio entre semestres
+    filasMatriz.push([]);
   }
 
-  // Hoja 1: Matriz de Cargas
-  const ws = XLSX.utils.aoa_to_sheet(filasExcel);
-  ws['!cols'] = [
-    { wch: 45 }, // Materia
-    { wch: 8 },  // Horas
-    { wch: 25 }, // Grupo A
-    { wch: 25 }, // Grupo B
-    { wch: 25 }, // Grupo C
-    { wch: 25 }, // Grupo D
-    { wch: 25 }, // Grupo E
+  const wsMatriz = XLSX.utils.aoa_to_sheet(filasMatriz);
+  wsMatriz['!cols'] = [
+    { wch: 45 },
+    { wch: 8 },
+    { wch: 25 },
+    { wch: 25 },
+    { wch: 25 },
+    { wch: 25 },
+    { wch: 25 },
+  ];
+  XLSX.utils.book_append_sheet(wb, wsMatriz, '2_Matriz_Horarios');
+
+  // -------------------------------------------------------------
+  // HOJA 3: INSTRUCCIONES RÁPIDAS
+  // -------------------------------------------------------------
+  const filasInstrucciones: any[][] = [
+    ['GUÍA DE USO DE LA PLANTILLA INTEGRAL DE HORARIOS'],
+    [],
+    ['1. HOJA "1_Plantilla_Personal":'],
+    ['   - Registre o actualice los nombres y horas de su plantilla docente y directiva.'],
+    ['   - El sistema los guardará automáticamente en el catálogo de su escuela.'],
+    [],
+    ['2. HOJA "2_Matriz_Horarios":'],
+    ['   - Asigne las materias escribiendo el nombre o apellido del docente en la columna de cada grupo.'],
+    ['   - Los nombres pueden escribirse en mayúsculas, minúsculas o abreviados (ej. "JOSE ALAIN", "ROSELIA", "HERNANDEZ PEREZ").'],
+    [],
+    ['3. CARGA EN LA PLATAFORMA:'],
+    ['   - Suba este mismo archivo en el Paso 2 o en el Paso 3 del Generador de Horarios.'],
+    ['   - ¡La plataforma importará el personal y llenará la matriz en un solo paso!'],
   ];
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Matriz_Horarios');
+  const wsInstrucciones = XLSX.utils.aoa_to_sheet(filasInstrucciones);
+  wsInstrucciones['!cols'] = [{ wch: 85 }];
+  XLSX.utils.book_append_sheet(wb, wsInstrucciones, 'Instrucciones');
 
-  // Hoja 2: Directorio de Personal de la Escuela
-  if (docentesDisponibles.length > 0) {
-    const filasDocentes: any[][] = [
-      ['DIRECTORIO DE PERSONAL DE LA ESCUELA'],
-      ['Copie y pegue estos nombres en la hoja "Matriz_Horarios" para asegurar coincidencia exacta:'],
-      [],
-      ['Nombre Completo', 'Cargo', 'Horas Base', 'Email'],
-    ];
-
-    docentesDisponibles.forEach((d) => {
-      filasDocentes.push([
-        `${d.apellidoPaterno || ''} ${d.apellidoMaterno || ''} ${d.nombre || ''}`.trim(),
-        d.cargo || 'DOCENTE',
-        `${d.horasAsignadas ?? d.horas_base ?? 20} hrs`,
-        d.email || '',
-      ]);
-    });
-
-    const wsDoc = XLSX.utils.aoa_to_sheet(filasDocentes);
-    wsDoc['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 12 }, { wch: 30 }];
-    XLSX.utils.book_append_sheet(wb, wsDoc, 'Docentes_Plantel');
-  }
-
-  XLSX.writeFile(wb, `Plantilla_Matriz_Horarios_${periodoActivo}.xlsx`);
+  // Descargar archivo
+  XLSX.writeFile(wb, `Plantilla_Integral_Horarios_${periodoActivo}.xlsx`);
 }
+
+/**
+ * Alias retrocompatible
+ */
+export const descargarPlantillaMatrizDocente = descargarPlantillaIntegralHorarios;
+
