@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
         FROM teachers
         ORDER BY name ASC
       `;
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.warn("[api/horarios/catalogos GET] Error consultando teachers:", e);
+    }
 
     const docentes = rows.map((t: any) => {
       const parts = (t.name || "").trim().split(" ");
@@ -53,9 +55,8 @@ export async function POST(req: NextRequest) {
 
     if (accion === "CREAR_DOCENTE") {
       const fullName = [nombre, apellidoPaterno, apellidoMaterno].filter(Boolean).join(" ");
-      const emailFinal = emailDocente || `${Date.now()}@temporal-horario.local`;
+      const emailFinal = emailDocente || `docente_${Date.now()}@didacteca.local`;
 
-      // Intentar insertar en la tabla teachers
       let docenteId = `doc_temp_${Date.now()}`;
       try {
         const rows = await sql()`
@@ -65,13 +66,13 @@ export async function POST(req: NextRequest) {
           RETURNING id::text
         `;
         if (rows[0]?.id) docenteId = rows[0].id;
-      } catch {
-        // Si falla (ej: email duplicado), usar ID temporal
+      } catch (e) {
+        console.warn("[api/horarios/catalogos POST] Insert docente fallback:", e);
       }
 
       const docente = {
         id: docenteId,
-        nombre,
+        nombre: nombre || "Docente",
         apellidoPaterno: apellidoPaterno || "",
         apellidoMaterno: apellidoMaterno || "",
         cargo: "DOCENTE",

@@ -1,5 +1,5 @@
 /**
- * Utilidades para la estructura de grupos por año/grado y asignaturas oficiales del MCCEMS 2025-2027 Puebla
+ * Utilidades para la estructura de grupos por año/grado y asignaturas oficiales del MCCEMS 2025-2026
  */
 
 export interface EscuelaEstructuraGrupos {
@@ -18,6 +18,9 @@ export interface GrupoDefinicion {
 
 const LETRAS_GRUPO = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 
+/**
+ * 15 Capacitaciones Laborales Oficiales BGE Puebla (MCCEMS 2025-2026)
+ */
 export const FORMACIONES_LABORALES = [
   "Administracion",
   "Agricultura Sostenible de Traspatio",
@@ -36,6 +39,9 @@ export const FORMACIONES_LABORALES = [
   "Turismo"
 ];
 
+/**
+ * Mapeo oficial de Nombres de Submódulos por Capacitación Laboral
+ */
 export const UACS_LABORALES_MAPA: Record<string, {
   sem3: { name: string; abrev: string }[];
   sem4: { name: string; abrev: string }[];
@@ -314,6 +320,9 @@ export const UACS_LABORALES_MAPA: Record<string, {
   }
 };
 
+/**
+ * Optativas FFE Categorizadas por Cuadros (MCCEMS 2025-2026 Puebla)
+ */
 export const FFE_RECURSOS_SOCIOCOGNITIVOS = [
   "Comunicación y Sociedad I",
   "Raíces Etimológicas del Español I",
@@ -340,11 +349,62 @@ export const FFE_AREAS_CONOCIMIENTO = [
   "Pensamiento Filosófico I"
 ];
 
+/**
+ * Mapeo Oficial de Continuidad de Asignaturas FFE (5.º Semestre -> 6.º Semestre)
+ * Según documento normativo oficial "FFE 2025-2026.pdf"
+ */
+export const FFE_CONTINUIDAD_5_A_6: Record<string, string> = {
+  // Recursos Sociocognitivos - Lengua y Comunicación
+  "Comunicación y Sociedad I": "Comunicación y Sociedad II",
+  "Raíces Etimológicas del Español I": "Raíces Etimológicas del Español II",
+  "Inglés V (Avanzado)": "Inglés VI (Avanzado)",
+  "Inglés V": "Inglés VI",
+
+  // Recursos Sociocognitivos - Pensamiento Matemático
+  "Taller de Pensamiento Variacional I": "Taller de Pensamiento Variacional II",
+  "Dibujo Técnico I": "Dibujo Técnico II",
+  "Pensamiento Matemático Aplicado a las Finanzas I": "Pensamiento Matemático Aplicado a las Finanzas II",
+  "Taller de Probabilidad y Estadística I": "Taller de Probabilidad y Estadística II",
+
+  // Áreas de Conocimiento - Ciencias Naturales, Experimentales y Tecnología
+  "Salud Integral I": "Salud Integral II",
+  "Análisis de Fenómenos y Procesos Biológicos": "Temas Selectos de Biología",
+  "Análisis de Fenómenos Físicos I": "Análisis de Fenómenos Físicos II",
+  "Organización del Flujo de Materia y Energía en los Organismos I": "Organización del Flujo de Materia en los Organismos II",
+
+  // Áreas de Conocimiento - Ciencias Sociales
+  "Fundamentos de Administración I": "Fundamentos de Administración II",
+  "Procesos Contables I": "Procesos Contables II",
+  "Derecho y Sociedad I": "Derecho y Sociedad II",
+  "Economía I. La Función de los Agentes Económicos en la Sociedad": "Economía II. Política Económica y Política Pública Mexicana",
+  "Temas Selectos de Ciencias Sociales I": "Temas Selectos de Ciencias Sociales II",
+  "Psicología I": "Psicología II",
+
+  // Áreas de Conocimiento - Humanidades
+  "Arte y Cultura I": "Arte y Cultura II",
+  "Lógica y Pensamiento Crítico": "Experiencia Estética",
+  "Pensamiento Filosófico I": "Pensamiento Filosófico II"
+};
+
+/**
+ * Obtiene el nombre de la asignatura continuadora en 6.º semestre a partir de la de 5.º
+ */
+export function obtenerFfeSemestre6(nombreSem5: string): string {
+  if (!nombreSem5) return "Optativa FFE II";
+  return FFE_CONTINUIDAD_5_A_6[nombreSem5] || nombreSem5.replace(/ I$/, " II");
+}
+
+/**
+ * Catálogo Oficial Completo de Optativas FFE MCCEMS 2025-2026
+ */
 export const FFE_OPTATIVAS_CATALOGO = [
   ...FFE_RECURSOS_SOCIOCOGNITIVOS,
   ...FFE_AREAS_CONOCIMIENTO
 ];
 
+/**
+ * Genera la lista de grupos oficiales de una escuela basándose en su estructura (ej: 2-1-1)
+ */
 export function generarGruposPorEstructura(
   escuela: { gruposPrimerAno?: number; gruposSegundoAno?: number; gruposTercerAno?: number },
   periodoSemestral: "SEMESTRE_A" | "SEMESTRE_B" = "SEMESTRE_A"
@@ -374,12 +434,26 @@ export function generarGruposPorEstructura(
   return grupos;
 }
 
+/**
+ * Catálogo Oficial Nombres Exactos de Formación Socioemocional (Currículum Ampliado / FFEO)
+ * Nombres oficiales según MCCEMS BGE Puebla:
+ * 1. Educación para la Salud
+ * 2. Educación Integral en Sexualidad y Género
+ * 3. Práctica y Colaboración Ciudadana
+ */
 export const FORMACIONES_SOCIOEMOCIONALES = [
   "Educación para la Salud",
   "Educación Integral en Sexualidad y Género",
   "Práctica y Colaboración Ciudadana"
 ];
 
+/**
+ * Calcula la Formación Socioemocional exacta para cada semestre de un grupo (3º, 4º, 5º, 6º)
+ * Reglas Estrictas:
+ * - 3.er Semestre: Selección del Director (Opción 1). NUNCA se repite en 4.º, 5.º ni 6.º.
+ * - 5.º Semestre: Selección del Director entre las 2 restantes (Opción 2). NUNCA se repite en 3.er, 4.º ni 6.º.
+ * - 4.º y 6.º Semestre: Asignación automática de la 3.ª opción restante (Opción 3). 4.º y 6.º llevan EXACTAMENTE la misma asignatura.
+ */
 export function resolverSocioemocionalGrupo(
   socioemocionalSem3?: string,
   socioemocionalSem5?: string
@@ -413,6 +487,9 @@ export function resolverSocioemocionalGrupo(
   };
 }
 
+/**
+ * Resuelve las Asignaturas/UACs oficiales exactas para un Grupo según su Semestre y Capacitaciones
+ */
 export function obtenerAsignaturasParaGrupo(
   semestre: number,
   capacitacionNombre: string = "Administracion",
@@ -421,6 +498,8 @@ export function obtenerAsignaturasParaGrupo(
 ): { nombre: string; tipo: "FUNDAMENTAL" | "LABORAL" | "EXTENDIDO" | "SOCIOEMOCIONAL"; horas: number }[] {
 
   if (semestre === 1) {
+    // 1.er Semestre 2026-2027: 8 asignaturas activas (25 horas totales)
+    // Se ocultan LAB-INV (3 hrs) y ART-CULT-I (2 hrs) según nuevas indicaciones SEP
     return [
       { nombre: "Ciencias Naturales, Experimentales y Tecnología I", tipo: "FUNDAMENTAL", horas: 4 },
       { nombre: "Pensamiento Matemático I", tipo: "FUNDAMENTAL", horas: 4 },
@@ -428,9 +507,7 @@ export function obtenerAsignaturasParaGrupo(
       { nombre: "Lenguaje y Comunicación I", tipo: "FUNDAMENTAL", horas: 3 },
       { nombre: "Inglés I", tipo: "FUNDAMENTAL", horas: 3 },
       { nombre: "Cultura Digital I", tipo: "FUNDAMENTAL", horas: 3 },
-      { nombre: "Laboratorio de Investigación", tipo: "FUNDAMENTAL", horas: 3 },
       { nombre: "Ciencias Sociales I", tipo: "FUNDAMENTAL", horas: 2 },
-      { nombre: "Actividades Artísticas y Culturales I", tipo: "SOCIOEMOCIONAL", horas: 2 },
       { nombre: "Actividades Físicas y Deportivas I", tipo: "SOCIOEMOCIONAL", horas: 2 },
     ];
   }
@@ -444,7 +521,6 @@ export function obtenerAsignaturasParaGrupo(
       { nombre: "Inglés II", tipo: "FUNDAMENTAL", horas: 3 },
       { nombre: "Cultura Digital II", tipo: "FUNDAMENTAL", horas: 3 },
       { nombre: "Ciencias Sociales II", tipo: "FUNDAMENTAL", horas: 2 },
-      { nombre: "Actividades Artísticas y Culturales II", tipo: "SOCIOEMOCIONAL", horas: 2 },
       { nombre: "Actividades Físicas y Deportivas II", tipo: "SOCIOEMOCIONAL", horas: 2 },
     ];
   }
@@ -486,13 +562,15 @@ export function obtenerAsignaturasParaGrupo(
   if (semestre === 5) {
     const labInfo = UACS_LABORALES_MAPA[capacitacionNombre]?.sem5 || UACS_LABORALES_MAPA["Administracion"].sem5;
     
-    const ffe1 = ffeOptativasArr[0] || FFE_RECURSOS_SOCIOCOGNITIVOS[0];
-    const ffe2 = ffeOptativasArr[1] || FFE_RECURSOS_SOCIOCOGNITIVOS[1];
-    const ffe3 = ffeOptativasArr[2] || FFE_AREAS_CONOCIMIENTO[0];
-    const ffe4 = ffeOptativasArr[3] || FFE_AREAS_CONOCIMIENTO[1];
+    // 4 Optativas FFE de libre selección (cualquiera de las 20 del catálogo)
+    const ffe1 = ffeOptativasArr[0] || FFE_OPTATIVAS_CATALOGO[0];
+    const ffe2 = ffeOptativasArr[1] || FFE_OPTATIVAS_CATALOGO[1];
+    const ffe3 = ffeOptativasArr[2] || FFE_OPTATIVAS_CATALOGO[2];
+    const ffe4 = ffeOptativasArr[3] || FFE_OPTATIVAS_CATALOGO[3];
     const socioNombre = ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1];
 
     return [
+      // UACs Fundamentales oficiales del 5.º semestre MCCEMS 2025-2026 BGE Puebla
       { nombre: "La Energía en los Procesos de la Vida Diaria", tipo: "FUNDAMENTAL", horas: 4 },
       { nombre: "Conciencia Histórica II. México Durante el Expansionismo Capitalista", tipo: "FUNDAMENTAL", horas: 3 },
       { nombre: "Taller de Habilidades del Pensamiento", tipo: "FUNDAMENTAL", horas: 3 },
@@ -506,11 +584,12 @@ export function obtenerAsignaturasParaGrupo(
     ];
   }
 
+  // Semestre 6: Continuidad automática con FFE de 5.º semestre
   const labInfo6 = UACS_LABORALES_MAPA[capacitacionNombre]?.sem6 || UACS_LABORALES_MAPA["Administracion"].sem6;
-  const ffe1 = ffeOptativasArr[0] || FFE_RECURSOS_SOCIOCOGNITIVOS[0];
-  const ffe2 = ffeOptativasArr[1] || FFE_RECURSOS_SOCIOCOGNITIVOS[1];
-  const ffe3 = ffeOptativasArr[2] || FFE_AREAS_CONOCIMIENTO[0];
-  const ffe4 = ffeOptativasArr[3] || FFE_AREAS_CONOCIMIENTO[1];
+  const ffe1 = obtenerFfeSemestre6(ffeOptativasArr[0] || FFE_OPTATIVAS_CATALOGO[0]);
+  const ffe2 = obtenerFfeSemestre6(ffeOptativasArr[1] || FFE_OPTATIVAS_CATALOGO[1]);
+  const ffe3 = obtenerFfeSemestre6(ffeOptativasArr[2] || FFE_OPTATIVAS_CATALOGO[2]);
+  const ffe4 = obtenerFfeSemestre6(ffeOptativasArr[3] || FFE_OPTATIVAS_CATALOGO[3]);
   const socioNombre = ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[2];
 
   return [

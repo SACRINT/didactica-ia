@@ -15,6 +15,7 @@
     "@stripe/stripe-js": "^9.12.1",
     "@vercel/blob": "^2.4.1",
     "docx": "^9.7.1",
+    "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.28.0",

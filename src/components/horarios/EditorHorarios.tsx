@@ -35,7 +35,7 @@ interface Props {
   cargas: any[];
   onVolverAWizard: () => void;
   onGuardarHorario?: (horarioGuardado: any) => void;
-  esAdmin?: boolean; // Si es true, muestra info técnica del modelo de IA
+  esAdmin?: boolean;
 }
 
 const PALETA_ESTILOS: Record<string, { bg: string; text: string; border: string }> = {
@@ -78,7 +78,6 @@ export default function EditorHorarios({
     const filtrados = grupos.filter((g) => semestresDeseados.includes(g.semestre));
     if (filtrados.length > 0) return filtrados;
 
-    // Si la DB solo guardó los grupos del semestre A, derivamos los grupos del semestre B (2°, 4°, 6°)
     if (periodoFiltro === "B") {
       const impares = grupos.filter((g) => [1, 3, 5].includes(g.semestre));
       if (impares.length > 0) {
@@ -98,7 +97,6 @@ export default function EditorHorarios({
     return grupos;
   }, [grupos, periodoFiltro]);
 
-  // Sincronizar grupoSeleccionadoId cuando cambian los gruposVisibles
   React.useEffect(() => {
     if (gruposVisibles.length > 0) {
       const yaExiste = gruposVisibles.some((g) => g.id === grupoSeleccionadoId);
@@ -108,7 +106,6 @@ export default function EditorHorarios({
     }
   }, [gruposVisibles]);
 
-  // Verificar si hay horario generado para la vista/grupo seleccionado
   const tieneHorarioGeneradoParaGrupo = React.useMemo(() => {
     if (!horario?.celdas || horario.celdas.length === 0) return false;
     if (vistaTab === "GRUPO") {
@@ -117,20 +114,14 @@ export default function EditorHorarios({
     return true;
   }, [horario, vistaTab, grupoSeleccionadoId]);
 
-  // Modal de Exportación Avanzada
   const [mostrarModalExportar, setMostrarModalExportar] = useState<boolean>(false);
-
-  // Control de apertura/cierre del panel del Chat IA
   const [mostrarChat, setMostrarChat] = useState<boolean>(true);
 
-  // Chat IA
   const [mensajeChat, setMensajeChat] = useState<string>("");
   const [enviandoChat, setEnviandoChat] = useState<boolean>(false);
   const [chatHistorial, setChatHistorial] = useState<any[]>(horarioInicial?.mensajesChat || []);
   const [limpiadoChat, setLimpiadoChat] = useState<boolean>(false);
 
-  // Slots libres bloqueados: el director puede fijar horas vacías para que la IA no las ocupe
-  // Formato: Set<"dia_periodo_filtroId">
   const [slotsLibresBloqueados, setSlotsLibresBloqueados] = useState<Set<string>>(() => {
     const initialArr = horarioInicial?.scoreMetricas?.slotsLibresBloqueados;
     if (Array.isArray(initialArr) && initialArr.length > 0) {
@@ -169,14 +160,32 @@ export default function EditorHorarios({
   const esSlotLibreBloqueado = (dia: number, periodo: number, filtroId: string) =>
     slotsLibresBloqueados.has(`${dia}_${periodo}_${filtroId}`);
 
-  // Estado para Drag and Drop
   const [draggedCelda, setDraggedCelda] = useState<any>(null);
 
   const diasLectivos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
   const numHorasPorDia = horarioInicial?.config?.horasPorDia || horario?.config?.horasPorDia || 6;
   const periodos = Array.from({ length: numHorasPorDia }, (_, i) => i + 1);
+  
+  const grupoActivoObj = React.useMemo(() => {
+    return gruposVisibles.find((g) => g.id === grupoSeleccionadoId) || grupos.find((g) => g.id === grupoSeleccionadoId);
+  }, [gruposVisibles, grupos, grupoSeleccionadoId]);
 
-  // Helper para asignar estilo de color por nombre de UAC
+  const docenteActivoObj = React.useMemo(() => {
+    return docentes.find((d) => d.id === docenteSeleccionadoId);
+  }, [docentes, docenteSeleccionadoId]);
+
+  const horasGrupoActual = React.useMemo(() => {
+    if (!grupoActivoObj) return numHorasPorDia;
+    return (grupoActivoObj as any).horasPorDia || (grupoActivoObj.semestre === 1 ? 5 : numHorasPorDia);
+  }, [grupoActivoObj, numHorasPorDia]);
+
+  const periodosVisibles = React.useMemo(() => {
+    if (vistaTab === "GRUPO") {
+      return Array.from({ length: horasGrupoActual }, (_, i) => i + 1);
+    }
+    return Array.from({ length: numHorasPorDia }, (_, i) => i + 1);
+  }, [vistaTab, horasGrupoActual, numHorasPorDia]);
+
   const getEstiloAsignatura = (uacName: string) => {
     if (!uacName) return ESTILOS_ARRAY[0];
     let hash = 0;
@@ -194,7 +203,7 @@ export default function EditorHorarios({
     const cargaMatch = cargas.find(c => c.asignaturaId === celda.asignaturaId || c.id === celda.cargaId);
     if (cargaMatch?.uacName) return cargaMatch.uacName;
 
-    return "UAC / Materia";
+    return celda.asignaturaId || "UAC / Materia";
   };
 
   const getNombreDocenteCelda = (celda: any) => {
@@ -228,7 +237,6 @@ export default function EditorHorarios({
     return null;
   };
 
-  // Bloquear / Desbloquear celda para la IA
   const toggleBloquearCelda = (celda: any, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!celda || !horario?.celdas) return;
@@ -246,7 +254,6 @@ export default function EditorHorarios({
     toast.success(estadoNuevo ? "🔒 Celda fijada (la IA no la moverá)" : "Celda desbloqueada para la IA");
   };
 
-  // Guardar Cambios del Horario en la Base de Datos
   const handleGuardarHorarioDB = async () => {
     if (!horario?.id || guardandoCambios) return;
     setGuardandoCambios(true);
@@ -270,7 +277,7 @@ export default function EditorHorarios({
         if (onGuardarHorario) {
           onGuardarHorario(data.horario);
         }
-        toast.success("💾 ¡Horario guardado permanentemente en la base de datos!");
+        toast.success("💾 ¡Horario guardado permanentemente!");
       } else {
         toast.error(data.error || "Error al guardar el horario");
       }
@@ -281,7 +288,6 @@ export default function EditorHorarios({
     }
   };
 
-  // Chat IA — Enviar mensaje
   const handleEnviarMensajeIA = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mensajeChat.trim() || enviandoChat) return;
@@ -299,13 +305,24 @@ export default function EditorHorarios({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           horarioId: horario.id,
-          mensaje: userMsg
+          mensaje: userMsg,
+          slotsLibresBloqueados: Array.from(slotsLibresBloqueados),
+          celdas: horario.celdas
         })
       });
 
       const data = await res.json();
       if (data.success) {
         setHorario(data.horario);
+        if (data.horario?.scoreMetricas?.slotsLibresBloqueados && Array.isArray(data.horario.scoreMetricas.slotsLibresBloqueados)) {
+          const nuevosSlots = new Set<string>(data.horario.scoreMetricas.slotsLibresBloqueados);
+          setSlotsLibresBloqueados(nuevosSlots);
+          if (typeof window !== "undefined" && escuela?.id && horario?.id) {
+            try {
+              localStorage.setItem(`horarios_slots_libres_${escuela.id}_${horario.id}`, JSON.stringify(Array.from(nuevosSlots)));
+            } catch (e) {}
+          }
+        }
         setChatHistorial(data.horario.mensajesChat || []);
         setHayCambiosSinGuardar(false);
         toast.success("Ajuste procesado por el Asistente IA");
@@ -319,11 +336,10 @@ export default function EditorHorarios({
     }
   };
 
-  // Chat IA — Limpiar historial (no resetea el contador del admin)
   const handleLimpiarChat = async () => {
     if (!horario?.id) return;
     const confirmar = window.confirm(
-      "¿Limpiar el historial de chat? Los mensajes anteriores se borrarán pero el contador de uso del administrador se mantiene."
+      "¿Limpiar el historial de chat? Los mensajes anteriores se borrarán."
     );
     if (!confirmar) return;
 
@@ -344,7 +360,6 @@ export default function EditorHorarios({
     }
   };
 
-  // Lógica Drag and Drop Inteligente con Reacomodo Ripple en Cascada
   const handleDragStart = (e: React.DragEvent, celda: any) => {
     if (celda.esBloqueado) {
       e.preventDefault();
@@ -367,14 +382,14 @@ export default function EditorHorarios({
       return;
     }
 
-    // Ejecutar el motor de Reordenamiento Inteligente (Ripple Solver)
     const resultado = reacomodarHorarioConRipple(
       horario.celdas,
       draggedCelda,
       targetDia,
       targetPeriodo,
       numHorasPorDia,
-      slotsLibresBloqueados
+      slotsLibresBloqueados,
+      grupos
     );
 
     if (!resultado.success) {
@@ -398,19 +413,17 @@ export default function EditorHorarios({
     setDraggedCelda(null);
   };
 
-  // Motor de Exportación Avanzado PDF, Excel y DOCX
   const ejecutarExportacion = async (
     opcion: "VISTA_ACTUAL" | "PAQUETE_DOCENTES" | "PAQUETE_GRUPOS" | "SUMARIO_MAESTRO" | "SUMARIO_GRUPO",
     formato: "PDF" | "EXCEL" | "DOCX"
   ) => {
     setMostrarModalExportar(false);
 
-    // ── Sumario Maestro (todos los docentes, tabla compacta) ──
     if (opcion === "SUMARIO_MAESTRO") {
       exportarSumarioExcel(
         {
-          nombreEscuela: escuela.nombre,
-          cct: escuela.cct || "CCT",
+          nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
+          cct: escuela?.cct || "CCT",
           dias: diasLectivos,
           numHorasPorDia,
           entidades: docentes.map(d => ({
@@ -433,12 +446,11 @@ export default function EditorHorarios({
       return;
     }
 
-    // ── Sumario Grupo (todos los grupos, tabla compacta) ──
     if (opcion === "SUMARIO_GRUPO") {
       exportarSumarioExcel(
         {
-          nombreEscuela: escuela.nombre,
-          cct: escuela.cct || "CCT",
+          nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
+          cct: escuela?.cct || "CCT",
           dias: diasLectivos,
           numHorasPorDia,
           entidades: grupos.map(g => ({ id: g.id, etiqueta: `Grupo ${g.nombre}` })),
@@ -458,7 +470,6 @@ export default function EditorHorarios({
       return;
     }
 
-    // ── Exportaciones por filas (PDF / Excel / DOCX) ──
     const filasExport: any[] = [];
     let tipoVistaPDF: any = "GRUPO";
     let tituloTabla = "";
@@ -476,7 +487,7 @@ export default function EditorHorarios({
             }
           }
         }
-        filasExport.push({ encabezado: `GRUPO ${g?.nombre || ""}`, celdas: celdasMapa });
+        filasExport.push({ encabezado: `GRUPO: ${g?.nombre || ""}`, celdas: celdasMapa });
       } else if (vistaTab === "DOCENTE") {
         const dObj = docentes.find(item => item.id === docenteSeleccionadoId);
         const nomDoc = dObj ? `${dObj.nombre} ${dObj.apellidoPaterno || ""}`.trim() : "DOCENTE";
@@ -527,13 +538,15 @@ export default function EditorHorarios({
             }
           }
         }
-        filasExport.push({ encabezado: `GRUPO ${g.nombre}`, celdas: celdasMapa });
+        filasExport.push({ encabezado: `GRUPO: ${g.nombre}`, celdas: celdasMapa });
       }
     }
 
     const payload = {
-      nombreEscuela: escuela.nombre,
-      cct: escuela.cct || "CCT",
+      nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
+      cct: escuela?.cct || "CCT",
+      zonaEscolar: (escuela as any)?.zona || "004",
+      cicloEscolar: (horario as any)?.cicloEscolar?.nombre || "2026-2027",
       tipoVista: tipoVistaPDF,
       tituloTabla,
       dias: diasLectivos,
@@ -553,12 +566,10 @@ export default function EditorHorarios({
     }
   };
 
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", width: "100%" }}>
       {/* Barra de Controles Superior */}
       <div style={{ background: "white", padding: "1rem", borderRadius: "12px", border: "1px solid var(--border)", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-        {/* Selector de Vista */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <button
             onClick={() => setVistaTab("GRUPO")}
@@ -586,7 +597,6 @@ export default function EditorHorarios({
           </button>
         </div>
 
-        {/* Acciones de Exportación & Configuración */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <button
             onClick={() => setMostrarChat(!mostrarChat)}
@@ -615,7 +625,6 @@ export default function EditorHorarios({
             <Sliders style={{ width: "15px", height: "15px" }} /> Reconfigurar
           </button>
 
-          {/* Botón Guardar Cambios en Base de Datos */}
           <button
             onClick={handleGuardarHorarioDB}
             disabled={guardandoCambios || !hayCambiosSinGuardar}
@@ -634,7 +643,7 @@ export default function EditorHorarios({
               boxShadow: hayCambiosSinGuardar ? "0 2px 8px rgba(22, 163, 74, 0.3)" : "none",
               transition: "all 0.2s ease"
             }}
-            title={hayCambiosSinGuardar ? "Haga clic para guardar los cambios permanentemente en la base de datos" : "Sin cambios pendientes por guardar"}
+            title={hayCambiosSinGuardar ? "Guardar cambios permanentemente" : "Sin cambios pendientes"}
           >
             {guardandoCambios ? (
               <>
@@ -755,6 +764,67 @@ export default function EditorHorarios({
       <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start", width: "100%" }}>
         {/* PANEL IZQUIERDO: Cuadrícula interactiva completa */}
         <div style={{ flex: 1, minWidth: 0, background: "white", borderRadius: "16px", border: "1px solid var(--border)", padding: "1.25rem", boxShadow: "var(--shadow)" }}>
+          
+          {/* TARJETA EJECUTIVA DE METADATOS DEL GRUPO / DOCENTE */}
+          {vistaTab === "GRUPO" && grupoActivoObj && (
+            <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
+                  {grupoActivoObj.nombre}
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>
+                    {grupoActivoObj.semestre}° Semestre • Bachillerato General Estatal
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
+                    <span>⏱️ Jornada: <strong style={{ color: "#1e3a8a" }}>{horasGrupoActual} hrs/día ({horasGrupoActual * 5} hrs/sem)</strong></span>
+                    {grupoActivoObj.capacitacionNombre && <span>💼 Capacitación: <strong>{grupoActivoObj.capacitacionNombre}</strong></span>}
+                    {grupoActivoObj.ffeoSocioemocional && <span>🌱 FFEO: <strong>{grupoActivoObj.ffeoSocioemocional}</strong></span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Asignaturas en Retícula</div>
+                <div style={{ fontSize: "1rem", fontWeight: 900, color: "#1e3a8a" }}>
+                  {(horario?.celdas || []).filter((c: any) => c.grupoId === grupoSeleccionadoId).length} / {horasGrupoActual * 5} hrs asignadas
+                </div>
+              </div>
+            </div>
+          )}
+
+          {vistaTab === "DOCENTE" && docenteActivoObj && (() => {
+            const celdasDoc = (horario?.celdas || []).filter((c: any) => c.docenteId === docenteSeleccionadoId);
+            const totalHrsDoc = celdasDoc.length;
+            const materiasDoc = Array.from(new Set(celdasDoc.map((c: any) => getNombreAsignaturaCelda(c))));
+            const gruposDoc = Array.from(new Set(celdasDoc.map((c: any) => { const grp = grupos.find((g: any) => g.id === c.grupoId); return grp ? grp.nombre : c.grupoId; })));
+
+            return (
+              <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{ background: "#1e3a8a", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
+                    👨‍🏫
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>
+                      Prof. {docenteActivoObj.nombre} {docenteActivoObj.apellidoPaterno || ""}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
+                      <span>💼 Cargo: <strong>{docenteActivoObj.cargo || "Docente"}</strong></span>
+                      <span>👥 Grupos: <strong>{gruposDoc.length > 0 ? gruposDoc.join(", ") : "Ninguno"}</strong></span>
+                      <span>📚 Materias distintas: <strong>{materiasDoc.length}</strong></span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Carga Frente a Grupo</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHrsDoc > 0 ? "#16a34a" : "#64748b" }}>
+                    {totalHrsDoc} hrs / semana
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {!tieneHorarioGeneradoParaGrupo && vistaTab === "GRUPO" ? (
             <div style={{ padding: "3.5rem 2rem", textAlign: "center", background: "#f8fafc", borderRadius: "16px", border: "2px dashed #cbd5e1", margin: "1rem 0" }}>
               <Grid style={{ width: "48px", height: "48px", color: "#94a3b8", margin: "0 auto 1rem" }} />
@@ -783,7 +853,7 @@ export default function EditorHorarios({
                 </tr>
               </thead>
               <tbody>
-                {periodos.map((p) => (
+                {periodosVisibles.map((p) => (
                   <tr key={p}>
                     <td style={{ background: "var(--bg)", textAlign: "center", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text)", border: "1px solid #cbd5e1" }}>
                       Hora {p}
@@ -825,13 +895,21 @@ export default function EditorHorarios({
                                   </p>
                                   <button
                                     onClick={(e) => toggleBloquearCelda(celda, e)}
-                                    title={celda.esBloqueado ? "Celda bloqueada (Haga clic para desbloquear)" : "Fijar celda para que la IA no la mueva"}
-                                    style={{ background: "none", border: "none", cursor: "pointer", padding: "0 2px" }}
+                                    title={celda.esBloqueado ? "🔒 Celda protegida con candado (Clic para desbloquear)" : "Clic para fijar con candado"}
+                                    style={{
+                                      background: celda.esBloqueado ? "#fef3c7" : "transparent",
+                                      borderRadius: "4px",
+                                      border: celda.esBloqueado ? "1px solid #f59e0b" : "none",
+                                      cursor: "pointer",
+                                      padding: "1px 3px",
+                                      display: "inline-flex",
+                                      alignItems: "center"
+                                    }}
                                   >
                                     {celda.esBloqueado ? (
-                                      <Lock style={{ width: "13px", height: "13px", color: "#d97706" }} />
+                                      <Lock style={{ width: "12px", height: "12px", color: "#d97706" }} />
                                     ) : (
-                                      <Unlock style={{ width: "13px", height: "13px", color: "#94a3b8" }} />
+                                      <Unlock style={{ width: "11px", height: "11px", color: "#94a3b8", opacity: 0.3 }} />
                                     )}
                                   </button>
                                 </div>
@@ -846,7 +924,6 @@ export default function EditorHorarios({
                               </div>
                             </div>
                           ) : (() => {
-                            // Determinar filtroId según la vista activa
                             const filtroId =
                               vistaTab === "GRUPO" ? grupoSeleccionadoId :
                               vistaTab === "DOCENTE" ? docenteSeleccionadoId :
@@ -864,7 +941,7 @@ export default function EditorHorarios({
                                   cursor: "pointer"
                                 }}
                                 onClick={() => toggleBloquearSlotLibre(dia, p, filtroId)}
-                                title={estaBloqueado ? "Hora libre bloqueada \u2014 clic para desbloquear" : "Clic para bloquear esta hora libre (la IA no colocará clases aquí)"}
+                                title={estaBloqueado ? "Hora libre bloqueada — clic para desbloquear" : "Clic para bloquear esta hora libre (la IA no colocará clases aquí)"}
                               >
                                 {estaBloqueado ? (
                                   <>
@@ -890,18 +967,17 @@ export default function EditorHorarios({
         {/* PANEL DERECHO: Chat IA Asistente Deslizable */}
         {mostrarChat && (
           <div style={{ width: "340px", flexShrink: 0, background: "#0f172a", borderRadius: "16px", border: "1px solid #334155", padding: "1.25rem", display: "flex", flexDirection: "column", height: "600px", boxShadow: "0 10px 25px rgba(0,0,0,0.3)" }}>
-              <div style={{ borderBottom: "1px solid #334155", paddingBottom: "0.75rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ borderBottom: "1px solid #334155", paddingBottom: "0.75rem", marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <Sparkles style={{ width: "20px", height: "20px", color: "#60a5fa" }} />
                 <div>
                   <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "white", margin: 0 }}>Asistente IA de Horarios</h3>
                   {esAdmin && (
-                    <p style={{ fontSize: "0.65rem", color: "#94a3b8", margin: 0 }}>Gemini 3.5 Flash Lite | SISAT-ATP Pool</p>
+                    <p style={{ fontSize: "0.65rem", color: "#94a3b8", margin: 0 }}>Gemini 3.5 Flash Lite | DidactecaIA Pool</p>
                   )}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                {/* Botón: Limpiar historial del chat (solo borra mensajes, no el contador del admin) */}
                 <button
                   onClick={handleLimpiarChat}
                   title="Limpiar historial de conversación"
