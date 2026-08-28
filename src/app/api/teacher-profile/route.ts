@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { schoolName, municipality, city, cct, subsystem, name, lockProfile } = body;
+    const { schoolName, municipality, city, cct, subsystem, name, role, lockProfile } = body;
 
     // Validaciones básicas
     if (!schoolName?.trim() || !municipality?.trim() || !city?.trim() || !cct?.trim() || !subsystem?.trim()) {
@@ -18,6 +18,11 @@ export async function POST(req: Request) {
         { error: 'Todos los campos son requeridos' },
         { status: 400 }
       );
+    }
+
+    const VALID_ROLES = ['docente', 'director', 'supervisor'];
+    if (role && !VALID_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Rol no válido' }, { status: 400 });
     }
 
     const db = neon(process.env.DATABASE_URL!);
@@ -53,6 +58,7 @@ export async function POST(req: Request) {
         city = ${city.trim()},
         cct = ${cct.trim()},
         subsystem = ${subsystem.trim()},
+        role = COALESCE(${role || null}, role, 'docente'),
         profile_completed = true,
         school_locked = ${lockProfile === true},
         updated_at = now()
@@ -80,7 +86,7 @@ export async function GET() {
     const db = neon(process.env.DATABASE_URL!);
     const rows = await db`
       SELECT name, school_name, municipality, city, cct, subsystem,
-             profile_completed, school_locked
+             profile_completed, school_locked, role
       FROM teachers
       WHERE email = ${session.user.email}
       LIMIT 1
