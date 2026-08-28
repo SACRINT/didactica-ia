@@ -29,6 +29,15 @@ export default async function PaecDashboardPage({
   const teacher = await getTeacherByEmail(session.user.email);
   if (!teacher) redirect(`/${locale}/login`);
 
+  const isAdmin =
+    teacher.role === 'administrador' ||
+    session.user.email === process.env.ADMIN_EMAIL;
+
+  const isDirector = isAdmin || teacher.role === 'director';
+  if (!isDirector) {
+    redirect(`/${locale}/dashboard`);
+  }
+
   // Direct fetch from DB for Server Component
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL not set');
   const sql = neon(process.env.DATABASE_URL);

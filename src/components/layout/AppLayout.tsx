@@ -157,9 +157,6 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         <Link href={`/${locale}/dashboard`} className={`sidebar-link ${activeSection === 'dashboard' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📝</span>Mis planeaciones
         </Link>
-        <Link href={`/${locale}/paec`} className={`sidebar-link ${activeSection === 'paec' ? 'active' : ''}`}>
-          <span className="sidebar-link-icon">🏫</span>Proyectos PAEC-PEC
-        </Link>
         <Link href={`/${locale}/mis-documentos`} className={`sidebar-link ${activeSection === 'mis-documentos' ? 'active' : ''}`}>
           <span className="sidebar-link-icon">📁</span>Mis Documentos
         </Link>
@@ -174,11 +171,14 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
             <Link href={`/${locale}/mi-escuela`} className={`sidebar-link ${activeSection === 'mi-escuela' ? 'active' : ''}`}>
               <span className="sidebar-link-icon">👥</span>Mi Personal
             </Link>
-            <Link href={`/${locale}/horarios`} className={`sidebar-link ${activeSection === 'horarios' ? 'active' : ''}`}>
-              <span className="sidebar-link-icon">📅</span>Horarios IA (Directores)
+            <Link href={`/${locale}/paec`} className={`sidebar-link ${activeSection === 'paec' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">🏫</span>Proyectos PAEC-PEC
             </Link>
             <Link href={`/${locale}/pmc`} className={`sidebar-link ${activeSection === 'pmc' ? 'active' : ''}`}>
               <span className="sidebar-link-icon">📈</span>Plan de Mejora (PMC)
+            </Link>
+            <Link href={`/${locale}/horarios`} className={`sidebar-link ${activeSection === 'horarios' ? 'active' : ''}`}>
+              <span className="sidebar-link-icon">📅</span>Horarios IA (Directores)
             </Link>
           </>
         )}

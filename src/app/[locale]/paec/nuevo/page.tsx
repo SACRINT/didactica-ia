@@ -1,3 +1,6 @@
+import { auth } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { getTeacherByEmail } from '@/lib/db';
 import AppLayout from '@/components/layout/AppLayout';
 import PaecWizardClient from './PaecWizardClient';
 import type { Metadata } from 'next';
@@ -13,6 +16,21 @@ interface PageProps {
 
 export default async function NuevoPaecPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
+  const session = await auth();
+  if (!session?.user?.email) redirect(`/${locale}/login`);
+
+  const teacher = await getTeacherByEmail(session.user.email);
+  if (!teacher) redirect(`/${locale}/login`);
+
+  const isAdmin =
+    teacher.role === 'administrador' ||
+    session.user.email === process.env.ADMIN_EMAIL;
+
+  const isDirector = isAdmin || teacher.role === 'director';
+  if (!isDirector) {
+    redirect(`/${locale}/dashboard`);
+  }
+
   const { id } = await searchParams;
 
   return (

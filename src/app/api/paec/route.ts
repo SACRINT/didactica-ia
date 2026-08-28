@@ -15,6 +15,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Docente no encontrado' }, { status: 404 });
     }
 
+    const isAdmin = teacher.role === 'administrador' || session.user.email === process.env.ADMIN_EMAIL;
+    const isDirector = isAdmin || teacher.role === 'director';
+    if (!isDirector) {
+      return NextResponse.json({ error: 'Solo los directores pueden gestionar proyectos PAEC' }, { status: 403 });
+    }
+
     const projects = await getPaecProjectsByTeacher(teacher.id);
     return NextResponse.json({ projects });
   } catch (error) {
@@ -33,6 +39,12 @@ export async function POST(request: NextRequest) {
     const teacher = await getTeacherByEmail(session.user.email);
     if (!teacher) {
       return NextResponse.json({ error: 'Docente no encontrado' }, { status: 404 });
+    }
+
+    const isAdmin = teacher.role === 'administrador' || session.user.email === process.env.ADMIN_EMAIL;
+    const isDirector = isAdmin || teacher.role === 'director';
+    if (!isDirector) {
+      return NextResponse.json({ error: 'Solo los directores pueden gestionar proyectos PAEC' }, { status: 403 });
     }
 
     const body = (await request.json()) as CreatePaecInput;
