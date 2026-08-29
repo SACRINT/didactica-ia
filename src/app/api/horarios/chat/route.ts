@@ -4,6 +4,7 @@ import { sql, getTeacherByEmail } from "@/lib/db";
 import { procesarComandoIA, RespuestaIAHorario } from "@/lib/horarios/ai-assistant";
 import { resolverHorario } from "@/lib/horarios/solver";
 import { moverCelda, intercambiarCeldas, bloquearLibre } from "@/lib/horarios/mutations";
+import { buscarCadenaSwap, normalizarId } from "@/lib/horarios/chain-swap";
 
 export async function POST(req: NextRequest) {
   try {
@@ -107,27 +108,47 @@ export async function POST(req: NextRequest) {
     // 2. Procesar con el Asistente IA (Gemini 3.5 / 3.1 Flash Lite)
     const respuestaIA: RespuestaIAHorario = await procesarComandoIA(mensaje, contexto, teacherId);
 
-    // 3. Si no es factible, retornar respuesta explicativa
-    if (!respuestaIA.factible) {
-      return NextResponse.json({
-        success: true,
-        respuestaIA,
-        respuesta: respuestaIA,
-        horario: {
-          id: horarioId,
-          celdas: clientCeldas,
-          scoreMetricas: { slotsLibresBloqueados }
-        }
-      });
-    }
+    const nuevoHistorial = [
+      ...(body.historialConversacion || []),
+      { role: "user", content: mensaje },
+      { role: "assistant", content: respuestaIA.explicacion }
+    ];
 
-    // 4. Router de Acciones: Mutaciones Quirúrgicas vs Macro-Restricciones
     let celdasResultado = [...clientCeldas];
     let slotsLibresActualizados = new Set<string>(slotsLibresBloqueados || []);
     let scoreMetricas: any = { slotsLibresBloqueados: Array.from(slotsLibresActualizados) };
 
+    // 3. Si no es factible, retornar respuesta explicativa con historial preservado
+    if (!respuestaIA.factible) {
+      const horarioActualizado = {
+        id: horarioId,
+        config: { horasPorDia, diasLectivos },
+        scoreMetricas: { slotsLibresBloqueados: Array.from(slotsLibresActualizados) },
+        celdas: clientCeldas,
+        mensajesChat: nuevoHistorial
+      };
+
+      try {
+        await sql()`
+          UPDATE horario_config
+          SET horario_generado = ${JSON.stringify(horarioActualizado)}
+          WHERE teacher_id = ${teacherId}::uuid
+        `;
+      } catch (e) {
+        console.warn("[api/horarios/chat] Error actualizando horario no factible:", e);
+      }
+
+      return NextResponse.json({
+        success: true,
+        respuestaIA,
+        respuesta: respuestaIA,
+        horario: horarioActualizado
+      });
+    }
+
+    // 4. Router de Acciones: Mutaciones Quirúrgicas vs Macro-Restricciones
     const gruposInfo = grupos.map((g: any) => ({
-      id: g.id,
+      id: normalizarId(g.id),
       nombre: g.nombre,
       semestre: g.semestre || 1,
       horasPorDia: g.semestre === 1 ? 5 : horasPorDia
@@ -153,6 +174,28 @@ export async function POST(req: NextRequest) {
           );
           if (resMover.success) {
             celdasResultado = resMover.celdas;
+          } else {
+            // Intentar con búsqueda de cadena de reubicación
+            const celdaTarget = celdasResultado.find(c => {
+              if (accion.diaOrigen && accion.periodoOrigen && (c.diaSemana !== accion.diaOrigen || c.periodo !== accion.periodoOrigen)) return false;
+              if (accion.grupoId && normalizarId(c.grupoId) !== normalizarId(accion.grupoId)) return false;
+              if (accion.docenteId && normalizarId(c.docenteId) !== normalizarId(accion.docenteId)) return false;
+              return true;
+            });
+            if (celdaTarget) {
+              const resCadena = buscarCadenaSwap(
+                celdasResultado,
+                celdaTarget,
+                { dia: celdaTarget.diaSemana, periodo: celdaTarget.periodo },
+                slotsLibresActualizados,
+                gruposInfo,
+                horasPorDia,
+                5
+              );
+              if (resCadena.success && resCadena.celdasResult) {
+                celdasResultado = resCadena.celdasResult;
+              }
+            }
           }
         } else if (accion.tipo === "INTERCAMBIAR" && accion.origen && accion.destino) {
           const resSwap = intercambiarCeldas(
@@ -305,12 +348,6 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-
-    const nuevoHistorial = [
-      ...(body.historialConversacion || []),
-      { role: "user", content: mensaje },
-      { role: "assistant", content: respuestaIA.explicacion }
-    ];
 
     const horarioActualizado = {
       id: horarioId,
