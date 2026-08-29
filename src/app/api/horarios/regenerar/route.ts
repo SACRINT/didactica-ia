@@ -19,72 +19,93 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { horarioId, slotsLibresBloqueados = [], celdas = [] } = body;
 
-    // 1. Cargar configuración y cargas de la base de datos
-    const configResult = await sql()`
-      SELECT * FROM horario_config WHERE teacher_id = ${teacherId}::uuid LIMIT 1
-    `;
-    const configRow = configResult[0];
+    // 1. Cargar configuración existente
+    let configRows: any[] = [];
+    try {
+      configRows = await sql()`
+        SELECT * FROM horario_config WHERE teacher_id = ${teacherId}::uuid LIMIT 1
+      `;
+    } catch (e) {
+      console.warn("[api/horarios/regenerar POST] Error consultando horario_config:", e);
+    }
+    const configRow = configRows[0] || null;
 
     const horasPorDia = configRow?.horas_por_dia || 6;
     const diasLectivos = configRow?.dias_lectivos || 5;
+    const periodoActivo = configRow?.periodo_activo || "A";
+    const semestresDeseados = periodoActivo === "B" ? [2, 4, 6] : [1, 3, 5];
 
-    // 2. Cargar grupos
+    // 2. Cargar grupos del semestre activo
     const gruposRows = await sql()`
-      SELECT id, nombre, semestre, horas_por_dia, turno FROM horario_grupos 
-      WHERE teacher_id = ${teacherId}::uuid
+      SELECT id::text, nombre, semestre
+      FROM horario_grupos
+      WHERE teacher_id = ${teacherId}::uuid AND semestre = ANY(${semestresDeseados}::int[])
       ORDER BY semestre ASC, nombre ASC
     `;
 
     const grupos = gruposRows.map((g: any) => ({
       id: String(g.id || g.nombre),
-      nombre: String(g.nombre || g.id),
+      nombre: String(g.nombre),
       semestre: Number(g.semestre || 1),
-      horasPorDia: Number(g.horas_por_dia || (g.semestre === 1 ? 5 : horasPorDia))
+      horasPorDia: Number(g.semestre === 1 ? 5 : horasPorDia)
     }));
 
-    // 3. Cargar docentes de personal
+    // 3. Cargar personal docente registrado
     const personalRows = await sql()`
-      SELECT id, nombre, apellido_paterno, apellido_materno, cargo, horas_max_dia 
-      FROM personal 
-      WHERE teacher_id = ${teacherId}::uuid
-      ORDER BY nombre ASC
+      SELECT id::text, nombre, apellido_paterno, apellido_materno, cargo, horas_base, email
+      FROM escuela_personal
+      WHERE director_id = ${teacherId}::uuid AND activo = TRUE
+      ORDER BY apellido_paterno ASC, nombre ASC
     `;
 
     const docentes = personalRows.map((d: any) => ({
       id: String(d.id),
       nombreCompleto: `${d.nombre || ''} ${d.apellido_paterno || ''} ${d.apellido_materno || ''}`.trim() || 'Docente',
-      horasMaxDia: Number(d.horas_max_dia || horasPorDia)
+      horasMaxDia: Number(horasPorDia)
     }));
 
-    // 4. Cargar cargas docentes
+    // 4. Cargar cargas académicas de la escuela
     const cargasRows = await sql()`
-      SELECT id, personal_id, grupo_id, uac_name, horas_semanales, requiere_aula_especial, aula_especial_id
-      FROM horario_carga_docente
+      SELECT id::text, grupo_nombre AS "grupoId", uac_name AS "uacName", personal_id AS "personalId", horas_semanales AS "horasSemanales", requiere_aula_esp AS "requiereAulaEspecial"
+      FROM horario_cargas
       WHERE teacher_id = ${teacherId}::uuid
+      ORDER BY grupo_nombre ASC, uac_name ASC
     `;
 
-    const cargas = cargasRows.map((c: any, idx: number) => ({
-      id: String(c.id || `carga_${idx}`),
-      docenteId: String(c.personal_id),
-      grupoId: String(c.grupo_id),
-      asignaturaId: String(c.uac_name),
-      horasSemanales: Number(c.horas_semanales || 3),
-      esHoraDoblePermitida: true,
-      requiereAulaEspecial: !!c.requiere_aula_especial,
-      aulaEspecialId: c.aula_especial_id || undefined
-    })).filter((c: any) => c.docenteId && c.grupoId && c.horasSemanales > 0);
+    const cargas = cargasRows.map((c: any, idx: number) => {
+      const gMatch = grupos.find((g: any) => g.id === c.grupoId || g.nombre === c.grupoId);
+      const grpId = gMatch ? gMatch.id : c.grupoId;
 
-    // 5. Extraer celdas fijadas con candado
+      return {
+        id: c.id || `carga_${idx}`,
+        docenteId: String(c.personalId || ''),
+        grupoId: grpId,
+        asignaturaId: String(c.uacName || ''),
+        horasSemanales: Number(c.horasSemanales || 3),
+        esHoraDoblePermitida: true,
+        requiereAulaEspecial: !!c.requiereAulaEspecial
+      };
+    }).filter((c: any) => {
+      const gMatch = grupos.find((g: any) => g.id === c.grupoId);
+      return gMatch && c.docenteId && c.grupoId && c.horasSemanales > 0;
+    });
+
+    // 5. Extraer celdas fijas con candado
     const celdasFijas = (Array.isArray(celdas) ? celdas : [])
       .filter((c: any) => c.esBloqueado)
-      .map((c: any) => ({
-        diaSemana: Number(c.diaSemana),
-        periodo: Number(c.periodo),
-        grupoId: String(c.grupoId),
-        docenteId: String(c.docenteId),
-        asignaturaId: String(c.asignaturaId || c.uacName || ""),
-        aulaId: c.aulaId || undefined
-      }));
+      .map((c: any) => {
+        const gMatch = grupos.find((g: any) => g.id === c.grupoId || g.nombre === c.grupoId);
+        const grpId = gMatch ? gMatch.id : c.grupoId;
+
+        return {
+          diaSemana: Number(c.diaSemana),
+          periodo: Number(c.periodo),
+          grupoId: grpId,
+          docenteId: String(c.docenteId),
+          asignaturaId: String(c.asignaturaId || c.uacName || ""),
+          aulaId: c.aulaId || undefined
+        };
+      });
 
     // 6. Preparar parámetros del Solver Global
     const params: SolverParams = {
@@ -129,8 +150,8 @@ export async function POST(req: NextRequest) {
           id: c.id || `celda_${idx}_${Date.now()}`,
           diaSemana: c.diaSemana,
           periodo: c.periodo,
-          grupoId: c.grupoId,
-          docenteId: c.docenteId,
+          grupoId: grpObj ? grpObj.id : c.grupoId,
+          docenteId: docObj ? docObj.id : c.docenteId,
           asignaturaId: c.asignaturaId,
           uacName: c.asignaturaId,
           aulaId: c.aulaId,

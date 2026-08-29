@@ -244,7 +244,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
   }
 
   // 4. Min-Conflicts Local Search con Penalización de Restricciones
-  const MAX_ITER = 3000;
+  const MAX_ITER = 20000;
   let iter = 0;
 
   function getConflictedCells(): UnitCell[] {
@@ -315,7 +315,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
       }
     }
 
-    if (bestIdx !== -1 && (bestDelta < 0 || Math.random() < 0.12)) {
+    if (bestIdx !== -1 && (bestDelta < 0 || Math.random() < 0.15)) {
       const c2 = cells[bestIdx];
       const d1 = c1.dia, p1 = c1.periodo;
       const d2 = c2.dia, p2 = c2.periodo;
