@@ -109,10 +109,12 @@ export default function EditorHorarios({
   const tieneHorarioGeneradoParaGrupo = React.useMemo(() => {
     if (!horario?.celdas || horario.celdas.length === 0) return false;
     if (vistaTab === "GRUPO") {
-      return horario.celdas.some((c: any) => c.grupoId === grupoSeleccionadoId || c.grupo?.id === grupoSeleccionadoId);
+      const grp = gruposVisibles.find((g) => g.id === grupoSeleccionadoId) || grupos.find((g) => g.id === grupoSeleccionadoId);
+      const idsValidos = [grupoSeleccionadoId, grp?.id, grp?.nombre].filter(Boolean);
+      return horario.celdas.some((c: any) => idsValidos.includes(c.grupoId) || idsValidos.includes(c.grupo?.id) || idsValidos.includes(c.grupo?.nombre));
     }
     return true;
-  }, [horario, vistaTab, grupoSeleccionadoId]);
+  }, [horario, vistaTab, grupoSeleccionadoId, gruposVisibles, grupos]);
 
   const [mostrarModalExportar, setMostrarModalExportar] = useState<boolean>(false);
   const [mostrarChat, setMostrarChat] = useState<boolean>(true);
@@ -222,8 +224,9 @@ export default function EditorHorarios({
     if (!horario?.celdas) return null;
 
     if (vistaTab === "GRUPO") {
+      const idsValidos = [grupoSeleccionadoId, grupoActivoObj?.id, grupoActivoObj?.nombre].filter(Boolean);
       return horario.celdas.find(
-        (c: any) => c.diaSemana === diaSemana && c.periodo === periodo && c.grupoId === grupoSeleccionadoId
+        (c: any) => c.diaSemana === diaSemana && c.periodo === periodo && (idsValidos.includes(c.grupoId) || idsValidos.includes(c.grupo?.id) || idsValidos.includes(c.grupo?.nombre))
       );
     } else if (vistaTab === "DOCENTE") {
       return horario.celdas.find(

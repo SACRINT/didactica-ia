@@ -13,7 +13,7 @@ interface Props {
   aulasIniciales: any[];
   docentesIniciales: any[];
   cargasIniciales: any[];
-  onGenerarClick: () => void;
+  onGenerarClick: (params?: any) => void;
   pasoInicial?: number;
   onStepChange?: (paso: number) => void;
 }
@@ -852,6 +852,7 @@ export default function WizardConfiguracion({
             asignaturaId: uac.id,
             uacName: uac.uacName,
             personalId: docenteId,
+            docenteId: docenteId,
             horasSemanales: uac.horasSemanales || 3,
             tipo: uac.tipo || "fundamental"
           });
@@ -874,17 +875,35 @@ export default function WizardConfiguracion({
           config: {
             diasLectivos: 5,
             horasPorDia: numPeriodos,
-            horaInicio
+            horaInicio,
+            periodoActivo
           },
           grupos,
           aulas: aulasIniciales.length > 0 ? aulasIniciales : [{ nombre: "Aula General", tipo: "REGULAR" }],
-          cargas: cargasCompletas
+          cargas: cargasCompletas,
+          escuela: {
+            mapaCurricularCompletado: true,
+          }
         })
       });
       const data = await res.json();
       if (data.success) {
         toast.success("Configuración guardada correctamente");
-        onGenerarClick();
+        onGenerarClick({
+          grupos,
+          docentes,
+          aulas: aulasIniciales.length > 0 ? aulasIniciales : [{ id: "aula-gen", nombre: "Aula General", tipo: "REGULAR" }],
+          cargas: cargasCompletas,
+          config: {
+            diasLectivos: 5,
+            horasPorDia: numPeriodos,
+            horaInicio,
+            periodoActivo
+          },
+          diasLectivos: 5,
+          horasPorDia: numPeriodos,
+          horaInicio
+        });
       } else {
         toast.error(data.error || "Error al guardar configuración");
       }

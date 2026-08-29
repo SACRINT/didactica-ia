@@ -37,17 +37,6 @@ export async function GET(req: NextRequest) {
       duracionReceso: 20,
     };
 
-    // Estructura de escuela (usando datos del teacher + config)
-    const escuela = {
-      id: teacherId,
-      cct: teacher.cct || teacher.school_name || "SIN CCT",
-      nombre: teacher.school_name || "Mi Plantel",
-      gruposPrimerAno: configDB?.g1 ?? 1,
-      gruposSegundoAno: configDB?.g2 ?? 1,
-      gruposTercerAno: configDB?.g3 ?? 1,
-      mapaCurricularCompletado: configDB?.mapa_curricular_completado ?? false,
-    };
-
     // ── Grupos guardados ───────────────────────────────────────────────
     let gruposRows: any[] = [];
     try {
@@ -64,6 +53,26 @@ export async function GET(req: NextRequest) {
         ORDER BY semestre ASC, nombre ASC
       `;
     } catch { /* tabla no existe */ }
+
+    // Estructura de escuela (usando datos del teacher + config)
+    const tieneGruposDB = gruposRows.length > 0;
+    const escuela = {
+      id: teacherId,
+      cct: teacher.cct || teacher.school_name || "SIN CCT",
+      nombre: teacher.school_name || "Mi Plantel",
+      gruposPrimerAno: configDB?.g1 ?? 1,
+      gruposSegundoAno: configDB?.g2 ?? 1,
+      gruposTercerAno: configDB?.g3 ?? 1,
+      mapaCurricularCompletado: configDB?.mapa_curricular_completado !== undefined ? Boolean(configDB.mapa_curricular_completado) : tieneGruposDB,
+    };
+
+    // Si tiene grupos guardados pero la bandera estaba en false, actualizarla
+    if (tieneGruposDB && !configDB?.mapa_curricular_completado) {
+      try {
+        await sql()`UPDATE horario_config SET mapa_curricular_completado = TRUE WHERE teacher_id = ${teacherId}::uuid`;
+        escuela.mapaCurricularCompletado = true;
+      } catch {}
+    }
 
     // ── Cargas guardadas ───────────────────────────────────────────────
     let cargasRows: any[] = [];
@@ -138,7 +147,7 @@ export async function GET(req: NextRequest) {
       aulas,
       docentes,
       cargas,
-      horario: null, // horario generado: por ahora siempre null (fase futura)
+      horario: configDB?.horario_generado || null,
     });
   } catch (error: any) {
     console.error("[api/horarios/configuracion GET]", error);
@@ -166,7 +175,7 @@ export async function POST(req: NextRequest) {
     const g1 = escuelaBody?.gruposPrimerAno  ?? config?.g1  ?? 1;
     const g2 = escuelaBody?.gruposSegundoAno ?? config?.g2  ?? 1;
     const g3 = escuelaBody?.gruposTercerAno  ?? config?.g3  ?? 1;
-    const mapaDone = escuelaBody?.mapaCurricularCompletado ?? false;
+    const mapaDone = true; // Si se guarda configuración desde el Wizard, siempre está completado
 
     try {
       await sql()`
@@ -188,7 +197,7 @@ export async function POST(req: NextRequest) {
           g1                        = EXCLUDED.g1,
           g2                        = EXCLUDED.g2,
           g3                        = EXCLUDED.g3,
-          mapa_curricular_completado= EXCLUDED.mapa_curricular_completado,
+          mapa_curricular_completado= TRUE,
           updated_at                = NOW()
       `;
     } catch (e) {

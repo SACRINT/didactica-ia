@@ -65,10 +65,11 @@ export default function HorariosDashboardClient({
 
       if (data.escuela) {
         setEscuelaState(data.escuela);
-        // ── Abrir modal de mapa curricular automáticamente si no está completo ──
-        // (replica la lógica de SISAT-ATP)
-        if (data.escuela.mapaCurricularCompletado === false) {
+        // Solo abrir el modal si NO se ha completado Y NO existen grupos previamente guardados
+        if (data.escuela.mapaCurricularCompletado === false && (!data.grupos || data.grupos.length === 0)) {
           setMapaModalAbierto(true);
+        } else {
+          setMapaModalAbierto(false);
         }
       }
       if (data.config) setConfig(data.config);
@@ -81,21 +82,22 @@ export default function HorariosDashboardClient({
           grupoId: c.grupoId,
           asignaturaId: c.asignaturaId || c.uacName,
           uacName: c.uacName || '',
-          personalId: c.personalId,
+          personalId: c.personalId || c.docenteId,
+          docenteId: c.docenteId || c.personalId,
           horasSemanales: c.horasSemanales,
           requiereAulaEspecial: c.requiereAulaEspecial || false,
         }));
         setCargas(cargasNormalizadas);
       }
 
-      if (data.horario) {
+      if (data.horario && Array.isArray(data.horario.celdas) && data.horario.celdas.length > 0) {
         setHorario(data.horario);
         setModo('EDITOR');
         setPasoActual(4);
       } else {
         setModo('WIZARD');
-        // Si ya hay grupos guardados, ir al paso 2; si no, paso 1
-        setPasoActual(data.grupos?.length > 0 ? 2 : 1);
+        // Si ya hay grupos guardados, ir al paso 2 o 3; si no, paso 1
+        setPasoActual(data.grupos?.length > 0 ? 3 : 1);
       }
     } catch (e) {
       console.error('Error cargando configuración de horarios:', e);
@@ -105,19 +107,33 @@ export default function HorariosDashboardClient({
     }
   };
 
-  const handleGenerarHorarioIA = async () => {
+  const handleGenerarHorarioIA = async (paramsFromWizard?: any) => {
     setLoading(true);
     try {
+      const finalGrupos = paramsFromWizard?.grupos || grupos;
+      const finalDocentes = paramsFromWizard?.docentes || docentes;
+      const finalAulas = paramsFromWizard?.aulas || (aulas.length > 0 ? aulas : [{ id: 'aula-gen', nombre: 'Aula General', tipo: 'REGULAR' }]);
+      const finalCargas = paramsFromWizard?.cargas || cargas;
+      const finalConfig = paramsFromWizard?.config || config || { horasPorDia: 6, diasLectivos: 5 };
+
+      if (paramsFromWizard?.grupos) setGrupos(paramsFromWizard.grupos);
+      if (paramsFromWizard?.docentes) setDocentes(paramsFromWizard.docentes);
+      if (paramsFromWizard?.cargas) setCargas(paramsFromWizard.cargas);
+      if (paramsFromWizard?.config) setConfig(paramsFromWizard.config);
+
       const res = await fetch('/api/horarios/generar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           params: {
-            grupos,
-            docentes,
-            aulas: aulas.length > 0 ? aulas : [{ id: 'aula-gen', nombre: 'Aula General', tipo: 'REGULAR' }],
-            cargas,
-            config: config || { horasPorDia: 6, diasLectivos: 5 },
+            grupos: finalGrupos,
+            docentes: finalDocentes,
+            aulas: finalAulas,
+            cargas: finalCargas,
+            diasLectivos: finalConfig.diasLectivos || 5,
+            horasPorDia: finalConfig.horasPorDia || 6,
+            horaInicio: finalConfig.horaInicio || '08:00',
+            config: finalConfig,
           },
         }),
       });
