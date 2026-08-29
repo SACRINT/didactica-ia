@@ -310,13 +310,17 @@ export default function EditorHorarios({
           horarioId: horario.id,
           mensaje: userMsg,
           slotsLibresBloqueados: Array.from(slotsLibresBloqueados),
-          celdas: horario.celdas
+          celdas: horario.celdas,
+          historialConversacion: chatHistorial
         })
       });
 
       const data = await res.json();
       if (data.success) {
         setHorario(data.horario);
+        if (onGuardarHorario) {
+          onGuardarHorario(data.horario);
+        }
         if (data.horario?.scoreMetricas?.slotsLibresBloqueados && Array.isArray(data.horario.scoreMetricas.slotsLibresBloqueados)) {
           const nuevosSlots = new Set<string>(data.horario.scoreMetricas.slotsLibresBloqueados);
           setSlotsLibresBloqueados(nuevosSlots);
@@ -328,7 +332,7 @@ export default function EditorHorarios({
         }
         setChatHistorial(data.horario.mensajesChat || []);
         setHayCambiosSinGuardar(false);
-        toast.success("Ajuste procesado por el Asistente IA");
+        toast.success("✨ ¡Horario reorganizado con éxito por la IA!");
       } else {
         toast.error(data.error || "Error al procesar mensaje");
       }

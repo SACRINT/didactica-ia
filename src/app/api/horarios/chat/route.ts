@@ -141,63 +141,38 @@ export async function POST(req: NextRequest) {
 
           const restriccionMaxHrsDia = accion.restriccionDistribucion === "MAX_1_HR_DIA" ? 1 : 2;
 
-          // Acumular bloqueos de docentes
-          if (accion.bloqueosDocentes && Array.isArray(accion.bloqueosDocentes)) {
-            for (const bd of accion.bloqueosDocentes) {
-              if (bd.diasIndisponibles && Array.isArray(bd.diasIndisponibles)) {
-                for (const d of bd.diasIndisponibles) {
-                  for (let p = 1; p <= horasPorDia; p++) {
-                    slotsLibresBloqueados.push(`${d}_${p}_${bd.docenteId}`);
-                  }
-                }
-              }
-              if (bd.periodosIndisponibles && Array.isArray(bd.periodosIndisponibles)) {
-                for (const pi of bd.periodosIndisponibles) {
-                  slotsLibresBloqueados.push(`${pi.dia}_${pi.periodo}_${bd.docenteId}`);
-                }
-              }
-            }
-          }
-
-          // Acumular bloqueos de grupos
-          if (accion.bloqueosGrupos && Array.isArray(accion.bloqueosGrupos)) {
-            for (const bg of accion.bloqueosGrupos) {
-              if (bg.diasIndisponibles && Array.isArray(bg.diasIndisponibles)) {
-                for (const d of bg.diasIndisponibles) {
-                  for (let p = 1; p <= horasPorDia; p++) {
-                    slotsLibresBloqueados.push(`${d}_${p}_${bg.grupoId}`);
-                  }
-                }
-              }
-              if (bg.periodosIndisponibles && Array.isArray(bg.periodosIndisponibles)) {
-                for (const pi of bg.periodosIndisponibles) {
-                  slotsLibresBloqueados.push(`${pi.dia}_${pi.periodo}_${bg.grupoId}`);
-                }
-              }
-            }
-          }
-
-          slotsLibresBloqueados = Array.from(new Set(slotsLibresBloqueados));
-
-          // Preparar cargas para el Solver
-          const cargasParaSolver = cargasRows.length > 0
-            ? cargasRows.map((c: any) => ({
-                id: c.id,
-                docenteId: c.personalId,
+          // Reconstruir cargas completas agrupando las celdas activas
+          const cargasMap = new Map<string, any>();
+          for (const c of clientCeldas) {
+            if (!c.docenteId || c.docenteId === "__BLOQUEADO__") continue;
+            const key = `${c.grupoId}___${c.docenteId}___${c.asignaturaId || c.uacName}`;
+            if (!cargasMap.has(key)) {
+              cargasMap.set(key, {
+                id: `carga_${cargasMap.size}`,
                 grupoId: c.grupoId,
-                asignaturaId: c.uacName,
-                horasSemanales: c.horasSemanales || 3,
-                requiereAulaEspecial: c.requiereAulaEspecial
-              }))
-            : clientCeldas.map((c: any, idx: number) => ({
-                id: `carga_chat_${idx}`,
                 docenteId: c.docenteId,
-                grupoId: c.grupoId,
                 asignaturaId: c.asignaturaId || c.uacName || "MATERIA",
-                horasSemanales: 1,
-                requiereAulaEspecial: false
-              }));
+                horasSemanales: 0,
+                aulaEspecialId: c.aulaId || undefined,
+                requiereAulaEspecial: !!c.aulaId
+              });
+            }
+            cargasMap.get(key)!.horasSemanales += 1;
+          }
 
+          let cargasParaSolver = Array.from(cargasMap.values());
+          if (cargasParaSolver.length === 0 && cargasRows.length > 0) {
+            cargasParaSolver = cargasRows.map((c: any) => ({
+              id: c.id,
+              docenteId: c.personalId,
+              grupoId: c.grupoId,
+              asignaturaId: c.uacName,
+              horasSemanales: c.horasSemanales || 3,
+              requiereAulaEspecial: c.requiereAulaEspecial
+            }));
+          }
+
+          // Resolver con el nuevo Solver Min-Conflicts
           const resultadoSolver = resolverHorario({
             diasLectivos,
             horasPorDia,
@@ -216,7 +191,7 @@ export async function POST(req: NextRequest) {
             slotsLibresBloqueados
           });
 
-          if (resultadoSolver.exito && resultadoSolver.celdas && resultadoSolver.celdas.length > 0) {
+          if (resultadoSolver.celdas && resultadoSolver.celdas.length > 0) {
             celdasResultado = resultadoSolver.celdas.map((c, idx) => ({
               id: `celda_res_${idx}_${c.diaSemana}_${c.periodo}_${c.grupoId}`,
               diaSemana: c.diaSemana,
@@ -237,17 +212,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const nuevoHistorial = [
+      ...(body.historialConversacion || []),
+      { role: "user", content: mensaje },
+      { role: "assistant", content: respuestaIA.explicacion }
+    ];
+
     const horarioActualizado = {
       id: horarioId,
       config: { horasPorDia, diasLectivos },
       scoreMetricas,
       celdas: celdasResultado,
-      mensajesChat: [
-        ...(body.historialConversacion || []),
-        { role: "user", content: mensaje },
-        { role: "assistant", content: respuestaIA.explicacion }
-      ]
+      mensajesChat: nuevoHistorial
     };
+
+    // 5. Persistir permanentemente en base de datos Postgres Neon
+    try {
+      await sql()`
+        UPDATE horario_config
+        SET horario_generado = ${JSON.stringify(horarioActualizado)}
+        WHERE teacher_id = ${teacherId}::uuid
+      `;
+    } catch (e) {
+      console.warn("[api/horarios/chat] Error actualizando horario_generado:", e);
+    }
 
     return NextResponse.json({
       success: true,

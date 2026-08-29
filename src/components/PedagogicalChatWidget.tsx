@@ -317,13 +317,13 @@ export default function PedagogicalChatWidget({ uacContext, paecContext }: { uac
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, fontFamily: 'inherit' }}>
+    <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 9999, fontFamily: 'inherit' }}>
       {/* Panel Desplegable del Chat */}
       {isOpen && (
         <div
           style={{
             position: 'absolute',
-            bottom: '70px',
+            bottom: '60px',
             right: 0,
             width: '390px',
             height: '570px',
@@ -575,56 +575,64 @@ export default function PedagogicalChatWidget({ uacContext, paecContext }: { uac
         </div>
       )}
 
-      {/* Botón Flotante Principal */}
-      <button
-        type="button"
-        onClick={() => {
-          if (isOpen && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-          }
-          setIsOpen(!isOpen);
-        }}
-        style={{
-          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-          color: '#ffffff',
-          border: 'none',
-          padding: '0.85rem 1.25rem',
-          borderRadius: '50px',
-          fontWeight: 800,
-          fontSize: '0.875rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          boxShadow: '0 10px 25px rgba(37, 99, 235, 0.4)',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 14px 28px rgba(37, 99, 235, 0.5)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 10px 25px rgba(37, 99, 235, 0.4)';
-        }}
-      >
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Sparkles style={{ width: '20px', height: '20px' }} />
-          <span
-            style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              width: '8px',
-              height: '8px',
-              background: '#22c55e',
-              borderRadius: '50%',
-              boxShadow: '0 0 6px #22c55e'
-            }}
-          ></span>
-        </div>
-        <span>{isOpen ? 'Cerrar Asistente' : '🤖 Asesor Didáctico IA 24/7'}</span>
-      </button>
+      {/* Botón Flotante Principal Circular (FAB) */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button
+          type="button"
+          onClick={() => {
+            if (isOpen && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+              window.speechSynthesis.cancel();
+            }
+            setIsOpen(!isOpen);
+          }}
+          title={isOpen ? 'Cerrar Asesor Didáctico' : 'Asesor Didáctico IA 24/7 (Clic para abrir)'}
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            background: isOpen
+              ? '#334155'
+              : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            color: '#ffffff',
+            border: '2px solid rgba(255, 255, 255, 0.2)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 20px rgba(37, 99, 235, 0.45)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            padding: 0
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.08)';
+            e.currentTarget.style.boxShadow = '0 12px 25px rgba(37, 99, 235, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.45)';
+          }}
+        >
+          {isOpen ? (
+            <X style={{ width: '22px', height: '22px' }} />
+          ) : (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bot style={{ width: '24px', height: '24px' }} />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  width: '9px',
+                  height: '9px',
+                  background: '#22c55e',
+                  borderRadius: '50%',
+                  boxShadow: '0 0 6px #22c55e'
+                }}
+              ></span>
+            </div>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
