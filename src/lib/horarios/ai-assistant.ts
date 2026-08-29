@@ -73,6 +73,11 @@ REGLA DE VALIDACIÓN MATEMÁTICA DE DÍAS LIBRES (CRÍTICO):
 3. Si piden bloquear horas o periodos específicos (ej: "no pongas clases en la 6ta hora a Nemorio el viernes"):
    - Agrega en 'bloqueosDocentes' el 'docenteId' con 'periodosIndisponibles': [{ "dia": 5, "periodo": 6 }].
 
+4. Si piden que las horas libres de un docente sean "intermedias" (evitando primera o última hora de salida/entrada):
+   - Verifica cuántas horas libres tiene el docente: HorasLibres = (diasLectivos × horasPorDia) - horasAsignadas.
+   - Si un docente tiene 27 horas asignadas en una jornada de 30 horas, solo tiene 3 horas libres en toda la semana.
+   - En este caso, NO le bloquees los periodos 1 y 6 de los 5 días (porque eso bloquearía 10 slots y no cabrían sus 27 horas de clase). Explica que sus 27 horas de clase se distribuirán cubriendo entradas y salidas para que sus 3 huecos queden en medio, dejando 'periodosIndisponibles: []'.
+
 FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
 {
   "explicacion": "Explicación amable y profesional sobre la factibilidad y las acciones aplicadas, confirmando explícitamente que se respetan los bloqueos de horas libres solicitados",

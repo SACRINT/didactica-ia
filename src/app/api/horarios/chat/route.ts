@@ -172,6 +172,35 @@ export async function POST(req: NextRequest) {
             }));
           }
 
+          // Sanitizar restricciones para asegurar que no excedan las horas libres del docente
+          const restriccionesSanitizadas = (accion.bloqueosDocentes || []).map((r: any) => {
+            const docInfo = docentes.find((d: any) => d.id === r.docenteId);
+            const hrsAsig = docInfo?.horasAsignadas || 20;
+            const diasIndisp = r.diasIndisponibles || [];
+            const diasDisponibles = Math.max(1, diasLectivos - diasIndisp.length);
+            const maxCapacidadDias = diasDisponibles * horasPorDia;
+
+            if (hrsAsig > maxCapacidadDias) {
+              return {
+                docenteId: r.docenteId,
+                diasIndisponibles: [],
+                periodosIndisponibles: []
+              };
+            }
+
+            let periodosValidos = r.periodosIndisponibles || [];
+            const maxPeriodosPermitidos = maxCapacidadDias - hrsAsig;
+            if (periodosValidos.length > maxPeriodosPermitidos) {
+              periodosValidos = periodosValidos.slice(0, Math.max(0, maxPeriodosPermitidos));
+            }
+
+            return {
+              docenteId: r.docenteId,
+              diasIndisponibles: diasIndisp,
+              periodosIndisponibles: periodosValidos
+            };
+          });
+
           // Resolver con el nuevo Solver Min-Conflicts
           const resultadoSolver = resolverHorario({
             diasLectivos,
@@ -187,22 +216,29 @@ export async function POST(req: NextRequest) {
             aulas: [{ id: "aula-general", nombre: "Aula General", tipo: "REGULAR" }],
             cargas: cargasParaSolver,
             celdasFijas: celdasFijasExistentes,
-            restriccionesDocentes: accion.bloqueosDocentes || [],
+            restriccionesDocentes: restriccionesSanitizadas,
             slotsLibresBloqueados
           });
 
           if (resultadoSolver.celdas && resultadoSolver.celdas.length > 0) {
-            celdasResultado = resultadoSolver.celdas.map((c, idx) => ({
-              id: `celda_res_${idx}_${c.diaSemana}_${c.periodo}_${c.grupoId}`,
-              diaSemana: c.diaSemana,
-              periodo: c.periodo,
-              grupoId: c.grupoId,
-              docenteId: c.docenteId,
-              asignaturaId: c.asignaturaId,
-              aulaId: c.aulaId || null,
-              cargaId: c.cargaId || null,
-              esBloqueado: !!c.esBloqueado
-            }));
+            celdasResultado = resultadoSolver.celdas.map((c, idx) => {
+              const grpObj = grupos.find((g: any) => g.id === c.grupoId || g.nombre === c.grupoId);
+              const docObj = docentesRows.find((d: any) => d.id === c.docenteId);
+              return {
+                id: `celda_res_${idx}_${c.diaSemana}_${c.periodo}_${c.grupoId}`,
+                diaSemana: c.diaSemana,
+                periodo: c.periodo,
+                grupoId: c.grupoId,
+                grupo: grpObj ? { id: grpObj.id, nombre: grpObj.nombre, semestre: grpObj.semestre } : undefined,
+                docenteId: c.docenteId,
+                docente: docObj ? { id: docObj.id, nombre: docObj.nombre, apellidoPaterno: docObj.apellido_paterno } : undefined,
+                asignaturaId: c.asignaturaId,
+                asignatura: { id: c.asignaturaId, uacName: c.asignaturaId },
+                aulaId: c.aulaId || null,
+                cargaId: c.cargaId || null,
+                esBloqueado: !!c.esBloqueado
+              };
+            });
             scoreMetricas = {
               ...resultadoSolver.metricas,
               slotsLibresBloqueados

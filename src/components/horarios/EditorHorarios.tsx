@@ -163,6 +163,7 @@ export default function EditorHorarios({
     slotsLibresBloqueados.has(`${dia}_${periodo}_${filtroId}`);
 
   const [draggedCelda, setDraggedCelda] = useState<any>(null);
+  const [dragOverPos, setDragOverPos] = useState<{ dia: number; periodo: number } | null>(null);
 
   const diasLectivos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
   const numHorasPorDia = horarioInicial?.config?.horasPorDia || horario?.config?.horasPorDia || 6;
@@ -201,8 +202,9 @@ export default function EditorHorarios({
   const getNombreAsignaturaCelda = (celda: any) => {
     if (!celda) return "";
     if (celda.asignatura?.uacName) return celda.asignatura.uacName;
+    if (celda.uacName) return celda.uacName;
     
-    const cargaMatch = cargas.find(c => c.asignaturaId === celda.asignaturaId || c.id === celda.cargaId);
+    const cargaMatch = cargas.find(c => c.asignaturaId === celda.asignaturaId || c.id === celda.cargaId || c.uacName === celda.asignaturaId);
     if (cargaMatch?.uacName) return cargaMatch.uacName;
 
     return celda.asignaturaId || "UAC / Materia";
@@ -217,7 +219,137 @@ export default function EditorHorarios({
     if (docObj) {
       return `${docObj.nombre} ${docObj.apellidoPaterno || ""}`.trim();
     }
-    return "Docente";
+    return celda.docenteId || "Docente";
+  };
+
+  const getNombreGrupoCelda = (celda: any) => {
+    if (!celda) return "";
+    if (celda.grupo?.nombre) return `Grupo ${celda.grupo.nombre}`;
+    const gObj = grupos.find((g: any) => g.id === celda.grupoId || g.nombre === celda.grupoId);
+    if (gObj) return `Grupo ${gObj.nombre}`;
+    return `Grupo ${celda.grupoId || ""}`;
+  };
+
+  // Handlers de Drag & Drop
+  const handleDragStart = (e: React.DragEvent, celda: any) => {
+    if (celda.esBloqueado) {
+      e.preventDefault();
+      toast.error("🔒 Esta celda está fijada con candado. Desbloquéala antes de moverla.");
+      return;
+    }
+    setDraggedCelda(celda);
+    e.dataTransfer.setData("text/plain", celda.id || `${celda.diaSemana}_${celda.periodo}_${celda.grupoId}`);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, dia: number, periodo: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!dragOverPos || dragOverPos.dia !== dia || dragOverPos.periodo !== periodo) {
+      setDragOverPos({ dia, periodo });
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverPos(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCelda(null);
+    setDragOverPos(null);
+  };
+
+  const handleDropOnSlot = (targetDia: number, targetPeriodo: number) => {
+    setDragOverPos(null);
+    if (!draggedCelda || !horario?.celdas) return;
+
+    const sourceDia = draggedCelda.diaSemana;
+    const sourcePeriodo = draggedCelda.periodo;
+
+    // Si se soltó en la misma posición, no hacer nada
+    if (sourceDia === targetDia && sourcePeriodo === targetPeriodo) {
+      setDraggedCelda(null);
+      return;
+    }
+
+    if (draggedCelda.esBloqueado) {
+      toast.error("🔒 La materia seleccionada está fijada con candado.");
+      setDraggedCelda(null);
+      return;
+    }
+
+    // Buscar si en el grupo de la celda arrastrada ya hay una materia en la posición destino
+    const targetCeldaEnGrupo = horario.celdas.find(
+      (c: any) => c.diaSemana === targetDia && c.periodo === targetPeriodo && c.grupoId === draggedCelda.grupoId
+    );
+
+    if (targetCeldaEnGrupo?.esBloqueado) {
+      toast.error("🔒 La celda de destino está fijada con candado. Desbloquéala para permitir el intercambio.");
+      setDraggedCelda(null);
+      return;
+    }
+
+    // Verificar si el docente de la celda arrastrada ya está ocupado en otro grupo a esa misma hora en el día destino
+    const docenteOcupadoEnDestino = horario.celdas.find(
+      (c: any) =>
+        c.diaSemana === targetDia &&
+        c.periodo === targetPeriodo &&
+        c.docenteId === draggedCelda.docenteId &&
+        c.id !== draggedCelda.id &&
+        c.grupoId !== draggedCelda.grupoId
+    );
+
+    if (docenteOcupadoEnDestino) {
+      const grpConflicto = grupos.find(g => g.id === docenteOcupadoEnDestino.grupoId)?.nombre || docenteOcupadoEnDestino.grupoId;
+      toast.error(`⚠️ Conflicto: El docente ya tiene clase en ${grpConflicto} en ese horario.`);
+      setDraggedCelda(null);
+      return;
+    }
+
+    // Si hay intercambio (swap), verificar si el docente de la celda destino no se empalma en la posición origen
+    if (targetCeldaEnGrupo) {
+      const docenteDestinoOcupadoEnOrigen = horario.celdas.find(
+        (c: any) =>
+          c.diaSemana === sourceDia &&
+          c.periodo === sourcePeriodo &&
+          c.docenteId === targetCeldaEnGrupo.docenteId &&
+          c.id !== targetCeldaEnGrupo.id &&
+          c.grupoId !== targetCeldaEnGrupo.grupoId
+      );
+
+      if (docenteDestinoOcupadoEnOrigen) {
+        const grpConflicto = grupos.find(g => g.id === docenteDestinoOcupadoEnOrigen.grupoId)?.nombre || docenteDestinoOcupadoEnOrigen.grupoId;
+        toast.error(`⚠️ Conflicto: El docente de intercambio ya tiene clase en ${grpConflicto} en el horario de origen.`);
+        setDraggedCelda(null);
+        return;
+      }
+    }
+
+    // Aplicar el movimiento / swap en la lista de celdas
+    const nuevasCeldas = horario.celdas.map((c: any) => {
+      // Celda arrastrada -> pasa a targetDia, targetPeriodo
+      if (c.id === draggedCelda.id || (c.diaSemana === sourceDia && c.periodo === sourcePeriodo && c.grupoId === draggedCelda.grupoId)) {
+        return { ...c, diaSemana: targetDia, periodo: targetPeriodo };
+      }
+      // Celda de destino (si existía) -> pasa a sourceDia, sourcePeriodo (SWAP)
+      if (targetCeldaEnGrupo && (c.id === targetCeldaEnGrupo.id || (c.diaSemana === targetDia && c.periodo === targetPeriodo && c.grupoId === targetCeldaEnGrupo.grupoId))) {
+        return { ...c, diaSemana: sourceDia, periodo: sourcePeriodo };
+      }
+      return c;
+    });
+
+    const horarioActualizado = { ...horario, celdas: nuevasCeldas };
+    setHorario(horarioActualizado);
+    setHayCambiosSinGuardar(true);
+    setDraggedCelda(null);
+
+    const matNombre = getNombreAsignaturaCelda(draggedCelda);
+    if (targetCeldaEnGrupo) {
+      const matTargetNombre = getNombreAsignaturaCelda(targetCeldaEnGrupo);
+      toast.success(`🔄 Intercambio: "${matNombre}" ⇄ "${matTargetNombre}"`);
+    } else {
+      toast.success(`✅ "${matNombre}" reubicada al Día ${targetDia}, Hora ${targetPeriodo}`);
+    }
   };
 
   const getCeldaInfo = (diaSemana: number, periodo: number) => {
@@ -365,59 +497,6 @@ export default function EditorHorarios({
     } catch (err) {
       toast.error("Error de conexión al limpiar el chat");
     }
-  };
-
-  const handleDragStart = (e: React.DragEvent, celda: any) => {
-    if (celda.esBloqueado) {
-      e.preventDefault();
-      toast.error("🔒 Celda fijada. Desbloquéela antes de moverla.");
-      return;
-    }
-    setDraggedCelda(celda);
-    e.dataTransfer.setData("text/plain", celda.id || "");
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDropOnSlot = (targetDia: number, targetPeriodo: number) => {
-    if (!draggedCelda) return;
-
-    if (draggedCelda.diaSemana === targetDia && draggedCelda.periodo === targetPeriodo) {
-      setDraggedCelda(null);
-      return;
-    }
-
-    const resultado = reacomodarHorarioConRipple(
-      horario.celdas,
-      draggedCelda,
-      targetDia,
-      targetPeriodo,
-      numHorasPorDia,
-      slotsLibresBloqueados,
-      grupos
-    );
-
-    if (!resultado.success) {
-      toast.error(resultado.error || "No se pudo realizar el movimiento.");
-      setDraggedCelda(null);
-      return;
-    }
-
-    setHorario({ ...horario, celdas: resultado.celdasActualizadas });
-    setHayCambiosSinGuardar(true);
-
-    if (resultado.numMovidas && resultado.numMovidas > 1) {
-      toast.success(
-        `✅ Materia reubicada exitosamente. Se reacomodaron ${resultado.numMovidas - 1} clase(s) automáticamente sin empalmes.`,
-        { duration: 4000 }
-      );
-    } else {
-      toast.success(`Materia reubicada a ${diasLectivos[targetDia - 1]} Hora ${targetPeriodo}`);
-    }
-
-    setDraggedCelda(null);
   };
 
   const ejecutarExportacion = async (
@@ -920,17 +999,28 @@ export default function EditorHorarios({
                       const uacNombre = getNombreAsignaturaCelda(celda);
                       const estiloColor = getEstiloAsignatura(uacNombre);
 
+                      const isDragOver = dragOverPos?.dia === dia && dragOverPos?.periodo === p;
+
                       return (
                         <td
                           key={dia}
-                          onDragOver={handleDragOver}
+                          onDragOver={(e) => handleDragOver(e, dia, p)}
+                          onDragLeave={handleDragLeave}
                           onDrop={() => handleDropOnSlot(dia, p)}
-                          style={{ border: "1px solid #334155", height: "75px", padding: "0.3rem", verticalAlign: "top", background: celda ? "transparent" : "#0b1120" }}
+                          style={{
+                            border: isDragOver ? "2px dashed #38bdf8" : "1px solid #334155",
+                            height: "75px",
+                            padding: "0.3rem",
+                            verticalAlign: "top",
+                            background: isDragOver ? "rgba(56, 189, 248, 0.12)" : celda ? "transparent" : "#0b1120",
+                            transition: "all 0.15s ease"
+                          }}
                         >
                           {celda ? (
                             <div
                               draggable={!celda.esBloqueado}
                               onDragStart={(e) => handleDragStart(e, celda)}
+                              onDragEnd={handleDragEnd}
                               className="horario-celda-box"
                               style={{
                                 height: "100%",
@@ -942,7 +1032,9 @@ export default function EditorHorarios({
                                 padding: "0.35rem",
                                 borderRadius: "6px",
                                 cursor: celda.esBloqueado ? "not-allowed" : "grab",
-                                boxShadow: celda.esBloqueado ? "0 0 0 1px #f59e0b" : "none"
+                                boxShadow: celda.esBloqueado ? "0 0 0 1px #f59e0b" : "none",
+                                opacity: draggedCelda?.id === celda.id ? 0.4 : 1,
+                                transition: "transform 0.1s ease, box-shadow 0.1s ease"
                               }}
                             >
                               <div>
@@ -971,11 +1063,11 @@ export default function EditorHorarios({
                                   </button>
                                 </div>
                                 <p style={{ fontSize: "0.7rem", fontWeight: 800, color: "#f8fafc", margin: "0.15rem 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {vistaTab === "DOCENTE" ? `Grupo ${celda.grupo?.nombre || ""}` : getNombreDocenteCelda(celda)}
+                                  {vistaTab === "DOCENTE" ? getNombreGrupoCelda(celda) : getNombreDocenteCelda(celda)}
                                 </p>
                                 {vistaTab === "SUMARIO" && (
                                   <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "#94a3b8", margin: 0 }}>
-                                    Grupo {celda.grupo?.nombre}
+                                    {getNombreGrupoCelda(celda)}
                                   </p>
                                 )}
                               </div>
