@@ -245,21 +245,25 @@ export default function EditorHorarios({
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const validarSlotDestino = (dia: number, periodo: number, celda: any): { status: "ok" | "libre-bloqueado" | "doc-ocupado" | "candado" | "fuera-jornada"; razon?: string } => {
+  const validarSlotDestino = (dia: number, periodo: number, celda: any): {
+    status: "ok" | "cadena-ok" | "grupo-ocupado" | "libre-bloqueado" | "doc-ocupado" | "candado" | "fuera-jornada";
+    razon?: string;
+    numCeldasCadena?: number;
+  } => {
     if (!celda) return { status: "ok" };
 
     const gid = normalizarId(celda.grupoId);
     const docId = normalizarId(celda.docenteId);
     const aulaId = normalizarId(celda.aulaId);
 
-    // Validar jornada de grupo (1er semestre = 5 horas)
+    // 1. Jornada del grupo (1er semestre = 5 horas)
     const grp = grupos.find((g: any) => normalizarId(g.id) === gid);
     const maxP = grp?.horasPorDia || (grp?.semestre === 1 ? 5 : numHorasPorDia);
     if (periodo > maxP) {
-      return { status: "fuera-jornada", razon: `⚠️ Este grupo solo tiene ${maxP} horas de clase al día.` };
+      return { status: "fuera-jornada", razon: `⚠️ Este grupo tiene jornada de ${maxP}h. No cabe en Hora ${periodo}.` };
     }
 
-    // Validar si el slot es hora libre bloqueada para el docente, grupo o aula
+    // 2. Slots libres bloqueados
     if (
       esSlotLibreBloqueado(dia, periodo, docId) ||
       esSlotLibreBloqueado(dia, periodo, gid) ||
@@ -268,26 +272,76 @@ export default function EditorHorarios({
       return { status: "libre-bloqueado", razon: "🔒 Hora libre / día bloqueado con candado para este docente o grupo." };
     }
 
-    // Validar si la celda destino en el mismo grupo tiene candado
+    // 3. Celda destino con candado en el grupo
     const destBloq = horario?.celdas?.find(
-      (c: any) => c.diaSemana === dia && c.periodo === periodo && normalizarId(c.grupoId) === gid && c.esBloqueado
+      (c: any) => c.diaSemana === dia && c.periodo === periodo &&
+        normalizarId(c.grupoId) === gid && c.esBloqueado
     );
     if (destBloq) {
       return { status: "candado", razon: "🔒 La celda de destino está fijada con candado." };
     }
 
-    // Validar si el docente ya tiene clase en otro grupo en ese mismo horario
+    // 4. ¿El DOCENTE ya tiene clase en OTRO grupo a esta hora?
     const docOcupado = horario?.celdas?.find(
       (c: any) =>
-        c.diaSemana === dia &&
-        c.periodo === periodo &&
+        c.diaSemana === dia && c.periodo === periodo &&
         normalizarId(c.docenteId) === docId &&
         c.id !== celda.id &&
         normalizarId(c.grupoId) !== gid
     );
     if (docOcupado) {
       const gNom = grupos.find((g: any) => normalizarId(g.id) === normalizarId(docOcupado.grupoId))?.nombre || docOcupado.grupoId;
-      return { status: "doc-ocupado", razon: `⚠️ Conflicto: El docente ya imparte clase en ${gNom} a esta hora.` };
+      return { status: "doc-ocupado", razon: `⚠️ Conflicto: El docente ya imparte en ${gNom} a esta hora.` };
+    }
+
+    // 5. ¿El GRUPO ya tiene otra clase en este slot? (Verificación de doble capa)
+    const grupoOcupado = horario?.celdas?.find(
+      (c: any) =>
+        c.diaSemana === dia && c.periodo === periodo &&
+        normalizarId(c.grupoId) === gid &&
+        c.id !== celda.id
+    );
+
+    if (grupoOcupado) {
+      const docDesplazadoId = normalizarId(grupoOcupado.docenteId);
+      const origenDia = celda.diaSemana;
+      const origenPeriodo = celda.periodo;
+
+      const docDesplazadoLibreEnOrigen = !horario?.celdas?.some(
+        (c: any) =>
+          c.diaSemana === origenDia && c.periodo === origenPeriodo &&
+          normalizarId(c.docenteId) === docDesplazadoId &&
+          c.id !== grupoOcupado.id
+      );
+
+      const grupoLibreEnOrigen = !horario?.celdas?.some(
+        (c: any) =>
+          c.diaSemana === origenDia && c.periodo === origenPeriodo &&
+          normalizarId(c.grupoId) === gid &&
+          c.id !== celda.id
+      );
+
+      const libreBloqOrigen = esSlotLibreBloqueado(origenDia, origenPeriodo, docDesplazadoId) || esSlotLibreBloqueado(origenDia, origenPeriodo, gid);
+
+      if (docDesplazadoLibreEnOrigen && grupoLibreEnOrigen && !libreBloqOrigen && !grupoOcupado.esBloqueado) {
+        // Swap directo 1 a 1 posible
+        return {
+          status: "cadena-ok",
+          razon: `🔄 Swap directo: "${getNombreAsignaturaCelda(grupoOcupado)}" ⇄ "${getNombreAsignaturaCelda(celda)}"`,
+          numCeldasCadena: 2
+        };
+      }
+
+      // No hay swap directo — requerirá cadena multi-paso
+      const celdasGrupoMismoDia = (horario?.celdas || []).filter(
+        (c: any) => normalizarId(c.grupoId) === gid && c.diaSemana === dia
+      ).length;
+
+      return {
+        status: "grupo-ocupado",
+        razon: `⚠️ Grupo ${grp?.nombre || ""} ya tiene "${getNombreAsignaturaCelda(grupoOcupado)}". Se buscará reubicación en cadena.`,
+        numCeldasCadena: celdasGrupoMismoDia
+      };
     }
 
     return { status: "ok" };
@@ -336,8 +390,15 @@ export default function EditorHorarios({
       return;
     }
 
+    // Validación predictiva inteligente
     const validacion = validarSlotDestino(targetDia, targetPeriodo, celdaArrastrada);
-    if (validacion.status !== "ok") {
+
+    if (
+      validacion.status === "doc-ocupado" ||
+      validacion.status === "libre-bloqueado" ||
+      validacion.status === "candado" ||
+      validacion.status === "fuera-jornada"
+    ) {
       toast.error(validacion.razon || "Movimiento no permitido por restricciones.");
       draggedCeldaRef.current = null;
       setDraggedCelda(null);
@@ -351,33 +412,59 @@ export default function EditorHorarios({
       nombre: g.nombre
     }));
 
-    // 1. Intentar Reacomodo Ripple Directo / Cascada estándar
-    const resultadoRipple = reacomodarHorarioConRipple(
-      horario.celdas,
-      celdaArrastrada,
-      targetDia,
-      targetPeriodo,
-      numHorasPorDia,
-      slotsLibresBloqueados,
-      gruposInfo
-    );
+    // NIVEL 1: Movimiento directo a casilla vacía o con status "ok"
+    if (validacion.status === "ok") {
+      const resultadoRipple = reacomodarHorarioConRipple(
+        horario.celdas,
+        celdaArrastrada,
+        targetDia,
+        targetPeriodo,
+        numHorasPorDia,
+        slotsLibresBloqueados,
+        gruposInfo
+      );
 
-    if (resultadoRipple.success && resultadoRipple.celdasActualizadas) {
-      setHorario({ ...horario, celdas: resultadoRipple.celdasActualizadas });
-      setHayCambiosSinGuardar(true);
-      draggedCeldaRef.current = null;
-      setDraggedCelda(null);
+      if (resultadoRipple.success && resultadoRipple.celdasActualizadas) {
+        setHorario({ ...horario, celdas: resultadoRipple.celdasActualizadas });
+        setHayCambiosSinGuardar(true);
+        draggedCeldaRef.current = null;
+        setDraggedCelda(null);
 
-      const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
-      if (resultadoRipple.numMovidas && resultadoRipple.numMovidas > 1) {
-        toast.success(`🔄 Reubicación en cadena: ${resultadoRipple.numMovidas} clases reacomodadas sin empalmes.`);
-      } else {
+        const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
         toast.success(`✅ "${matNombre}" reubicada al Día ${targetDia}, Hora ${targetPeriodo}`);
+        return;
       }
-      return;
     }
 
-    // 2. Si Ripple falla, ejecutar Búsqueda de Cadena de Swaps BFS/DFS Multi-Paso (Ultra-Inteligente)
+    // NIVEL 2: Swap directo 1 a 1 (status "cadena-ok")
+    if (validacion.status === "cadena-ok" || validacion.status === "ok") {
+      const resultadoRipple = reacomodarHorarioConRipple(
+        horario.celdas,
+        celdaArrastrada,
+        targetDia,
+        targetPeriodo,
+        numHorasPorDia,
+        slotsLibresBloqueados,
+        gruposInfo
+      );
+
+      if (resultadoRipple.success && resultadoRipple.celdasActualizadas) {
+        setHorario({ ...horario, celdas: resultadoRipple.celdasActualizadas });
+        setHayCambiosSinGuardar(true);
+        draggedCeldaRef.current = null;
+        setDraggedCelda(null);
+
+        const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
+        const celdaDestino = horario.celdas.find(
+          (c: any) => c.diaSemana === targetDia && c.periodo === targetPeriodo && normalizarId(c.grupoId) === normalizarId(celdaArrastrada.grupoId)
+        );
+        const matDest = celdaDestino ? getNombreAsignaturaCelda(celdaDestino) : "otra materia";
+        toast.success(`🔄 Swap directo exitoso: "${matNombre}" ⇄ "${matDest}"`);
+        return;
+      }
+    }
+
+    // NIVEL 3: Búsqueda de Cadena de Swaps BFS/DFS Multi-Paso (Cross-Group)
     const resultadoCadena = buscarCadenaSwap(
       horario.celdas,
       celdaArrastrada,
@@ -403,7 +490,24 @@ export default function EditorHorarios({
       return;
     }
 
-    toast.error(resultadoRipple.error || resultadoCadena.error || "No fue posible reubicar la clase sin generar empalmes.");
+    // NIVEL 4: Explicación detallada del conflicto si todo falló
+    const celdaOcupante = horario.celdas.find(
+      (c: any) =>
+        c.diaSemana === targetDia &&
+        c.periodo === targetPeriodo &&
+        normalizarId(c.grupoId) === normalizarId(celdaArrastrada.grupoId) &&
+        c.id !== celdaArrastrada.id
+    );
+    const nombreOcupante = celdaOcupante ? getNombreAsignaturaCelda(celdaOcupante) : "otra materia";
+    const docOcupante = celdaOcupante
+      ? docentes.find((d: any) => normalizarId(d.id) === normalizarId(celdaOcupante.docenteId))
+      : null;
+    const nombreDoc = docOcupante ? `${docOcupante.nombre} ${docOcupante.apellidoPaterno || ""}`.trim() : "";
+    const grpNombre = grupos.find((g: any) => normalizarId(g.id) === normalizarId(celdaArrastrada.grupoId))?.nombre || "";
+
+    toast.error(
+      `❌ Conflicto: El Grupo ${grpNombre} ya tiene "${nombreOcupante}"${nombreDoc ? ` (${nombreDoc})` : ""} en Hora ${targetPeriodo}. No fue posible encontrar una reubicación en cadena sin empalmes.`
+    );
     draggedCeldaRef.current = null;
     setDraggedCelda(null);
   };
@@ -1057,25 +1161,33 @@ export default function EditorHorarios({
 
                       const isDragOver = dragOverPos?.dia === dia && dragOverPos?.periodo === p;
                       const validacionPreview = isDragOver && draggedCelda ? validarSlotDestino(dia, p, draggedCelda) : null;
-                      const esValido = validacionPreview ? validacionPreview.status === "ok" : true;
 
-                      const borderEstilo = isDragOver
-                        ? esValido
-                          ? "2px solid #22c55e"
-                          : "2px solid #ef4444"
-                        : "1px solid #334155";
+                      const getPreviewColors = (status: string | null | undefined) => {
+                        switch (status) {
+                          case "ok":
+                            return { border: "2px solid #22c55e", bg: "rgba(34, 197, 94, 0.25)" }; // Verde: slot libre
+                          case "cadena-ok":
+                            return { border: "2px solid #f59e0b", bg: "rgba(245, 158, 11, 0.25)" }; // Amarillo: swap directo 1 a 1
+                          case "grupo-ocupado":
+                            return { border: "2px solid #3b82f6", bg: "rgba(59, 130, 246, 0.25)" }; // Azul: reubicación en cadena
+                          case "doc-ocupado":
+                          case "libre-bloqueado":
+                          case "candado":
+                          case "fuera-jornada":
+                            return { border: "2px solid #ef4444", bg: "rgba(239, 68, 68, 0.3)" }; // Rojo: no permitido
+                          default:
+                            return { border: "1px solid #334155", bg: celda ? "transparent" : "#0b1120" };
+                        }
+                      };
 
-                      const backgroundEstilo = isDragOver
-                        ? esValido
-                          ? "rgba(34, 197, 94, 0.18)"
-                          : "rgba(239, 68, 68, 0.22)"
-                        : celda
-                        ? "transparent"
-                        : "#0b1120";
+                      const preview = isDragOver && validacionPreview
+                        ? getPreviewColors(validacionPreview.status)
+                        : { border: "1px solid #334155", bg: celda ? "transparent" : "#0b1120" };
 
                       return (
                         <td
                           key={dia}
+                          title={isDragOver && validacionPreview?.razon ? validacionPreview.razon : ""}
                           onDragOver={(e) => handleDragOver(e, dia, p)}
                           onDragLeave={handleDragLeave}
                           onDrop={(e) => {
@@ -1084,11 +1196,11 @@ export default function EditorHorarios({
                             handleDropOnSlot(dia, p);
                           }}
                           style={{
-                            border: borderEstilo,
+                            border: preview.border,
                             height: "75px",
                             padding: "0.3rem",
                             verticalAlign: "top",
-                            background: backgroundEstilo,
+                            background: preview.bg,
                             transition: "all 0.15s ease",
                             position: "relative"
                           }}

@@ -280,16 +280,43 @@ export function reacomodarHorarioConRipple(
 
   // Generador de slots candidatos respetando estrictamente el límite de horas diarias de CADA grupo
   const obtenerSlotsOrdenadosParaCelda = (celda: CeldaHorario) => {
+    const celdaGid = String(celda.grupoId || "").toLowerCase().trim();
+    const celdaDocId = String(celda.docenteId || "").toLowerCase().trim();
     const maxP = getMaxPeriodosGrupo(celda.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
-    const slots: { dia: number; periodo: number }[] = [];
+    const slots: { dia: number; periodo: number; esMismoGrupo: boolean }[] = [];
 
+    // 1. Slots del propio grupo (prioridad alta)
     for (let d = 1; d <= 5; d++) {
       for (let p = 1; p <= maxP; p++) {
-        slots.push({ dia: d, periodo: p });
+        slots.push({ dia: d, periodo: p, esMismoGrupo: true });
+      }
+    }
+
+    // 2. Slots de otros grupos donde el mismo docente imparte clases (cross-group si el grupo está saturado)
+    const otrosGruposDelDocente = new Set<string>();
+    for (const c of celdasCopy) {
+      const cGid = String(c.grupoId || "").toLowerCase().trim();
+      const cDocId = String(c.docenteId || "").toLowerCase().trim();
+      if (cGid !== celdaGid && cDocId === celdaDocId) {
+        otrosGruposDelDocente.add(cGid);
+      }
+    }
+
+    for (const ogid of otrosGruposDelDocente) {
+      const maxPOtro = getMaxPeriodosGrupo(ogid, gruposInfo, celdasOriginales, numHorasPorDia);
+      for (let d = 1; d <= 5; d++) {
+        for (let p = 1; p <= maxPOtro; p++) {
+          if (!slots.some(s => s.dia === d && s.periodo === p && s.esMismoGrupo)) {
+            slots.push({ dia: d, periodo: p, esMismoGrupo: false });
+          }
+        }
       }
     }
 
     return slots.sort((s1, s2) => {
+      // Priorizar mismo grupo
+      if (s1.esMismoGrupo !== s2.esMismoGrupo) return s1.esMismoGrupo ? -1 : 1;
+
       // Priorizar la posición donde estaba originalmente la celda
       if (s1.dia === celda.diaSemana && s1.periodo === celda.periodo) return -1;
       if (s2.dia === celda.diaSemana && s2.periodo === celda.periodo) return 1;
@@ -310,9 +337,13 @@ export function reacomodarHorarioConRipple(
   for (let i = 0; i < celdasCopy.length; i++) {
     if (isFixed(i)) {
       const c = celdasCopy[i];
-      ocupadoGrupo.add(`${c.diaSemana}_${c.periodo}_${c.grupoId}`);
-      ocupadoDocente.add(`${c.diaSemana}_${c.periodo}_${c.docenteId}`);
-      if (c.aulaId) ocupadoAula.add(`${c.diaSemana}_${c.periodo}_${c.aulaId}`);
+      const gid = String(c.grupoId || "").toLowerCase().trim();
+      const did = String(c.docenteId || "").toLowerCase().trim();
+      const aid = c.aulaId ? String(c.aulaId).toLowerCase().trim() : null;
+
+      ocupadoGrupo.add(`${c.diaSemana}_${c.periodo}_${gid}`);
+      ocupadoDocente.add(`${c.diaSemana}_${c.periodo}_${did}`);
+      if (aid) ocupadoAula.add(`${c.diaSemana}_${c.periodo}_${aid}`);
     }
   }
 
@@ -331,15 +362,18 @@ export function reacomodarHorarioConRipple(
 
     const celdaIndex = unfixedIndices[uIdx];
     const celda = celdasCopy[celdaIndex];
+    const gid = String(celda.grupoId || "").toLowerCase().trim();
+    const did = String(celda.docenteId || "").toLowerCase().trim();
+    const aid = celda.aulaId ? String(celda.aulaId).toLowerCase().trim() : null;
     const candidateSlots = obtenerSlotsOrdenadosParaCelda(celda);
 
     for (const slot of candidateSlots) {
       const d = slot.dia;
       const p = slot.periodo;
 
-      const keyGrp = `${d}_${p}_${celda.grupoId}`;
-      const keyDoc = `${d}_${p}_${celda.docenteId}`;
-      const keyAula = celda.aulaId ? `${d}_${p}_${celda.aulaId}` : null;
+      const keyGrp = `${d}_${p}_${gid}`;
+      const keyDoc = `${d}_${p}_${did}`;
+      const keyAula = aid ? `${d}_${p}_${aid}` : null;
 
       if (isSlotLibreBloqueadoParaCelda(d, p, celda, slotsLibresBloqueados)) continue;
       if (ocupadoGrupo.has(keyGrp)) continue;

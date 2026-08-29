@@ -156,14 +156,22 @@ export function buscarCadenaSwap(
       const otra = celdasActuales[j];
       if (otra.esBloqueado) continue;
 
-      // Restringir a swaps que tengan sentido (mismo grupo o grupo afín)
-      if (normalizarId(otra.grupoId) !== normalizarId(disp.grupoId)) continue;
+      // Restringir a swaps que tengan sentido (mismo grupo o mismo docente cross-group)
+      const esMismoGrupo = normalizarId(otra.grupoId) === normalizarId(disp.grupoId);
+      const esMismoDocente = normalizarId(otra.docenteId) === normalizarId(disp.docenteId);
+      if (!esMismoGrupo && !esMismoDocente) continue;
 
       const sig = `${currDisplacedIdx}->${j}@${otra.diaSemana}_${otra.periodo}`;
       if (visited.has(sig)) continue;
 
       // ¿La celda desplazada cabe en el slot de 'otra'?
       if (!slotValido(otra.diaSemana, otra.periodo, disp, occCur, slotsLibresBloqueados, gruposInfo, numHorasPorDia)) continue;
+
+      // Si es cross-group (distinto grupo), verificar que el slot también esté libre para el GRUPO de la celda desplazada
+      if (!esMismoGrupo) {
+        const keyGrpDisp = `${otra.diaSemana}_${otra.periodo}_${normalizarId(disp.grupoId)}`;
+        if (occCur.grupo.has(keyGrpDisp)) continue;
+      }
 
       // Simular swap
       const celdasTmp = celdasActuales.map((c) => ({ ...c }));
