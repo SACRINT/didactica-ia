@@ -21,6 +21,11 @@ export interface GrupoLimiteInfo {
   nombre?: string;
 }
 
+export function normalizarId(id: any): string {
+  if (!id) return "";
+  return String(id).toLowerCase().trim();
+}
+
 /**
  * Helper para verificar si un slot (día, periodo) está fijado como hora libre bloqueada
  * para el grupo, el docente o el aula.
@@ -141,51 +146,100 @@ export function reacomodarHorarioConRipple(
   }
 
   // 3. INTENTO DE INTERCAMBIO DIRECTO (DIRECT SWAP 1-A-1)
-  // Si en la casilla destino del MISMO GRUPO hay otra clase, intentamos un swap limpio entre ambas clases
-  const celdaEnDestinoMismoGrupoIdx = celdasCopy.findIndex(
+  // Buscar si en la casilla destino hay una celda ocupada (mismo grupo, mismo docente o general)
+  const celdaDestinoIdx = celdasCopy.findIndex(
     (c, idx) =>
       idx !== targetIndex &&
       c.diaSemana === targetDia &&
       c.periodo === targetPeriodo &&
-      c.grupoId === celdaAMover.grupoId
+      (normalizarId(c.grupoId) === normalizarId(celdaAMover.grupoId) ||
+       normalizarId(c.docenteId) === normalizarId(celdaAMover.docenteId))
   );
 
-  if (celdaEnDestinoMismoGrupoIdx !== -1) {
-    const celdaDestino = celdasCopy[celdaEnDestinoMismoGrupoIdx];
+  if (celdaDestinoIdx !== -1) {
+    const celdaDestino = celdasCopy[celdaDestinoIdx];
 
-    // Si la celda destino está bloqueada con candado, no se puede hacer swap directo
     if (!celdaDestino.esBloqueado) {
-      // Verificar si la celda destino puede moverse a (origDia, origPeriodo)
       const maxPDest = getMaxPeriodosGrupo(celdaDestino.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
-      const cabeEnOrigen = origPeriodo <= maxPDest;
-      const libreEnOrigen = !isSlotLibreBloqueadoParaCelda(origDia, origPeriodo, celdaDestino, slotsLibresBloqueados);
+      const maxPOrig = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
 
-      // Verificar si el docente de celdaAMover está ocupado en (targetDia, targetPeriodo) con OTRO grupo
-      const docenteAMoverOcupadoEnTarget = celdasCopy.some(
+      const cabeEnOrigen = origPeriodo <= maxPDest;
+      const cabeEnDestino = targetPeriodo <= maxPOrig;
+      const libreEnOrigen = !isSlotLibreBloqueadoParaCelda(origDia, origPeriodo, celdaDestino, slotsLibresBloqueados);
+      const libreEnDestino = !isSlotLibreBloqueadoParaCelda(targetDia, targetPeriodo, celdaAMover, slotsLibresBloqueados);
+
+      const mismoDocente = normalizarId(celdaDestino.docenteId) === normalizarId(celdaAMover.docenteId);
+      const mismoGrupo = normalizarId(celdaDestino.grupoId) === normalizarId(celdaAMover.grupoId);
+
+      // Si es el mismo docente y el mismo grupo: ¡Swap instantáneo 100% seguro!
+      if (mismoDocente && mismoGrupo && cabeEnOrigen && cabeEnDestino && libreEnOrigen && libreEnDestino) {
+        celdasCopy[targetIndex].diaSemana = targetDia;
+        celdasCopy[targetIndex].periodo = targetPeriodo;
+        celdasCopy[celdaDestinoIdx].diaSemana = origDia;
+        celdasCopy[celdaDestinoIdx].periodo = origPeriodo;
+
+        return {
+          success: true,
+          celdasActualizadas: celdasCopy,
+          numMovidas: 2
+        };
+      }
+
+      // Validar si el docente de celdaAMover está ocupado en target con algún TERCER grupo
+      const docenteAMoverOcupadoEnTarget = !mismoDocente && celdasCopy.some(
         (c, idx) =>
           idx !== targetIndex &&
-          idx !== celdaEnDestinoMismoGrupoIdx &&
-          c.docenteId === celdaAMover.docenteId &&
+          idx !== celdaDestinoIdx &&
+          normalizarId(c.docenteId) === normalizarId(celdaAMover.docenteId) &&
           c.diaSemana === targetDia &&
           c.periodo === targetPeriodo
       );
 
-      // Verificar si el docente de celdaDestino está ocupado en (origDia, origPeriodo) con OTRO grupo
-      const docenteDestOcupadoEnOrigen = celdasCopy.some(
+      // Validar si el docente de celdaDestino está ocupado en origen con algún TERCER grupo
+      const docenteDestOcupadoEnOrigen = !mismoDocente && celdasCopy.some(
         (c, idx) =>
           idx !== targetIndex &&
-          idx !== celdaEnDestinoMismoGrupoIdx &&
-          c.docenteId === celdaDestino.docenteId &&
+          idx !== celdaDestinoIdx &&
+          normalizarId(c.docenteId) === normalizarId(celdaDestino.docenteId) &&
           c.diaSemana === origDia &&
           c.periodo === origPeriodo
       );
 
-      if (cabeEnOrigen && libreEnOrigen && !docenteAMoverOcupadoEnTarget && !docenteDestOcupadoEnOrigen) {
+      // Validar si el grupo de celdaAMover tiene otra clase en target con un tercer docente
+      const grupoAMoverOcupadoEnTarget = !mismoGrupo && celdasCopy.some(
+        (c, idx) =>
+          idx !== targetIndex &&
+          idx !== celdaDestinoIdx &&
+          normalizarId(c.grupoId) === normalizarId(celdaAMover.grupoId) &&
+          c.diaSemana === targetDia &&
+          c.periodo === targetPeriodo
+      );
+
+      // Validar si el grupo de celdaDestino tiene otra clase en origen con un tercer docente
+      const grupoDestOcupadoEnOrigen = !mismoGrupo && celdasCopy.some(
+        (c, idx) =>
+          idx !== targetIndex &&
+          idx !== celdaDestinoIdx &&
+          normalizarId(c.grupoId) === normalizarId(celdaDestino.grupoId) &&
+          c.diaSemana === origDia &&
+          c.periodo === origPeriodo
+      );
+
+      if (
+        cabeEnOrigen &&
+        cabeEnDestino &&
+        libreEnOrigen &&
+        libreEnDestino &&
+        !docenteAMoverOcupadoEnTarget &&
+        !docenteDestOcupadoEnOrigen &&
+        !grupoAMoverOcupadoEnTarget &&
+        !grupoDestOcupadoEnOrigen
+      ) {
         // ¡Intercambio directo 100% válido y limpio!
         celdasCopy[targetIndex].diaSemana = targetDia;
         celdasCopy[targetIndex].periodo = targetPeriodo;
-        celdasCopy[celdaEnDestinoMismoGrupoIdx].diaSemana = origDia;
-        celdasCopy[celdaEnDestinoMismoGrupoIdx].periodo = origPeriodo;
+        celdasCopy[celdaDestinoIdx].diaSemana = origDia;
+        celdasCopy[celdaDestinoIdx].periodo = origPeriodo;
 
         return {
           success: true,

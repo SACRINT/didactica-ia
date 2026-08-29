@@ -281,20 +281,57 @@ export default function EditorHorarios({
       return { status: "candado", razon: "🔒 La celda de destino está fijada con candado." };
     }
 
-    // 4. ¿El DOCENTE ya tiene clase en OTRO grupo a esta hora?
-    const docOcupado = horario?.celdas?.find(
+    // 4. Swap directo si en el slot destino está OTRA clase del MISMO DOCENTE
+    const celdaDestinoMismoDoc = horario?.celdas?.find(
       (c: any) =>
         c.diaSemana === dia && c.periodo === periodo &&
         normalizarId(c.docenteId) === docId &&
-        c.id !== celda.id &&
-        normalizarId(c.grupoId) !== gid
+        c.id !== celda.id
     );
-    if (docOcupado) {
-      const gNom = grupos.find((g: any) => normalizarId(g.id) === normalizarId(docOcupado.grupoId))?.nombre || docOcupado.grupoId;
-      return { status: "doc-ocupado", razon: `⚠️ Conflicto: El docente ya imparte en ${gNom} a esta hora.` };
+
+    if (celdaDestinoMismoDoc) {
+      if (celdaDestinoMismoDoc.esBloqueado) {
+        return { status: "candado", razon: "🔒 La clase de destino del docente está fijada con candado." };
+      }
+      const esMismoGrp = normalizarId(celdaDestinoMismoDoc.grupoId) === gid;
+      const matDest = getNombreAsignaturaCelda(celdaDestinoMismoDoc);
+      const matOrig = getNombreAsignaturaCelda(celda);
+
+      if (esMismoGrp) {
+        // Mismo docente y mismo grupo: ¡Swap directo 100% puro e instantáneo!
+        return {
+          status: "cadena-ok",
+          razon: `🔄 Swap directo: "${matDest}" ⇄ "${matOrig}" (Mismo Grupo)`,
+          numCeldasCadena: 2
+        };
+      }
+
+      // Mismo docente, distinto grupo: verificar que los grupos no choquen en sus respectivos destinos
+      const origenDia = celda.diaSemana;
+      const origenPeriodo = celda.periodo;
+      const grpDestLibreEnOrigen = !horario?.celdas?.some(
+        (c: any) =>
+          c.diaSemana === origenDia && c.periodo === origenPeriodo &&
+          normalizarId(c.grupoId) === normalizarId(celdaDestinoMismoDoc.grupoId) &&
+          c.id !== celdaDestinoMismoDoc.id && c.id !== celda.id
+      );
+      const grpOrigLibreEnDestino = !horario?.celdas?.some(
+        (c: any) =>
+          c.diaSemana === dia && c.periodo === periodo &&
+          normalizarId(c.grupoId) === gid &&
+          c.id !== celdaDestinoMismoDoc.id && c.id !== celda.id
+      );
+
+      if (grpDestLibreEnOrigen && grpOrigLibreEnDestino) {
+        return {
+          status: "cadena-ok",
+          razon: `🔄 Swap directo: "${matDest}" ⇄ "${matOrig}"`,
+          numCeldasCadena: 2
+        };
+      }
     }
 
-    // 5. ¿El GRUPO ya tiene otra clase en este slot? (Verificación de doble capa)
+    // 5. ¿El GRUPO ya tiene otra clase en este slot con otro docente?
     const grupoOcupado = horario?.celdas?.find(
       (c: any) =>
         c.diaSemana === dia && c.periodo === periodo &&
@@ -307,17 +344,19 @@ export default function EditorHorarios({
       const origenDia = celda.diaSemana;
       const origenPeriodo = celda.periodo;
 
-      const docDesplazadoLibreEnOrigen = !horario?.celdas?.some(
+      const docDesplazadoLibreEnOrigen = docDesplazadoId === docId || !horario?.celdas?.some(
         (c: any) =>
           c.diaSemana === origenDia && c.periodo === origenPeriodo &&
           normalizarId(c.docenteId) === docDesplazadoId &&
-          c.id !== grupoOcupado.id
+          c.id !== grupoOcupado.id &&
+          c.id !== celda.id
       );
 
-      const grupoLibreEnOrigen = !horario?.celdas?.some(
+      const grupoLibreEnOrigen = normalizarId(grupoOcupado.grupoId) === gid || !horario?.celdas?.some(
         (c: any) =>
           c.diaSemana === origenDia && c.periodo === origenPeriodo &&
-          normalizarId(c.grupoId) === gid &&
+          normalizarId(c.grupoId) === normalizarId(grupoOcupado.grupoId) &&
+          c.id !== grupoOcupado.id &&
           c.id !== celda.id
       );
 
@@ -456,7 +495,12 @@ export default function EditorHorarios({
 
         const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
         const celdaDestino = horario.celdas.find(
-          (c: any) => c.diaSemana === targetDia && c.periodo === targetPeriodo && normalizarId(c.grupoId) === normalizarId(celdaArrastrada.grupoId)
+          (c: any) =>
+            c.diaSemana === targetDia &&
+            c.periodo === targetPeriodo &&
+            (normalizarId(c.grupoId) === normalizarId(celdaArrastrada.grupoId) ||
+             normalizarId(c.docenteId) === normalizarId(celdaArrastrada.docenteId)) &&
+            c.id !== celdaArrastrada.id
         );
         const matDest = celdaDestino ? getNombreAsignaturaCelda(celdaDestino) : "otra materia";
         toast.success(`🔄 Swap directo exitoso: "${matNombre}" ⇄ "${matDest}"`);
