@@ -70,15 +70,21 @@ export default function WizardConfiguracion({
   const [usuarioCambioGrupos, setUsuarioCambioGrupos] = useState<boolean>(false);
 
   // Número de grupos por grado independiente (1º, 3º, 5º)
-  const [g1, setG1] = useState<number>(
-    configInicial?.escuela?.gruposPrimerAno ?? (gruposIniciales.length > 0 ? Math.max(1, Math.ceil(gruposIniciales.length / 3)) : 1)
-  );
-  const [g2, setG2] = useState<number>(
-    configInicial?.escuela?.gruposSegundoAno ?? (gruposIniciales.length > 0 ? Math.max(1, Math.ceil(gruposIniciales.length / 3)) : 1)
-  );
-  const [g3, setG3] = useState<number>(
-    configInicial?.escuela?.gruposTercerAno ?? (gruposIniciales.length > 0 ? Math.max(1, Math.ceil(gruposIniciales.length / 3)) : 1)
-  );
+  const [g1, setG1] = useState<number>(() => {
+    if (configInicial?.escuela?.gruposPrimerAno) return configInicial.escuela.gruposPrimerAno;
+    const g1Count = (gruposIniciales || []).filter(g => g.semestre === 1 || g.semestre === 2).length;
+    return g1Count > 0 ? g1Count : 3;
+  });
+  const [g2, setG2] = useState<number>(() => {
+    if (configInicial?.escuela?.gruposSegundoAno) return configInicial.escuela.gruposSegundoAno;
+    const g2Count = (gruposIniciales || []).filter(g => g.semestre === 3 || g.semestre === 4).length;
+    return g2Count > 0 ? g2Count : 3;
+  });
+  const [g3, setG3] = useState<number>(() => {
+    if (configInicial?.escuela?.gruposTercerAno) return configInicial.escuela.gruposTercerAno;
+    const g3Count = (gruposIniciales || []).filter(g => g.semestre === 5 || g.semestre === 6).length;
+    return g3Count > 0 ? g3Count : 3;
+  });
 
   // Sincronizar g1, g2, g3 cuando cambia configInicial o escuelaId
   useEffect(() => {
@@ -86,8 +92,15 @@ export default function WizardConfiguracion({
       if (configInicial.escuela.gruposPrimerAno) setG1(configInicial.escuela.gruposPrimerAno);
       if (configInicial.escuela.gruposSegundoAno) setG2(configInicial.escuela.gruposSegundoAno);
       if (configInicial.escuela.gruposTercerAno) setG3(configInicial.escuela.gruposTercerAno);
+    } else if (gruposIniciales && gruposIniciales.length > 0) {
+      const c1 = gruposIniciales.filter(g => g.semestre === 1 || g.semestre === 2).length;
+      const c2 = gruposIniciales.filter(g => g.semestre === 3 || g.semestre === 4).length;
+      const c3 = gruposIniciales.filter(g => g.semestre === 5 || g.semestre === 6).length;
+      if (c1 > 0) setG1(c1);
+      if (c2 > 0) setG2(c2);
+      if (c3 > 0) setG3(c3);
     }
-  }, [configInicial, escuelaId]);
+  }, [configInicial, escuelaId, gruposIniciales]);
 
   // ─── PRIORIDAD ABSOLUTA BD: Los grupos de la BD recargan y generan los grupos completos ───
   useEffect(() => {
