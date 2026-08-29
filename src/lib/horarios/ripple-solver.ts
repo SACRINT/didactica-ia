@@ -1,3 +1,20 @@
+/**
+ * Motor de Reordenamiento Inteligente para Horarios Escolares.
+ *
+ * Estrategia de resolución con 3 niveles:
+ *   Nivel 1 — Movimiento directo a slot vacío (1 celda).
+ *   Nivel 2 — Intercambio directo entre 2 celdas (swap 1-a-1).
+ *   Nivel 3 — Reacomodo en cascada con backtracking (máx 5 saltos).
+ *
+ * Reglas duras (las ÚNICAS que bloquean un movimiento):
+ *   1. Celda con candado (esBloqueado) → inmovible.
+ *   2. Slot destino dentro de slotsLibresBloqueados → prohibido.
+ *   3. Jornada del grupo excedida → prohibido.
+ *   4. Empalme real entre docentes DISTINTOS → rechazado o resuelto por cascada.
+ *
+ * Intercambios entre el MISMO docente o del MISMO grupo → SIEMPRE permitidos.
+ */
+
 export interface CeldaHorario {
   id?: string;
   diaSemana: number; // 1..5
@@ -21,75 +38,102 @@ export interface GrupoLimiteInfo {
   nombre?: string;
 }
 
-export function normalizarId(id: any): string {
-  if (!id) return "";
-  return String(id).toLowerCase().trim();
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function normId(val: any): string {
+  if (val == null) return "";
+  if (typeof val === "string") return val.trim();
+  if (typeof val === "object" && val.id) return String(val.id).trim();
+  return String(val).trim();
 }
 
-/**
- * Helper para verificar si un slot (día, periodo) está fijado como hora libre bloqueada
- * para el grupo, el docente o el aula.
- */
-function isSlotLibreBloqueadoParaCelda(
+function getMaxPeriodosGrupo(
+  grupoId: string,
+  gruposInfo?: GrupoLimiteInfo[],
+  celdasOriginales?: CeldaHorario[],
+  fallback: number = 6
+): number {
+  const gid = normId(grupoId);
+  if (gruposInfo) {
+    const g = gruposInfo.find((x) => normId(x.id) === gid);
+    if (g) {
+      if (g.horasPorDia) return g.horasPorDia;
+      if (g.semestre === 1) return 5;
+      return fallback;
+    }
+  }
+  if (celdasOriginales) {
+    const c = celdasOriginales.find((x) => normId(x.grupoId) === gid);
+    if (c?.grupo) {
+      if (c.grupo.horasPorDia) return c.grupo.horasPorDia;
+      if (c.grupo.semestre === 1) return 5;
+    }
+  }
+  return fallback;
+}
+
+function isSlotBloqueado(
   dia: number,
   periodo: number,
   celda: CeldaHorario,
   slotsLibresBloqueados: Set<string>
 ): boolean {
   if (!slotsLibresBloqueados || slotsLibresBloqueados.size === 0) return false;
-  const keyGrp = `${dia}_${periodo}_${celda.grupoId}`;
-  const keyDoc = `${dia}_${periodo}_${celda.docenteId}`;
-  const keyAula = celda.aulaId ? `${dia}_${periodo}_${celda.aulaId}` : null;
+  const kGrp = `${dia}_${periodo}_${normId(celda.grupoId)}`;
+  const kDoc = `${dia}_${periodo}_${normId(celda.docenteId)}`;
+  return slotsLibresBloqueados.has(kGrp) || slotsLibresBloqueados.has(kDoc);
+}
 
-  return (
-    slotsLibresBloqueados.has(keyGrp) ||
-    slotsLibresBloqueados.has(keyDoc) ||
-    (keyAula !== null && slotsLibresBloqueados.has(keyAula))
+/** Verifica si un docente tiene clase en (dia, periodo) con cualquier grupo excepto el dado. */
+function docenteOcupadoEn(
+  celdas: CeldaHorario[],
+  docenteId: string,
+  dia: number,
+  periodo: number,
+  excluirGrupoId: string,
+  excluirIdx: number = -1
+): boolean {
+  const did = normId(docenteId);
+  const gid = normId(excluirGrupoId);
+  return celdas.some(
+    (c, i) =>
+      i !== excluirIdx &&
+      normId(c.docenteId) === did &&
+      c.diaSemana === dia &&
+      c.periodo === periodo &&
+      normId(c.grupoId) !== gid
   );
 }
 
-/**
- * Helper para obtener el número máximo de horas diarias de un grupo específico.
- * Por norma SEP Zona 004:
- * - 1.er semestre: máximo 5 horas al día (25 hrs/semana).
- * - 3.º y 5.º semestre: 6 horas al día (30 hrs/semana) o según horasPorDia.
- */
-function getMaxPeriodosGrupo(
+/** Verifica si un grupo tiene clase en (dia, periodo). */
+function grupoOcupadoEn(
+  celdas: CeldaHorario[],
   grupoId: string,
-  gruposInfo?: GrupoLimiteInfo[],
-  celdasOriginales?: CeldaHorario[],
-  fallbackHorasPorDia: number = 6
-): number {
-  if (gruposInfo && gruposInfo.length > 0) {
-    const gInfo = gruposInfo.find((g) => g.id === grupoId);
-    if (gInfo) {
-      if (gInfo.horasPorDia) return gInfo.horasPorDia;
-      if (gInfo.semestre === 1) return 5;
-      if (gInfo.nombre && (gInfo.nombre.includes("1°") || gInfo.nombre.includes("1º"))) return 5;
-      return fallbackHorasPorDia;
-    }
-  }
-
-  // Si no está en gruposInfo, inspeccionar la celda
-  if (celdasOriginales) {
-    const c = celdasOriginales.find((item) => item.grupoId === grupoId);
-    if (c?.grupo) {
-      if (c.grupo.horasPorDia) return c.grupo.horasPorDia;
-      if (c.grupo.semestre === 1) return 5;
-      if (c.grupo.nombre && (c.grupo.nombre.includes("1°") || c.grupo.nombre.includes("1º"))) return 5;
-    }
-  }
-
-  return fallbackHorasPorDia;
+  dia: number,
+  periodo: number,
+  excluirIdx: number = -1
+): boolean {
+  const gid = normId(grupoId);
+  return celdas.some(
+    (c, i) =>
+      i !== excluirIdx &&
+      normId(c.grupoId) === gid &&
+      c.diaSemana === dia &&
+      c.periodo === periodo
+  );
 }
 
-/**
- * Algoritmo de Reordenamiento Inteligente Ripple para Horarios.
- * 1. Valida límites de jornada diaria por grupo (e.g. 5 hrs para 1.er sem, 6 hrs para 3.º/5.º).
- * 2. Si el slot destino está ocupado por otra clase, intenta primero un INTERCAMBIO DIRECTO (Direct Swap).
- * 3. Si no es posible el intercambio directo, intenta un reacomodo en cascada (Ripple) respetando candados y horas libres.
- * 4. Si es imposible reacomodar sin generar empalmes, RECHAZA el movimiento con un aviso claro y NUNCA oculta asignaturas.
- */
+// ─── Resultado ──────────────────────────────────────────────────────────────
+
+export interface RippleResult {
+  success: boolean;
+  celdasActualizadas?: CeldaHorario[];
+  numMovidas?: number;
+  error?: string;
+}
+
+// ─── Función Principal ──────────────────────────────────────────────────────
+
 export function reacomodarHorarioConRipple(
   celdasOriginales: CeldaHorario[],
   celdaAMover: CeldaHorario,
@@ -98,7 +142,7 @@ export function reacomodarHorarioConRipple(
   numHorasPorDia: number = 6,
   slotsLibresBloqueados: Set<string> = new Set(),
   gruposInfo?: GrupoLimiteInfo[]
-): { success: boolean; celdasActualizadas?: CeldaHorario[]; numMovidas?: number; error?: string } {
+): RippleResult {
   if (!celdaAMover) {
     return { success: false, error: "No se especificó la celda a mover." };
   }
@@ -110,377 +154,269 @@ export function reacomodarHorarioConRipple(
   const origDia = celdaAMover.diaSemana;
   const origPeriodo = celdaAMover.periodo;
 
+  // Misma posición → no-op
   if (origDia === targetDia && origPeriodo === targetPeriodo) {
     return { success: true, celdasActualizadas: celdasOriginales, numMovidas: 0 };
   }
 
-  // 1. Validar que el periodo destino no exceda la jornada del grupo de la celda a mover
-  const maxPeriodosGrupoAMover = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
-  if (targetPeriodo > maxPeriodosGrupoAMover) {
+  // ── Validación de jornada ──
+  const maxPeriodos = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
+  if (targetPeriodo > maxPeriodos) {
     return {
       success: false,
-      error: `⚠️ Este grupo tiene una jornada de ${maxPeriodosGrupoAMover} horas diarias. No se pueden colocar clases en la Hora ${targetPeriodo}.`
+      error: `⚠️ Este grupo tiene jornada de ${maxPeriodos} horas. No se puede colocar en la Hora ${targetPeriodo}.`
     };
   }
 
-  // 2. Verificar si la casilla destino está fijada como hora libre bloqueada para el docente, grupo o aula
-  if (isSlotLibreBloqueadoParaCelda(targetDia, targetPeriodo, celdaAMover, slotsLibresBloqueados)) {
+  // ── Validación de hora libre bloqueada ──
+  if (isSlotBloqueado(targetDia, targetPeriodo, celdaAMover, slotsLibresBloqueados)) {
     return { success: false, error: "🔒 La casilla destino está fijada como hora libre para este docente o grupo." };
   }
 
-  // Clonar las celdas para trabajar de forma inmutable
-  const celdasCopy: CeldaHorario[] = celdasOriginales.map((c) => ({ ...c }));
+  // Clonar para trabajo inmutable
+  const cells: CeldaHorario[] = celdasOriginales.map((c) => ({ ...c }));
 
-  // Encontrar el índice de la celda a mover
-  const targetIndex = celdasCopy.findIndex(
+  // Encontrar índice de la celda a mover
+  const srcIdx = cells.findIndex(
     (c) =>
-      (c.id && c.id === celdaAMover.id) ||
+      (c.id && celdaAMover.id && c.id === celdaAMover.id) ||
       (c.diaSemana === origDia &&
         c.periodo === origPeriodo &&
-        c.grupoId === celdaAMover.grupoId &&
-        c.docenteId === celdaAMover.docenteId)
+        normId(c.grupoId) === normId(celdaAMover.grupoId) &&
+        normId(c.docenteId) === normId(celdaAMover.docenteId))
   );
 
-  if (targetIndex === -1) {
+  if (srcIdx === -1) {
     return { success: false, error: "No se encontró la celda seleccionada en el horario." };
   }
 
-  // 3. INTENTO DE INTERCAMBIO DIRECTO (DIRECT SWAP 1-A-1)
-  // Buscar si en la casilla destino hay una celda ocupada (mismo grupo, mismo docente o general)
-  const celdaDestinoIdx = celdasCopy.findIndex(
-    (c, idx) =>
-      idx !== targetIndex &&
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 1 — Slot destino VACÍO para el grupo → movimiento directo
+  // ══════════════════════════════════════════════════════════════════════════
+  const destinoLibreGrupo = !cells.some(
+    (c, i) => i !== srcIdx && normId(c.grupoId) === normId(celdaAMover.grupoId) && c.diaSemana === targetDia && c.periodo === targetPeriodo
+  );
+
+  if (destinoLibreGrupo) {
+    // Verificar que el docente no esté ocupado con OTRO grupo en el destino
+    if (!docenteOcupadoEn(cells, celdaAMover.docenteId, targetDia, targetPeriodo, celdaAMover.grupoId, srcIdx)) {
+      cells[srcIdx] = { ...cells[srcIdx], diaSemana: targetDia, periodo: targetPeriodo };
+      return { success: true, celdasActualizadas: cells, numMovidas: 1 };
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 2 — Intercambio directo 1-a-1 (MISMO grupo o MISMO docente)
+  // ══════════════════════════════════════════════════════════════════════════
+  const dstIdx = cells.findIndex(
+    (c, i) =>
+      i !== srcIdx &&
       c.diaSemana === targetDia &&
       c.periodo === targetPeriodo &&
-      (normalizarId(c.grupoId) === normalizarId(celdaAMover.grupoId) ||
-       normalizarId(c.docenteId) === normalizarId(celdaAMover.docenteId))
+      normId(c.grupoId) === normId(celdaAMover.grupoId)
   );
 
-  if (celdaDestinoIdx !== -1) {
-    const celdaDestino = celdasCopy[celdaDestinoIdx];
+  if (dstIdx !== -1 && !cells[dstIdx].esBloqueado) {
+    const mismoGrupo = true; // ya filtrado arriba
+    const mismoDocente = normId(cells[dstIdx].docenteId) === normId(celdaAMover.docenteId);
 
-    if (!celdaDestino.esBloqueado) {
-      const maxPDest = getMaxPeriodosGrupo(celdaDestino.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
-      const maxPOrig = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
+    if (mismoGrupo || mismoDocente) {
+      // Verificar que el swap no cree empalme con terceros
+      const srcDoc = normId(celdaAMover.docenteId);
+      const dstDoc = normId(cells[dstIdx].docenteId);
 
-      const cabeEnOrigen = origPeriodo <= maxPDest;
-      const cabeEnDestino = targetPeriodo <= maxPOrig;
-      const libreEnOrigen = !isSlotLibreBloqueadoParaCelda(origDia, origPeriodo, celdaDestino, slotsLibresBloqueados);
-      const libreEnDestino = !isSlotLibreBloqueadoParaCelda(targetDia, targetPeriodo, celdaAMover, slotsLibresBloqueados);
-
-      const mismoDocente = normalizarId(celdaDestino.docenteId) === normalizarId(celdaAMover.docenteId);
-      const mismoGrupo = normalizarId(celdaDestino.grupoId) === normalizarId(celdaAMover.grupoId);
-
-      // Si es el mismo docente y el mismo grupo: ¡Swap instantáneo 100% seguro!
-      if (mismoDocente && mismoGrupo && cabeEnOrigen && cabeEnDestino && libreEnOrigen && libreEnDestino) {
-        celdasCopy[targetIndex].diaSemana = targetDia;
-        celdasCopy[targetIndex].periodo = targetPeriodo;
-        celdasCopy[celdaDestinoIdx].diaSemana = origDia;
-        celdasCopy[celdaDestinoIdx].periodo = origPeriodo;
-
-        return {
-          success: true,
-          celdasActualizadas: celdasCopy,
-          numMovidas: 2
-        };
-      }
-
-      // Validar si el docente de celdaAMover está ocupado en target con algún TERCER grupo
-      const docenteAMoverOcupadoEnTarget = !mismoDocente && celdasCopy.some(
-        (c, idx) =>
-          idx !== targetIndex &&
-          idx !== celdaDestinoIdx &&
-          normalizarId(c.docenteId) === normalizarId(celdaAMover.docenteId) &&
-          c.diaSemana === targetDia &&
-          c.periodo === targetPeriodo
+      const srcEnTargetOcupado = cells.some(
+        (c, i) => i !== srcIdx && i !== dstIdx && normId(c.docenteId) === srcDoc && c.diaSemana === targetDia && c.periodo === targetPeriodo
+      );
+      const dstEnOrigenOcupado = cells.some(
+        (c, i) => i !== srcIdx && i !== dstIdx && normId(c.docenteId) === dstDoc && c.diaSemana === origDia && c.periodo === origPeriodo
       );
 
-      // Validar si el docente de celdaDestino está ocupado en origen con algún TERCER grupo
-      const docenteDestOcupadoEnOrigen = !mismoDocente && celdasCopy.some(
-        (c, idx) =>
-          idx !== targetIndex &&
-          idx !== celdaDestinoIdx &&
-          normalizarId(c.docenteId) === normalizarId(celdaDestino.docenteId) &&
-          c.diaSemana === origDia &&
-          c.periodo === origPeriodo
-      );
+      // Verificar bloqueos
+      const srcBloqueadoEnTarget = isSlotBloqueado(targetDia, targetPeriodo, cells[dstIdx], slotsLibresBloqueados);
+      const dstBloqueadoEnOrigen = isSlotBloqueado(origDia, origPeriodo, celdaAMover, slotsLibresBloqueados);
 
-      // Validar si el grupo de celdaAMover tiene otra clase en target con un tercer docente
-      const grupoAMoverOcupadoEnTarget = !mismoGrupo && celdasCopy.some(
-        (c, idx) =>
-          idx !== targetIndex &&
-          idx !== celdaDestinoIdx &&
-          normalizarId(c.grupoId) === normalizarId(celdaAMover.grupoId) &&
-          c.diaSemana === targetDia &&
-          c.periodo === targetPeriodo
-      );
-
-      // Validar si el grupo de celdaDestino tiene otra clase en origen con un tercer docente
-      const grupoDestOcupadoEnOrigen = !mismoGrupo && celdasCopy.some(
-        (c, idx) =>
-          idx !== targetIndex &&
-          idx !== celdaDestinoIdx &&
-          normalizarId(c.grupoId) === normalizarId(celdaDestino.grupoId) &&
-          c.diaSemana === origDia &&
-          c.periodo === origPeriodo
-      );
-
-      if (
-        cabeEnOrigen &&
-        cabeEnDestino &&
-        libreEnOrigen &&
-        libreEnDestino &&
-        !docenteAMoverOcupadoEnTarget &&
-        !docenteDestOcupadoEnOrigen &&
-        !grupoAMoverOcupadoEnTarget &&
-        !grupoDestOcupadoEnOrigen
-      ) {
-        // ¡Intercambio directo 100% válido y limpio!
-        celdasCopy[targetIndex].diaSemana = targetDia;
-        celdasCopy[targetIndex].periodo = targetPeriodo;
-        celdasCopy[celdaDestinoIdx].diaSemana = origDia;
-        celdasCopy[celdaDestinoIdx].periodo = origPeriodo;
-
-        return {
-          success: true,
-          celdasActualizadas: celdasCopy,
-          numMovidas: 2
-        };
+      if (!srcEnTargetOcupado && !dstEnOrigenOcupado && !srcBloqueadoEnTarget && !dstBloqueadoEnOrigen) {
+        // Swap directo limpio
+        const tmpD = cells[srcIdx].diaSemana;
+        const tmpP = cells[srcIdx].periodo;
+        cells[srcIdx] = { ...cells[srcIdx], diaSemana: cells[dstIdx].diaSemana, periodo: cells[dstIdx].periodo };
+        cells[dstIdx] = { ...cells[dstIdx], diaSemana: tmpD, periodo: tmpP };
+        return { success: true, celdasActualizadas: cells, numMovidas: 2 };
       }
     }
   }
 
-  // 4. INTENTO DE MOVIMIENTO DIRECTO A CASILLA VACÍA
-  // Si la casilla destino no tiene ninguna clase asignada en el grupo y el docente está libre
-  const casillaDestinoOcupadaEnGrupo = celdasCopy.some(
-    (c, idx) => idx !== targetIndex && c.grupoId === celdaAMover.grupoId && c.diaSemana === targetDia && c.periodo === targetPeriodo
-  );
-  const docenteOcupadoEnDestino = celdasCopy.some(
-    (c, idx) => idx !== targetIndex && c.docenteId === celdaAMover.docenteId && c.diaSemana === targetDia && c.periodo === targetPeriodo
-  );
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 2b — Swap con celda de OTRO grupo (docente Distinto)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (dstIdx !== -1 && !cells[dstIdx].esBloqueado) {
+    const srcDoc = normId(celdaAMover.docenteId);
+    const dstDoc = normId(cells[dstIdx].docenteId);
+    const srcGrp = normId(celdaAMover.grupoId);
+    const dstGrp = normId(cells[dstIdx].grupoId);
 
-  if (!casillaDestinoOcupadaEnGrupo && !docenteOcupadoEnDestino) {
-    celdasCopy[targetIndex].diaSemana = targetDia;
-    celdasCopy[targetIndex].periodo = targetPeriodo;
-    return {
-      success: true,
-      celdasActualizadas: celdasCopy,
-      numMovidas: 1
-    };
+    // ¿El docente origen puede ir al slot destino? (no tiene otra clase ahí con otro grupo)
+    const srcConflictTarget = cells.some(
+      (c, i) => i !== srcIdx && i !== dstIdx && normId(c.docenteId) === srcDoc && c.diaSemana === targetDia && c.periodo === targetPeriodo
+    );
+    // ¿El docente destino puede ir al slot origen? (no tiene otra clase ahí con otro grupo)
+    const dstConflictOrigin = cells.some(
+      (c, i) => i !== srcIdx && i !== dstIdx && normId(c.docenteId) === dstDoc && c.diaSemana === origDia && c.periodo === origPeriodo
+    );
+    // ¿Hay bloqueos?
+    const srcBloq = isSlotBloqueado(targetDia, targetPeriodo, cells[dstIdx], slotsLibresBloqueados);
+    const dstBloq = isSlotBloqueado(origDia, origPeriodo, celdaAMover, slotsLibresBloqueados);
+    // ¿El docente destino cabe en la jornada del grupo origen?
+    const dstMaxP = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
+    const dstCabeEnOrigen = origPeriodo <= dstMaxP;
+
+    if (!srcConflictTarget && !dstConflictOrigin && !srcBloq && !dstBloq && dstCabeEnOrigen) {
+      const tmpD = cells[srcIdx].diaSemana;
+      const tmpP = cells[srcIdx].periodo;
+      cells[srcIdx] = { ...cells[srcIdx], diaSemana: targetDia, periodo: targetPeriodo };
+      cells[dstIdx] = { ...cells[dstIdx], diaSemana: tmpD, periodo: tmpP };
+      return { success: true, celdasActualizadas: cells, numMovidas: 2 };
+    }
   }
 
-  // 5. MOTOR DE REUBICACIÓN EN CASCADA (RIPPLE CON BACKTRACKING CONTROLADO)
-  // Fijar temporalmente la celda seleccionada en las coordenadas destino
-  celdasCopy[targetIndex].diaSemana = targetDia;
-  celdasCopy[targetIndex].periodo = targetPeriodo;
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 3 — Reacomodo en cascada (backtracking controlado, máx 5 saltos)
+  // ══════════════════════════════════════════════════════════════════════════
+  return resolverCascada(cells, srcIdx, targetDia, targetPeriodo, origDia, origPeriodo, numHorasPorDia, slotsLibresBloqueados, gruposInfo);
+}
 
-  // Identificar celdas fijas (las que tienen esBloqueado === true MÁS la celda recién movida)
-  const isFixed = (idx: number) => idx === targetIndex || Boolean(celdasCopy[idx].esBloqueado);
+// ─── Cascada con Backtracking ───────────────────────────────────────────────
+
+function resolverCascada(
+  cells: CeldaHorario[],
+  srcIdx: number,
+  targetDia: number,
+  targetPeriodo: number,
+  origDia: number,
+  origPeriodo: number,
+  numHorasPorDia: number,
+  slotsLibresBloqueados: Set<string>,
+  gruposInfo?: GrupoLimiteInfo[],
+  maxDepth: number = 5
+): RippleResult {
+  const work = cells.map((c) => ({ ...c }));
+  const srcDoc = normId(work[srcIdx].docenteId);
+  const srcGrp = normId(work[srcIdx].grupoId);
+
+  // Marcar celdas fijadas (candado + la que estamos moviendo)
+  const fixed = new Set<number>();
+  fixed.add(srcIdx);
+  for (let i = 0; i < work.length; i++) {
+    if (work[i].esBloqueado) fixed.add(i);
+  }
+
+  // Colocar la celda fuente en el destino temporalmente
+  work[srcIdx] = { ...work[srcIdx], diaSemana: targetDia, periodo: targetPeriodo };
 
   // Verificar que las celdas fijas no colisionen entre sí
-  for (let i = 0; i < celdasCopy.length; i++) {
-    if (!isFixed(i)) continue;
-    const c1 = celdasCopy[i];
-
-    if (isSlotLibreBloqueadoParaCelda(c1.diaSemana, c1.periodo, c1, slotsLibresBloqueados)) {
-      return { success: false, error: "🔒 El movimiento colisiona con una hora libre bloqueada para el docente o grupo." };
-    }
-
-    for (let j = i + 1; j < celdasCopy.length; j++) {
-      if (!isFixed(j)) continue;
-      const c2 = celdasCopy[j];
-
+  const fixedArr = Array.from(fixed);
+  for (let a = 0; a < fixedArr.length; a++) {
+    for (let b = a + 1; b < fixedArr.length; b++) {
+      const c1 = work[fixedArr[a]];
+      const c2 = work[fixedArr[b]];
       if (c1.diaSemana === c2.diaSemana && c1.periodo === c2.periodo) {
-        if (c1.grupoId === c2.grupoId) {
+        if (normId(c1.grupoId) === normId(c2.grupoId)) {
           return { success: false, error: "🔒 Casilla ocupada por una clase fijada con candado en este grupo." };
         }
-        if (c1.docenteId === c2.docenteId) {
-          const docNombre = c1.docente?.nombre || "el docente";
-          return { success: false, error: `🔒 El docente ${docNombre} tiene otra clase fijada con candado en esta hora.` };
+        if (normId(c1.docenteId) === normId(c2.docenteId)) {
+          return { success: false, error: `🔒 El docente tiene otra clase fijada con candado en esta hora.` };
         }
       }
     }
   }
 
-  // Extraer los índices de las celdas no fijas que requieren reubicación
-  const unfixedIndices: number[] = [];
-  for (let i = 0; i < celdasCopy.length; i++) {
-    if (!isFixed(i)) {
-      unfixedIndices.push(i);
-    }
+  // Índices de celdas no fijas que necesitan reubicación
+  const unfixed: number[] = [];
+  for (let i = 0; i < work.length; i++) {
+    if (!fixed.has(i)) unfixed.push(i);
   }
 
-  if (unfixedIndices.length === 0) {
-    return { success: true, celdasActualizadas: celdasCopy, numMovidas: 1 };
+  if (unfixed.length === 0) {
+    return { success: true, celdasActualizadas: work, numMovidas: 1 };
   }
 
-  // Priorizar las celdas directamente afectadas por la colisión en destino o del mismo grupo/docente
-  unfixedIndices.sort((a, b) => {
-    const ca = celdasCopy[a];
-    const cb = celdasCopy[b];
-
+  // Priorizar celdas del mismo grupo o mismo docente
+  unfixed.sort((a, b) => {
+    const ca = work[a];
+    const cb = work[b];
     const scoreA =
-      (ca.grupoId === celdaAMover.grupoId ? 10 : 0) +
-      (ca.docenteId === celdaAMover.docenteId ? 10 : 0) +
+      (normId(ca.grupoId) === srcGrp ? 10 : 0) +
+      (normId(ca.docenteId) === srcDoc ? 10 : 0) +
       (ca.diaSemana === targetDia && ca.periodo === targetPeriodo ? 25 : 0);
-
     const scoreB =
-      (cb.grupoId === celdaAMover.grupoId ? 10 : 0) +
-      (cb.docenteId === celdaAMover.docenteId ? 10 : 0) +
+      (normId(cb.grupoId) === srcGrp ? 10 : 0) +
+      (normId(cb.docenteId) === srcDoc ? 10 : 0) +
       (cb.diaSemana === targetDia && cb.periodo === targetPeriodo ? 25 : 0);
-
     return scoreB - scoreA;
   });
 
-  // Generador de slots candidatos respetando estrictamente el límite de horas diarias de CADA grupo
-  const obtenerSlotsOrdenadosParaCelda = (celda: CeldaHorario) => {
-    const celdaGid = String(celda.grupoId || "").toLowerCase().trim();
-    const celdaDocId = String(celda.docenteId || "").toLowerCase().trim();
-    const maxP = getMaxPeriodosGrupo(celda.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
-    const slots: { dia: number; periodo: number; esMismoGrupo: boolean }[] = [];
-
-    // 1. Slots del propio grupo (prioridad alta)
-    for (let d = 1; d <= 5; d++) {
-      for (let p = 1; p <= maxP; p++) {
-        slots.push({ dia: d, periodo: p, esMismoGrupo: true });
-      }
-    }
-
-    // 2. Slots de otros grupos donde el mismo docente imparte clases (cross-group si el grupo está saturado)
-    const otrosGruposDelDocente = new Set<string>();
-    for (const c of celdasCopy) {
-      const cGid = String(c.grupoId || "").toLowerCase().trim();
-      const cDocId = String(c.docenteId || "").toLowerCase().trim();
-      if (cGid !== celdaGid && cDocId === celdaDocId) {
-        otrosGruposDelDocente.add(cGid);
-      }
-    }
-
-    for (const ogid of otrosGruposDelDocente) {
-      const maxPOtro = getMaxPeriodosGrupo(ogid, gruposInfo, celdasOriginales, numHorasPorDia);
-      for (let d = 1; d <= 5; d++) {
-        for (let p = 1; p <= maxPOtro; p++) {
-          if (!slots.some(s => s.dia === d && s.periodo === p && s.esMismoGrupo)) {
-            slots.push({ dia: d, periodo: p, esMismoGrupo: false });
-          }
-        }
-      }
-    }
-
-    return slots.sort((s1, s2) => {
-      // Priorizar mismo grupo
-      if (s1.esMismoGrupo !== s2.esMismoGrupo) return s1.esMismoGrupo ? -1 : 1;
-
-      // Priorizar la posición donde estaba originalmente la celda
-      if (s1.dia === celda.diaSemana && s1.periodo === celda.periodo) return -1;
-      if (s2.dia === celda.diaSemana && s2.periodo === celda.periodo) return 1;
-
-      // Priorizar el slot que dejó libre la celda arrastrada
-      if (s1.dia === origDia && s1.periodo === origPeriodo) return -1;
-      if (s2.dia === origDia && s2.periodo === origPeriodo) return 1;
-
-      return 0;
-    });
-  };
-
-  // Matriz de ocupación en O(1)
-  const ocupadoGrupo = new Set<string>();
-  const ocupadoDocente = new Set<string>();
-  const ocupadoAula = new Set<string>();
-
-  for (let i = 0; i < celdasCopy.length; i++) {
-    if (isFixed(i)) {
-      const c = celdasCopy[i];
-      const gid = String(c.grupoId || "").toLowerCase().trim();
-      const did = String(c.docenteId || "").toLowerCase().trim();
-      const aid = c.aulaId ? String(c.aulaId).toLowerCase().trim() : null;
-
-      ocupadoGrupo.add(`${c.diaSemana}_${c.periodo}_${gid}`);
-      ocupadoDocente.add(`${c.diaSemana}_${c.periodo}_${did}`);
-      if (aid) ocupadoAula.add(`${c.diaSemana}_${c.periodo}_${aid}`);
-    }
+  // Matrices de ocupación O(1)
+  const occGrp = new Set<string>();
+  const occDoc = new Set<string>();
+  for (const fi of fixed) {
+    const c = work[fi];
+    occGrp.add(`${c.diaSemana}_${c.periodo}_${normId(c.grupoId)}`);
+    occDoc.add(`${c.diaSemana}_${c.periodo}_${normId(c.docenteId)}`);
   }
 
-  let maxNodos = 40000;
-  let nodosVisitados = 0;
+  let nodos = 0;
+  const MAX_NODOS = 40000;
 
-  function resolverBacktracking(uIdx: number): boolean {
-    if (uIdx >= unfixedIndices.length) {
-      return true; // ¡Todas las celdas se asignaron respetando los límites!
-    }
+  function bt(ui: number): boolean {
+    if (ui >= unfixed.length) return true;
+    if (++nodos > MAX_NODOS) return false;
 
-    nodosVisitados++;
-    if (nodosVisitados > maxNodos) {
-      return false;
-    }
+    const ci = unfixed[ui];
+    const celda = work[ci];
+    const gid = normId(celda.grupoId);
+    const did = normId(celda.docenteId);
+    const maxP = getMaxPeriodosGrupo(celda.grupoId, gruposInfo, undefined, numHorasPorDia);
 
-    const celdaIndex = unfixedIndices[uIdx];
-    const celda = celdasCopy[celdaIndex];
-    const gid = String(celda.grupoId || "").toLowerCase().trim();
-    const did = String(celda.docenteId || "").toLowerCase().trim();
-    const aid = celda.aulaId ? String(celda.aulaId).toLowerCase().trim() : null;
-    const candidateSlots = obtenerSlotsOrdenadosParaCelda(celda);
+    for (let d = 1; d <= 5; d++) {
+      for (let p = 1; p <= maxP; p++) {
+        const kg = `${d}_${p}_${gid}`;
+        const kd = `${d}_${p}_${did}`;
 
-    for (const slot of candidateSlots) {
-      const d = slot.dia;
-      const p = slot.periodo;
+        if (occGrp.has(kg)) continue;
+        if (occDoc.has(kd)) continue;
+        if (isSlotBloqueado(d, p, celda, slotsLibresBloqueados)) continue;
 
-      const keyGrp = `${d}_${p}_${gid}`;
-      const keyDoc = `${d}_${p}_${did}`;
-      const keyAula = aid ? `${d}_${p}_${aid}` : null;
+        work[ci] = { ...work[ci], diaSemana: d, periodo: p };
+        occGrp.add(kg);
+        occDoc.add(kd);
 
-      if (isSlotLibreBloqueadoParaCelda(d, p, celda, slotsLibresBloqueados)) continue;
-      if (ocupadoGrupo.has(keyGrp)) continue;
-      if (ocupadoDocente.has(keyDoc)) continue;
-      if (keyAula && ocupadoAula.has(keyAula)) continue;
+        if (bt(ui + 1)) return true;
 
-      celdasCopy[celdaIndex].diaSemana = d;
-      celdasCopy[celdaIndex].periodo = p;
-      ocupadoGrupo.add(keyGrp);
-      ocupadoDocente.add(keyDoc);
-      if (keyAula) ocupadoAula.add(keyAula);
-
-      if (resolverBacktracking(uIdx + 1)) {
-        return true;
+        occGrp.delete(kg);
+        occDoc.delete(kd);
       }
-
-      ocupadoGrupo.delete(keyGrp);
-      ocupadoDocente.delete(keyDoc);
-      if (keyAula) ocupadoAula.delete(keyAula);
     }
-
     return false;
   }
 
-  const exito = resolverBacktracking(0);
+  const exito = bt(0);
 
   if (!exito) {
-    // Construir mensaje de error explicativo para el usuario
-    const docConflictivo = celdaAMover.docente?.nombre || "el docente";
+    const docNombre = work[srcIdx].docente?.nombre || "el docente";
     return {
       success: false,
-      error: `⚠️ No es posible mover esta clase: generaría una colisión con el horario del docente ${docConflictivo} o con horas bloqueadas que no se pueden reubicar en los periodos lectivos permitidos.`
+      error: `⚠️ No es posible reubicar esta clase: generaría colisión con el horario del docente ${docNombre} o con horas bloqueadas.`
     };
   }
 
-  // Contar cuántas celdas cambiaron de posición
+  // Contar movidas
   let numMovidas = 0;
-  for (let i = 0; i < celdasOriginales.length; i++) {
-    const orig = celdasOriginales[i];
-    const act = celdasCopy.find(
-      (c) =>
-        (c.id && c.id === orig.id) ||
-        (c.grupoId === orig.grupoId && c.docenteId === orig.docenteId && c.asignaturaId === orig.asignaturaId)
-    );
-
-    if (act && (act.diaSemana !== orig.diaSemana || act.periodo !== orig.periodo)) {
+  for (let i = 0; i < cells.length; i++) {
+    if (work[i].diaSemana !== cells[i].diaSemana || work[i].periodo !== cells[i].periodo) {
       numMovidas++;
     }
   }
 
-  return {
-    success: true,
-    celdasActualizadas: celdasCopy,
-    numMovidas: Math.max(numMovidas, 1)
-  };
+  return { success: true, celdasActualizadas: work, numMovidas: Math.max(numMovidas, 1) };
 }
