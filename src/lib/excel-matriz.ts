@@ -274,12 +274,10 @@ export async function parsearExcelMatriz(
           const filaMateria = data[mRow];
           if (!filaMateria || filaMateria.length === 0) continue;
 
-          // Si nos topamos con otra fila que parece encabezado de grupos o título de semestre, detener este bloque
-          const esNuevoEncabezado = filaMateria.some(cel => {
-            const str = String(cel || '').trim();
-            return str.match(/^[1-6][°º\-_]?[A-J]$/i);
-          });
-          if (esNuevoEncabezado) {
+          // Si nos topamos con un título de otro semestre o encabezado explícito, detener este bloque
+          const celda0 = String(filaMateria[0] || '').trim();
+          const esSeparadorSemestre = celda0.includes('---') || celda0.toUpperCase().includes('SEMESTRE');
+          if (esSeparadorSemestre) {
             break;
           }
 

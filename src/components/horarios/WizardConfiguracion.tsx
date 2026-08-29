@@ -688,8 +688,11 @@ export default function WizardConfiguracion({
   };
 
   const handleConfirmarImportacionMatriz = async () => {
-    if (!resultadoParseoMatriz || resultadoParseoMatriz.cargas.length === 0) {
-      toast.error("No hay cargas para aplicar.");
+    const docentesValidos = docentesParseadosHorarios.filter(d => d.valido);
+    const hayCargasEnMatriz = resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0;
+
+    if (docentesValidos.length === 0 && !hayCargasEnMatriz) {
+      toast.error("No se encontraron registros de docentes ni asignaciones en el archivo.");
       return;
     }
 
@@ -697,8 +700,7 @@ export default function WizardConfiguracion({
     try {
       let arrayPersonal = [...docentes];
 
-      // 1. Si el archivo tenía docentes en la Hoja 1 no guardados, registrarlos primero en bulk
-      const docentesValidos = docentesParseadosHorarios.filter(d => d.valido);
+      // 1. Si el archivo tenía docentes en la Hoja 1, registrarlos/actualizarlos en bulk
       if (docentesValidos.length > 0) {
         const res = await fetch("/api/escuela-personal/bulk", {
           method: "POST",
@@ -710,49 +712,61 @@ export default function WizardConfiguracion({
           arrayPersonal = data.docentes;
           setPersonalPlataforma(arrayPersonal);
           setDocentes(arrayPersonal);
+
+          const mapaHoras = { ...horasDocentes };
+          arrayPersonal.forEach((p: any) => {
+            mapaHoras[p.id] = p.horasAsignadas ?? p.horas_base ?? (p.cargo === "DOCENTE" ? 20 : 0);
+          });
+          setHorasDocentes(mapaHoras);
         }
       }
 
-      // 2. Reparsear con los IDs definitivos de docentes
-      const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
-      const reparseado = archivoMatrizExcel
-        ? await parsearExcelMatriz(archivoMatrizExcel, gruposDelPeriodoActual, getUACsIndividualesGrupo, arrayPersonal)
-        : resultadoParseoMatriz;
+      // 2. Si hay asignaciones en la matriz, aplicarlas con los IDs de docentes actualizados
+      let numAsignadas = 0;
+      if (hayCargasEnMatriz && archivoMatrizExcel) {
+        const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
+        const reparseado = await parsearExcelMatriz(archivoMatrizExcel, gruposDelPeriodoActual, getUACsIndividualesGrupo, arrayPersonal);
+        const cargasValidas = reparseado.cargas.filter(c => c.valido && c.personalId);
 
-      const cargasValidas = reparseado.cargas.filter(c => c.valido && c.personalId);
-      if (cargasValidas.length === 0) {
-        toast.error("No se encontraron docentes coincidentes para asignar. Verifique los nombres en el archivo.");
-        return;
+        if (cargasValidas.length > 0) {
+          const mapaCargas = new Map<string, any>();
+          cargas.forEach((c) => {
+            const key = `${c.grupoId}___${c.uacName || c.asignaturaId}`;
+            mapaCargas.set(key, c);
+          });
+
+          cargasValidas.forEach((c) => {
+            const key = `${c.grupoId}___${c.uacName}`;
+            mapaCargas.set(key, {
+              grupoId: c.grupoId,
+              asignaturaId: c.uacName,
+              uacName: c.uacName,
+              personalId: c.personalId,
+              horasSemanales: c.horasSemanales,
+              requiereAulaEspecial: false,
+            });
+          });
+
+          setCargas(Array.from(mapaCargas.values()));
+          numAsignadas = cargasValidas.length;
+        }
       }
 
-      const mapaCargas = new Map<string, any>();
-      // Mantener cargas existentes previas
-      cargas.forEach((c) => {
-        const key = `${c.grupoId}___${c.uacName || c.asignaturaId}`;
-        mapaCargas.set(key, c);
-      });
+      if (numAsignadas > 0 && docentesValidos.length > 0) {
+        toast.success(`¡Importación exitosa! ${docentesValidos.length} docentes sincronizados y ${numAsignadas} materias asignadas.`);
+      } else if (numAsignadas > 0) {
+        toast.success(`¡Matriz actualizada! ${numAsignadas} materias asignadas a docentes.`);
+      } else if (docentesValidos.length > 0) {
+        toast.success(`¡Personal sincronizado con éxito (${docentesValidos.length} docentes)!`);
+      }
 
-      // Sobreescribir con las nuevas cargas del archivo Excel
-      cargasValidas.forEach((c) => {
-        const key = `${c.grupoId}___${c.uacName}`;
-        mapaCargas.set(key, {
-          grupoId: c.grupoId,
-          asignaturaId: c.uacName,
-          uacName: c.uacName,
-          personalId: c.personalId,
-          horasSemanales: c.horasSemanales,
-          requiereAulaEspecial: false,
-        });
-      });
-
-      setCargas(Array.from(mapaCargas.values()));
-      toast.success(`¡Matriz actualizada! ${cargasValidas.length} materias asignadas a docentes.`);
       setMostrarModalMatrizExcel(false);
       setArchivoMatrizExcel(null);
       setResultadoParseoMatriz(null);
+      setDocentesParseadosHorarios([]);
       if (fileInputMatrizRef.current) fileInputMatrizRef.current.value = "";
     } catch (e) {
-      toast.error("Error al procesar la importación de matriz.");
+      toast.error("Error al procesar la importación.");
     } finally {
       setLoading(false);
     }
@@ -2363,36 +2377,73 @@ export default function WizardConfiguracion({
                   )}
 
                   <div style={{ maxHeight: "240px", overflowY: "auto", border: "1px solid #334155", borderRadius: "8px", background: "#1e293b" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
-                      <thead>
-                        <tr style={{ background: "#0f172a", borderBottom: "1px solid #334155", position: "sticky", top: 0 }}>
-                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Grupo</th>
-                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Materia (UAC)</th>
-                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Texto en Excel</th>
-                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Docente Asociado</th>
-                          <th style={{ padding: "0.4rem 0.6rem", textAlign: "center", color: "#94a3b8" }}>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {resultadoParseoMatriz.cargas.map((c, i) => (
-                          <tr key={i} style={{ borderBottom: "1px solid #334155", background: c.valido ? "transparent" : "rgba(245,158,11,0.08)" }}>
-                            <td style={{ padding: "0.35rem 0.6rem", color: "#38bdf8", fontWeight: 800 }}>{c.grupoNombre}</td>
-                            <td style={{ padding: "0.35rem 0.6rem", color: "#ffffff", fontWeight: 600 }}>{c.uacName}</td>
-                            <td style={{ padding: "0.35rem 0.6rem", color: "#94a3b8" }}>{c.docenteTextoExcel}</td>
-                            <td style={{ padding: "0.35rem 0.6rem", color: c.valido ? "#4ade80" : "#f87171", fontWeight: 700 }}>
-                              {c.docenteNombreMatch || "No encontrado"}
-                            </td>
-                            <td style={{ padding: "0.35rem 0.6rem", textAlign: "center" }}>
-                              {c.valido ? (
-                                <span style={{ color: "#4ade80", fontWeight: 800 }}>✓ Listo</span>
-                              ) : (
-                                <span style={{ color: "#fbbf24", fontSize: "0.6875rem" }}>⚠️ Sin coincidencia</span>
-                              )}
-                            </td>
+                    {resultadoParseoMatriz.cargas.length > 0 ? (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
+                        <thead>
+                          <tr style={{ background: "#0f172a", borderBottom: "1px solid #334155", position: "sticky", top: 0 }}>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Grupo</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Materia (UAC)</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Texto en Excel</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Docente Asociado</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "center", color: "#94a3b8" }}>Estado</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {resultadoParseoMatriz.cargas.map((c, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #334155", background: c.valido ? "transparent" : "rgba(245,158,11,0.08)" }}>
+                              <td style={{ padding: "0.35rem 0.6rem", color: "#38bdf8", fontWeight: 800 }}>{c.grupoNombre}</td>
+                              <td style={{ padding: "0.35rem 0.6rem", color: "#ffffff", fontWeight: 600 }}>{c.uacName}</td>
+                              <td style={{ padding: "0.35rem 0.6rem", color: "#94a3b8" }}>{c.docenteTextoExcel}</td>
+                              <td style={{ padding: "0.35rem 0.6rem", color: c.valido ? "#4ade80" : "#f87171", fontWeight: 700 }}>
+                                {c.docenteNombreMatch || "No encontrado"}
+                              </td>
+                              <td style={{ padding: "0.35rem 0.6rem", textAlign: "center" }}>
+                                {c.valido ? (
+                                  <span style={{ color: "#4ade80", fontWeight: 800 }}>✓ Listo</span>
+                                ) : (
+                                  <span style={{ color: "#fbbf24", fontSize: "0.6875rem" }}>⚠️ Sin coincidencia</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : docentesParseadosHorarios.length > 0 ? (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
+                        <thead>
+                          <tr style={{ background: "#0f172a", borderBottom: "1px solid #334155", position: "sticky", top: 0 }}>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>#</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Nombre Docente / Directivo</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "left", color: "#94a3b8" }}>Cargo</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "center", color: "#94a3b8" }}>Horas</th>
+                            <th style={{ padding: "0.4rem 0.6rem", textAlign: "center", color: "#94a3b8" }}>Estatus</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {docentesParseadosHorarios.map((d, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #334155" }}>
+                              <td style={{ padding: "0.35rem 0.6rem", color: "#64748b" }}>{i + 1}</td>
+                              <td style={{ padding: "0.35rem 0.6rem", color: "#ffffff", fontWeight: 700 }}>
+                                {d.apellidoPaterno} {d.apellidoMaterno} {d.nombre}
+                              </td>
+                              <td style={{ padding: "0.35rem 0.6rem", color: d.cargo === "DOCENTE" ? "#60a5fa" : "#fbbf24" }}>
+                                {d.cargo}
+                              </td>
+                              <td style={{ padding: "0.35rem 0.6rem", textAlign: "center", color: "#4ade80", fontWeight: 700 }}>
+                                {d.horasBase}h
+                              </td>
+                              <td style={{ padding: "0.35rem 0.6rem", textAlign: "center" }}>
+                                {d.valido ? <span style={{ color: "#4ade80", fontWeight: 800 }}>✓ Listo</span> : <span style={{ color: "#f87171" }}>⚠️ Incompleto</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div style={{ padding: "1.5rem", textAlign: "center", color: "#94a3b8", fontSize: "0.8125rem" }}>
+                        No se detectaron asignaciones en la matriz ni registros de personal.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2404,6 +2455,7 @@ export default function WizardConfiguracion({
                     setMostrarModalMatrizExcel(false);
                     setArchivoMatrizExcel(null);
                     setResultadoParseoMatriz(null);
+                    setDocentesParseadosHorarios([]);
                   }}
                   style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1.1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer" }}
                 >
@@ -2412,18 +2464,21 @@ export default function WizardConfiguracion({
                 <button
                   type="button"
                   onClick={handleConfirmarImportacionMatriz}
-                  disabled={!resultadoParseoMatriz || resultadoParseoMatriz.resumen.asignadasConExito === 0}
+                  disabled={
+                    loading ||
+                    (!docentesParseadosHorarios.some(d => d.valido) && (!resultadoParseoMatriz || resultadoParseoMatriz.cargas.length === 0))
+                  }
                   style={{
-                    background: (!resultadoParseoMatriz || resultadoParseoMatriz.resumen.asignadasConExito === 0) ? "#334155" : "#10b981",
+                    background: (loading || (!docentesParseadosHorarios.some(d => d.valido) && (!resultadoParseoMatriz || resultadoParseoMatriz.cargas.length === 0))) ? "#334155" : "#10b981",
                     color: "#ffffff",
                     padding: "0.5rem 1.4rem",
                     borderRadius: "8px",
                     fontWeight: 800,
                     border: "none",
-                    cursor: (!resultadoParseoMatriz || resultadoParseoMatriz.resumen.asignadasConExito === 0) ? "not-allowed" : "pointer"
+                    cursor: (loading || (!docentesParseadosHorarios.some(d => d.valido) && (!resultadoParseoMatriz || resultadoParseoMatriz.cargas.length === 0))) ? "not-allowed" : "pointer"
                   }}
                 >
-                  Confirmar e Importar a Matriz
+                  {loading ? "Procesando..." : (resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0) ? "Confirmar e Importar a Matriz" : "Confirmar e Importar Personal"}
                 </button>
               </div>
             </div>
