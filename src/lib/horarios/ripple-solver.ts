@@ -298,7 +298,7 @@ function resolverCascada(
   numHorasPorDia: number,
   slotsLibresBloqueados: Set<string>,
   gruposInfo?: GrupoLimiteInfo[],
-  maxDepth: number = 5
+  maxDepth: number = 8
 ): RippleResult {
   const work = cells.map((c) => ({ ...c }));
   const srcDoc = normId(work[srcIdx].docenteId);
@@ -366,7 +366,7 @@ function resolverCascada(
   }
 
   let nodos = 0;
-  const MAX_NODOS = 40000;
+  const MAX_NODOS = 200000;
 
   function bt(ui: number): boolean {
     if (ui >= unfixed.length) return true;

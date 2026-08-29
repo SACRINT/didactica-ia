@@ -145,6 +145,9 @@ export default function EditorHorarios({
     return new Set();
   });
 
+  const [regenerandoHorario, setRegenerandoHorario] = useState<boolean>(false);
+  const [limpiandoHorario, setLimpiandoHorario] = useState<boolean>(false);
+
   const toggleBloquearSlotLibre = (dia: number, periodo: number, filtroId: string) => {
     const key = `${dia}_${periodo}_${filtroId}`;
     setSlotsLibresBloqueados(prev => {
@@ -168,6 +171,109 @@ export default function EditorHorarios({
 
   const esSlotLibreBloqueado = (dia: number, periodo: number, filtroId: string) =>
     slotsLibresBloqueados.has(`${dia}_${periodo}_${filtroId}`);
+
+  const toggleBloquearDiaCompleto = (diaSemana: number) => {
+    const filtroId =
+      vistaTab === "GRUPO" ? grupoSeleccionadoId :
+      vistaTab === "DOCENTE" ? docenteSeleccionadoId :
+      vistaTab === "AULA" ? aulaSeleccionadaId :
+      grupoSeleccionadoId;
+
+    if (!filtroId) return;
+
+    setSlotsLibresBloqueados(prev => {
+      const nuevo = new Set(prev);
+      const horasDelDia = periodosVisibles;
+      const todasBloqueadas = horasDelDia.every(p => nuevo.has(`${diaSemana}_${p}_${filtroId}`));
+
+      if (todasBloqueadas) {
+        horasDelDia.forEach(p => nuevo.delete(`${diaSemana}_${p}_${filtroId}`));
+        toast.success(`Día ${diasLectivos[diaSemana - 1]} desbloqueado`);
+      } else {
+        horasDelDia.forEach(p => nuevo.add(`${diaSemana}_${p}_${filtroId}`));
+        toast.success(`🔒 Día ${diasLectivos[diaSemana - 1]} completo bloqueado (${horasDelDia.length} horas protegidas)`);
+      }
+
+      if (typeof window !== "undefined" && escuela?.id && horario?.id) {
+        try {
+          localStorage.setItem(`horarios_slots_libres_${escuela.id}_${horario.id}`, JSON.stringify(Array.from(nuevo)));
+        } catch (e) {}
+      }
+      setHayCambiosSinGuardar(true);
+      return nuevo;
+    });
+  };
+
+  const handleLimpiarReticula = async () => {
+    if (!horario?.id) return;
+    const candadosActivos = (horario.celdas || []).filter((c: any) => c.esBloqueado).length;
+    const confirmMsg = candadosActivos > 0
+      ? `¿Vaciar la retícula del horario? Se eliminarán las clases para que puedas pre-fijar bloqueos y días libres libremente.\n\n🔒 Se preservarán ${candadosActivos} materia(s) con candado.`
+      : "¿Vaciar la retícula del horario? Todas las casillas quedarán libres para que puedas pre-fijar bloqueos y días libres antes de reoptimizar.";
+
+    const confirmar = window.confirm(confirmMsg);
+    if (!confirmar) return;
+
+    setLimpiandoHorario(true);
+    try {
+      const res = await fetch("/api/horarios/regenerar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHorario(data.horario);
+        if (onGuardarHorario) {
+          onGuardarHorario(data.horario);
+        }
+        setHayCambiosSinGuardar(false);
+        toast.success("🧹 Retícula vaciada. Ahora puedes bloquear días u horas libres antes de reoptimizar.");
+      } else {
+        toast.error(data.error || "Error al vaciar retícula");
+      }
+    } catch (err) {
+      toast.error("Error de conexión al vaciar retícula");
+    } finally {
+      setLimpiandoHorario(false);
+    }
+  };
+
+  const handleRegenerarHorarioGlobal = async () => {
+    if (!horario?.id) return;
+    setRegenerandoHorario(true);
+    const toastId = toast.loading("⚡ Reoptimizando horario completo con Solver Global...");
+
+    try {
+      const res = await fetch("/api/horarios/regenerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          horarioId: horario.id,
+          slotsLibresBloqueados: Array.from(slotsLibresBloqueados),
+          celdas: horario.celdas
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setHorario(data.horario);
+        if (onGuardarHorario) {
+          onGuardarHorario(data.horario);
+        }
+        setHayCambiosSinGuardar(false);
+        toast.success(
+          `✨ ¡Horario reoptimizado al 100%! (${data.horario.celdas?.length || 0} horas asignadas, 0 empalmes)`,
+          { id: toastId }
+        );
+      } else {
+        toast.error(data.error || "No fue posible generar con las restricciones actuales", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error de conexión al reoptimizar horario", { id: toastId });
+    } finally {
+      setRegenerandoHorario(false);
+    }
+  };
 
   const [draggedCelda, setDraggedCelda] = useState<any>(null);
   const draggedCeldaRef = React.useRef<any>(null);
@@ -751,7 +857,7 @@ export default function EditorHorarios({
           </button>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
           <button
             onClick={() => setMostrarChat(!mostrarChat)}
             style={{
@@ -769,6 +875,53 @@ export default function EditorHorarios({
             }}
           >
             <MessageSquare style={{ width: "15px", height: "15px" }} /> {mostrarChat ? "Ocultar Chat IA" : "Abrir Chat IA"}
+          </button>
+
+          <button
+            onClick={handleLimpiarReticula}
+            disabled={limpiandoHorario || regenerandoHorario}
+            style={{
+              background: "#1e293b",
+              color: "#f87171",
+              border: "1px solid #7f1d1d",
+              padding: "0.45rem 0.85rem",
+              borderRadius: "8px",
+              fontWeight: 700,
+              fontSize: "0.8125rem",
+              cursor: limpiandoHorario || regenerandoHorario ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              transition: "all 0.15s ease"
+            }}
+            title="Vaciar las clases para dejar la retícula libre y pre-fijar días libres con candado"
+          >
+            <Trash2 style={{ width: "15px", height: "15px" }} />
+            {limpiandoHorario ? "Limpiando..." : "Limpiar Retícula"}
+          </button>
+
+          <button
+            onClick={handleRegenerarHorarioGlobal}
+            disabled={regenerandoHorario || limpiandoHorario}
+            style={{
+              background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+              color: "#ffffff",
+              border: "1px solid #8b5cf6",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              fontWeight: 800,
+              fontSize: "0.8125rem",
+              cursor: regenerandoHorario || limpiandoHorario ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              boxShadow: "0 2px 10px rgba(124, 58, 237, 0.4)",
+              transition: "all 0.15s ease"
+            }}
+            title="Reoptimizar las 255 horas con el Solver Global respetando todos tus candados y horas/días bloqueados"
+          >
+            <Sparkles style={{ width: "15px", height: "15px", animation: regenerandoHorario ? "spin 1s linear infinite" : "none" }} />
+            {regenerandoHorario ? "Reoptimizando..." : "Reoptimizar Horario"}
           </button>
 
           <button
@@ -999,9 +1152,65 @@ export default function EditorHorarios({
               <thead>
                 <tr>
                   <th style={{ width: "12%", padding: "0.6rem 0.5rem", background: "#1e293b", color: "#cbd5e1", border: "1px solid #334155", fontWeight: 800 }}>Periodo</th>
-                  {diasLectivos.map((d, i) => (
-                    <th key={i} style={{ width: "17.6%", padding: "0.6rem 0.5rem", background: "#1e293b", color: "#ffffff", border: "1px solid #334155", fontWeight: 800 }}>{d}</th>
-                  ))}
+                  {diasLectivos.map((d, i) => {
+                    const diaNum = i + 1;
+                    const filtroId =
+                      vistaTab === "GRUPO" ? grupoSeleccionadoId :
+                      vistaTab === "DOCENTE" ? docenteSeleccionadoId :
+                      vistaTab === "AULA" ? aulaSeleccionadaId :
+                      grupoSeleccionadoId;
+                    const diaCompletoBloqueado = periodosVisibles.length > 0 && periodosVisibles.every(p => slotsLibresBloqueados.has(`${diaNum}_${p}_${filtroId}`));
+
+                    return (
+                      <th
+                        key={i}
+                        style={{
+                          width: "17.6%",
+                          padding: "0.5rem 0.35rem",
+                          background: diaCompletoBloqueado ? "rgba(245, 158, 11, 0.18)" : "#1e293b",
+                          color: diaCompletoBloqueado ? "#fbbf24" : "#ffffff",
+                          border: diaCompletoBloqueado ? "1px solid #f59e0b" : "1px solid #334155",
+                          fontWeight: 800,
+                          textAlign: "center"
+                        }}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem" }}>
+                          <span>{d}</span>
+                          {(vistaTab === "DOCENTE" || vistaTab === "GRUPO") && (
+                            <button
+                              type="button"
+                              onClick={() => toggleBloquearDiaCompleto(diaNum)}
+                              title={diaCompletoBloqueado ? `Día ${d} bloqueado. Clic para desbloquear.` : `Clic para bloquear todo el día ${d} (${periodosVisibles.length} horas)`}
+                              style={{
+                                background: diaCompletoBloqueado ? "#f59e0b" : "#0f172a",
+                                color: diaCompletoBloqueado ? "#000000" : "#94a3b8",
+                                border: diaCompletoBloqueado ? "1px solid #d97706" : "1px solid #334155",
+                                borderRadius: "4px",
+                                fontSize: "0.65rem",
+                                padding: "2px 6px",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                transition: "all 0.15s ease"
+                              }}
+                            >
+                              {diaCompletoBloqueado ? (
+                                <>
+                                  <Lock style={{ width: "10px", height: "10px" }} /> Bloqueado
+                                </>
+                              ) : (
+                                <>
+                                  <Lock style={{ width: "10px", height: "10px", opacity: 0.6 }} /> Bloquear Día
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -1366,6 +1575,78 @@ export default function EditorHorarios({
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay de Carga durante Reoptimización Global */}
+      {regenerandoHorario && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.85)",
+            backdropFilter: "blur(6px)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <div
+            style={{
+              background: "#1e293b",
+              border: "1px solid #475569",
+              borderRadius: "16px",
+              padding: "2rem 2.5rem",
+              maxWidth: "480px",
+              width: "90%",
+              textAlign: "center",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+            }}
+          >
+            <div
+              style={{
+                width: "60px",
+                height: "60px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 1.25rem",
+                boxShadow: "0 0 20px rgba(124, 58, 237, 0.5)"
+              }}
+            >
+              <RefreshCw style={{ width: "28px", height: "28px", color: "#ffffff", animation: "spin 1.2s linear infinite" }} />
+            </div>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 900, color: "#ffffff", marginBottom: "0.5rem" }}>
+              ⚡ Reoptimizando Horario Escolar
+            </h3>
+            <p style={{ fontSize: "0.875rem", color: "#94a3b8", lineHeight: 1.5, marginBottom: "1.25rem" }}>
+              El Solver Global está procesando las <strong>255 horas lectivas</strong>, verificando las restricciones de los <strong>11 docentes</strong> y respetando todos los días y horas bloqueadas...
+            </p>
+            <div
+              style={{
+                background: "#0f172a",
+                borderRadius: "8px",
+                padding: "0.6rem 1rem",
+                border: "1px solid #334155",
+                fontSize: "0.75rem",
+                color: "#38bdf8",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem"
+              }}
+            >
+              <Sparkles style={{ width: "14px", height: "14px" }} />
+              Garantizando 0 empalmes y máxima distribución pedagógica
             </div>
           </div>
         </div>
