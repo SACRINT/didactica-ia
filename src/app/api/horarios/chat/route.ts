@@ -156,6 +156,8 @@ export async function POST(req: NextRequest) {
 
     if (respuestaIA.acciones && respuestaIA.acciones.length > 0) {
       for (const accion of respuestaIA.acciones) {
+        let ejecutadoLocal = false;
+
         if (accion.tipo === "MOVER_CELDA") {
           const resMover = moverCelda(
             celdasResultado,
@@ -174,6 +176,7 @@ export async function POST(req: NextRequest) {
           );
           if (resMover.success) {
             celdasResultado = resMover.celdas;
+            ejecutadoLocal = true;
           } else {
             // Intentar con búsqueda de cadena de reubicación
             const celdaTarget = celdasResultado.find(c => {
@@ -194,8 +197,14 @@ export async function POST(req: NextRequest) {
               );
               if (resCadena.success && resCadena.celdasResult) {
                 celdasResultado = resCadena.celdasResult;
+                ejecutadoLocal = true;
               }
             }
+          }
+
+          if (!ejecutadoLocal) {
+            // Activar solver global fijando la celda destino
+            accion.tipo = "REGENERAR_CON_RESTRICCIONES";
           }
         } else if (accion.tipo === "INTERCAMBIAR" && accion.origen && accion.destino) {
           const resSwap = intercambiarCeldas(
@@ -207,29 +216,42 @@ export async function POST(req: NextRequest) {
           );
           if (resSwap.success) {
             celdasResultado = resSwap.celdas;
-          }
-        } else if (accion.tipo === "BLOQUEAR_LIBRE") {
-          const resBloq = bloquearLibre(
-            celdasResultado,
-            {
-              docenteId: accion.docenteId,
-              grupoId: accion.grupoId,
-              dias: accion.dias,
-              periodos: accion.periodos,
-              intermedias: accion.intermedias
-            },
-            slotsLibresActualizados,
-            gruposInfo,
-            horasPorDia,
-            diasLectivos
-          );
-          if (resBloq.success) {
-            celdasResultado = resBloq.celdas;
-            slotsLibresActualizados = resBloq.slotsActualizados;
+            ejecutadoLocal = true;
           } else {
-            // Si la mutación quirúrgica no pudo encontrar huecos libres, ejecutar regeneración macro
             accion.tipo = "REGENERAR_CON_RESTRICCIONES";
           }
+        } else if (accion.tipo === "BLOQUEAR_LIBRE") {
+          // Agregar a slots bloqueados
+          if (accion.docenteId) {
+            if (accion.dias) {
+              for (const d of accion.dias) {
+                for (let p = 1; p <= horasPorDia; p++) {
+                  slotsLibresActualizados.add(`${d}_${p}_${accion.docenteId}`);
+                }
+              }
+            }
+            if (accion.periodos) {
+              for (const item of accion.periodos) {
+                slotsLibresActualizados.add(`${item.dia}_${item.periodo}_${accion.docenteId}`);
+              }
+            }
+          }
+          if (accion.grupoId) {
+            if (accion.dias) {
+              for (const d of accion.dias) {
+                for (let p = 1; p <= horasPorDia; p++) {
+                  slotsLibresActualizados.add(`${d}_${p}_${accion.grupoId}`);
+                }
+              }
+            }
+            if (accion.periodos) {
+              for (const item of accion.periodos) {
+                slotsLibresActualizados.add(`${item.dia}_${item.periodo}_${accion.grupoId}`);
+              }
+            }
+          }
+          // Siempre reoptimizar globalmente tras un bloqueo para garantizar reubicación sin empalmes
+          accion.tipo = "REGENERAR_CON_RESTRICCIONES";
         }
 
         if (accion.tipo === "REGENERAR_CON_RESTRICCIONES" || accion.tipo === "MACRO_RESTRICCION") {
@@ -245,69 +267,62 @@ export async function POST(req: NextRequest) {
               aulaId: c.aulaId || undefined
             }));
 
+          // Si vino de un MOVER_CELDA fallido, agregar la nueva ubicación como celda fija
+          if (accion.diaDestino && accion.periodoDestino && accion.asignatura) {
+            celdasFijasExistentes.push({
+              diaSemana: accion.diaDestino,
+              periodo: accion.periodoDestino,
+              grupoId: accion.grupoId || "1° A",
+              docenteId: accion.docenteId || teacherId,
+              asignaturaId: accion.asignatura,
+              aulaId: undefined
+            });
+          }
+
           const restriccionMaxHrsDia = accion.restriccionDistribucion === "MAX_1_HR_DIA" ? 1 : 2;
 
-          // Reconstruir cargas completas agrupando las celdas activas
-          const cargasMap = new Map<string, any>();
-          for (const c of clientCeldas) {
-            if (!c.docenteId || c.docenteId === "__BLOQUEADO__") continue;
-            const key = `${c.grupoId}___${c.docenteId}___${c.asignaturaId || c.uacName}`;
-            if (!cargasMap.has(key)) {
-              cargasMap.set(key, {
-                id: `carga_${cargasMap.size}`,
-                grupoId: c.grupoId,
-                docenteId: c.docenteId,
-                asignaturaId: c.asignaturaId || c.uacName || "MATERIA",
-                horasSemanales: 0,
-                aulaEspecialId: c.aulaId || undefined,
-                requiereAulaEspecial: !!c.aulaId
-              });
-            }
-            cargasMap.get(key)!.horasSemanales += 1;
-          }
-
-          let cargasParaSolver = Array.from(cargasMap.values());
-          if (cargasParaSolver.length === 0 && cargasRows.length > 0) {
-            cargasParaSolver = cargasRows.map((c: any) => ({
-              id: c.id,
-              docenteId: c.personalId,
-              grupoId: c.grupoId,
-              asignaturaId: c.uacName,
-              horasSemanales: c.horasSemanales || 3,
-              requiereAulaEspecial: c.requiereAulaEspecial
-            }));
-          }
-
-          // Sanitizar restricciones para asegurar que no excedan las horas libres del docente
-          const restriccionesSanitizadas = (accion.bloqueosDocentes || []).map((r: any) => {
-            const docInfo = docentes.find((d: any) => d.id === r.docenteId);
-            const hrsAsig = docInfo?.horasAsignadas || 20;
-            const diasIndisp = r.diasIndisponibles || [];
-            const diasDisponibles = Math.max(1, diasLectivos - diasIndisp.length);
-            const maxCapacidadDias = diasDisponibles * horasPorDia;
-
-            if (hrsAsig > maxCapacidadDias) {
+          // Preparar cargas para el solver (priorizando cargasRows de la BD)
+          let cargasParaSolver: any[] = [];
+          if (cargasRows.length > 0) {
+            cargasParaSolver = cargasRows.map((c: any, idx: number) => {
+              const gMatch = grupos.find((g: any) => g.id === c.grupoId || g.nombre === c.grupoId);
               return {
-                docenteId: r.docenteId,
-                diasIndisponibles: [],
-                periodosIndisponibles: []
+                id: c.id || `carga_${idx}`,
+                docenteId: String(c.personalId || ''),
+                grupoId: gMatch ? gMatch.id : c.grupoId,
+                asignaturaId: String(c.uacName || ''),
+                horasSemanales: Number(c.horasSemanales || 3),
+                esHoraDoblePermitida: true,
+                requiereAulaEspecial: !!c.requiereAulaEspecial
               };
+            }).filter((c: any) => {
+              const gMatch = grupos.find((g: any) => g.id === c.grupoId);
+              return gMatch && c.docenteId && c.grupoId && c.horasSemanales > 0;
+            });
+          }
+
+          if (cargasParaSolver.length === 0) {
+            const cargasMap = new Map<string, any>();
+            for (const c of clientCeldas) {
+              if (!c.docenteId || c.docenteId === "__BLOQUEADO__") continue;
+              const key = `${c.grupoId}___${c.docenteId}___${c.asignaturaId || c.uacName}`;
+              if (!cargasMap.has(key)) {
+                cargasMap.set(key, {
+                  id: `carga_${cargasMap.size}`,
+                  grupoId: c.grupoId,
+                  docenteId: c.docenteId,
+                  asignaturaId: c.asignaturaId || c.uacName || "MATERIA",
+                  horasSemanales: 0,
+                  aulaEspecialId: c.aulaId || undefined,
+                  requiereAulaEspecial: !!c.aulaId
+                });
+              }
+              cargasMap.get(key)!.horasSemanales += 1;
             }
+            cargasParaSolver = Array.from(cargasMap.values());
+          }
 
-            let periodosValidos = r.periodosIndisponibles || [];
-            const maxPeriodosPermitidos = maxCapacidadDias - hrsAsig;
-            if (periodosValidos.length > maxPeriodosPermitidos) {
-              periodosValidos = periodosValidos.slice(0, Math.max(0, maxPeriodosPermitidos));
-            }
-
-            return {
-              docenteId: r.docenteId,
-              diasIndisponibles: diasIndisp,
-              periodosIndisponibles: periodosValidos
-            };
-          });
-
-          // Resolver con el nuevo Solver Min-Conflicts respetando slotsLibresBloqueados
+          // Resolver con Solver Global CSP respetando slotsLibresBloqueados
           const resultadoSolver = resolverHorario({
             diasLectivos,
             horasPorDia,
@@ -317,7 +332,6 @@ export async function POST(req: NextRequest) {
             aulas: [{ id: "aula-general", nombre: "Aula General", tipo: "REGULAR" }],
             cargas: cargasParaSolver,
             celdasFijas: celdasFijasExistentes,
-            restriccionesDocentes: restriccionesSanitizadas,
             slotsLibresBloqueados: Array.from(slotsLibresActualizados)
           });
 

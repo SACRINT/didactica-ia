@@ -172,7 +172,7 @@ export default function EditorHorarios({
   const esSlotLibreBloqueado = (dia: number, periodo: number, filtroId: string) =>
     slotsLibresBloqueados.has(`${dia}_${periodo}_${filtroId}`);
 
-  const toggleBloquearDiaCompleto = (diaSemana: number) => {
+  const toggleBloquearDiaCompleto = async (diaSemana: number) => {
     const filtroId =
       vistaTab === "GRUPO" ? grupoSeleccionadoId :
       vistaTab === "DOCENTE" ? docenteSeleccionadoId :
@@ -181,27 +181,64 @@ export default function EditorHorarios({
 
     if (!filtroId) return;
 
-    setSlotsLibresBloqueados(prev => {
-      const nuevo = new Set(prev);
-      const horasDelDia = periodosVisibles;
-      const todasBloqueadas = horasDelDia.every(p => nuevo.has(`${diaSemana}_${p}_${filtroId}`));
+    const horasDelDia = periodosVisibles;
+    const todasBloqueadas = horasDelDia.every(p => slotsLibresBloqueados.has(`${diaSemana}_${p}_${filtroId}`));
 
-      if (todasBloqueadas) {
-        horasDelDia.forEach(p => nuevo.delete(`${diaSemana}_${p}_${filtroId}`));
-        toast.success(`Día ${diasLectivos[diaSemana - 1]} desbloqueado`);
-      } else {
-        horasDelDia.forEach(p => nuevo.add(`${diaSemana}_${p}_${filtroId}`));
-        toast.success(`🔒 Día ${diasLectivos[diaSemana - 1]} completo bloqueado (${horasDelDia.length} horas protegidas)`);
-      }
+    const nuevosSlots = new Set(slotsLibresBloqueados);
+    if (todasBloqueadas) {
+      horasDelDia.forEach(p => nuevosSlots.delete(`${diaSemana}_${p}_${filtroId}`));
+      setSlotsLibresBloqueados(nuevosSlots);
+      toast.success(`Día ${diasLectivos[diaSemana - 1]} desbloqueado`);
+    } else {
+      horasDelDia.forEach(p => nuevosSlots.add(`${diaSemana}_${p}_${filtroId}`));
+      setSlotsLibresBloqueados(nuevosSlots);
+      toast.success(`🔒 Día ${diasLectivos[diaSemana - 1]} completo bloqueado (${horasDelDia.length} horas protegidas)`);
+    }
 
-      if (typeof window !== "undefined" && escuela?.id && horario?.id) {
-        try {
-          localStorage.setItem(`horarios_slots_libres_${escuela.id}_${horario.id}`, JSON.stringify(Array.from(nuevo)));
-        } catch (e) {}
+    if (typeof window !== "undefined" && escuela?.id && horario?.id) {
+      try {
+        localStorage.setItem(`horarios_slots_libres_${escuela.id}_${horario.id}`, JSON.stringify(Array.from(nuevosSlots)));
+      } catch (e) {}
+    }
+    setHayCambiosSinGuardar(true);
+
+    // Si se acaba de bloquear el día y hay clases asignadas en ese día para esta entidad, reoptimizar con Solver Global
+    const tieneClasesEnDia = (horario?.celdas || []).some(
+      (c: any) => c.diaSemana === diaSemana && (normalizarId(c.docenteId) === normalizarId(filtroId) || normalizarId(c.grupoId) === normalizarId(filtroId))
+    );
+
+    if (!todasBloqueadas && tieneClasesEnDia) {
+      const diaNombre = diasLectivos[diaSemana - 1] || `Día ${diaSemana}`;
+      const toastId = toast.loading(`⚡ Reubicando clases fuera del día ${diaNombre} con Solver Global...`);
+      setRegenerandoHorario(true);
+      try {
+        const celdasBase = (horario?.celdas || []).filter(
+          (c: any) => !(c.diaSemana === diaSemana && (normalizarId(c.docenteId) === normalizarId(filtroId) || normalizarId(c.grupoId) === normalizarId(filtroId)))
+        );
+        const res = await fetch("/api/horarios/regenerar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            horarioId: horario?.id,
+            slotsLibresBloqueados: Array.from(nuevosSlots),
+            celdas: celdasBase
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.horario?.celdas) {
+          setHorario(data.horario);
+          if (onGuardarHorario) onGuardarHorario(data.horario);
+          setHayCambiosSinGuardar(false);
+          toast.success(`✨ ¡Día ${diaNombre} bloqueado y clases reubicadas automáticamente!`, { id: toastId, duration: 4000 });
+        } else {
+          toast.error(data.error || "No fue posible reubicar todas las clases fuera de este día.", { id: toastId });
+        }
+      } catch (err) {
+        toast.error("Error al reoptimizar horario", { id: toastId });
+      } finally {
+        setRegenerandoHorario(false);
       }
-      setHayCambiosSinGuardar(true);
-      return nuevo;
-    });
+    }
   };
 
   const handleLimpiarReticula = async () => {
@@ -395,7 +432,61 @@ export default function EditorHorarios({
     setDragOverPos(null);
   };
 
-  const handleDropOnSlot = (targetDia: number, targetPeriodo: number) => {
+  const handleBloquearSlotOcupado = async (dia: number, periodo: number, filtroId: string, celda: any) => {
+    const key = `${dia}_${periodo}_${filtroId}`;
+    const diaNombre = diasLectivos[dia - 1] || `Día ${dia}`;
+    const uacNombre = getNombreAsignaturaCelda(celda);
+
+    // 1. Agregar a slots libres bloqueados
+    const nuevosSlots = new Set(slotsLibresBloqueados);
+    nuevosSlots.add(key);
+    setSlotsLibresBloqueados(nuevosSlots);
+
+    if (typeof window !== "undefined" && escuela?.id && horario?.id) {
+      try {
+        localStorage.setItem(`horarios_slots_libres_${escuela.id}_${horario.id}`, JSON.stringify(Array.from(nuevosSlots)));
+      } catch (e) {}
+    }
+
+    // 2. Reoptimizar con Solver Global para reubicar la clase fuera de este slot
+    const toastId = toast.loading(`🔒 Bloqueando ${diaNombre} Hora ${periodo} y reubicando "${uacNombre}" con Solver Global...`);
+    setRegenerandoHorario(true);
+
+    try {
+      // Filtrar la celda de esta posición para que el solver la coloque en otro slot libre
+      const celdasBase = (horario?.celdas || []).filter(
+        (c: any) => !(c.diaSemana === dia && c.periodo === periodo && normalizarId(c.grupoId) === normalizarId(celda.grupoId))
+      );
+
+      const res = await fetch("/api/horarios/regenerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          horarioId: horario?.id,
+          slotsLibresBloqueados: Array.from(nuevosSlots),
+          celdas: celdasBase
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.horario?.celdas) {
+        setHorario(data.horario);
+        if (onGuardarHorario) {
+          onGuardarHorario(data.horario);
+        }
+        setHayCambiosSinGuardar(false);
+        toast.success(`🔒 ${diaNombre} Hora ${periodo} bloqueada exitosamente. "${uacNombre}" fue reubicada automáticamente.`, { id: toastId, duration: 4000 });
+      } else {
+        toast.error(data.error || "No fue posible reubicar la clase al bloquear esta hora.", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Error al bloquear hora y reoptimizar", { id: toastId });
+    } finally {
+      setRegenerandoHorario(false);
+    }
+  };
+
+  const handleDropOnSlot = async (targetDia: number, targetPeriodo: number) => {
     setDragOverPos(null);
     const celdaArrastrada = draggedCeldaRef.current || draggedCelda;
     if (!celdaArrastrada || !horario?.celdas) return;
@@ -410,7 +501,7 @@ export default function EditorHorarios({
       return;
     }
 
-    // Validación simple (solo candado y jornada)
+    // Validación simple (solo candado en destino y jornada máxima)
     const validacion = validarSlotDestinoSimple(targetDia, targetPeriodo, celdaArrastrada);
     if (!validacion.ok) {
       toast.error(validacion.razon || "Movimiento no permitido.");
@@ -427,8 +518,8 @@ export default function EditorHorarios({
       nombre: g.nombre
     }));
 
-    // El ripple-solver maneja TODO: movimiento directo, swap 1-a-1, y cascada
-    const resultado = reacomodarHorarioConRipple(
+    // 1. Intentar primero con el solver local ultra-rápido (<5ms)
+    const resultadoLocal = reacomodarHorarioConRipple(
       horario.celdas,
       celdaArrastrada,
       targetDia,
@@ -438,17 +529,16 @@ export default function EditorHorarios({
       gruposInfo
     );
 
-    if (resultado.success && resultado.celdasActualizadas) {
-      setHorario({ ...horario, celdas: resultado.celdasActualizadas });
+    if (resultadoLocal.success && resultadoLocal.celdasActualizadas) {
+      setHorario({ ...horario, celdas: resultadoLocal.celdasActualizadas });
       setHayCambiosSinGuardar(true);
       draggedCeldaRef.current = null;
       setDraggedCelda(null);
 
       const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
-      if (resultado.numMovidas && resultado.numMovidas > 2) {
-        toast.success(`🔄 Reubicación en cadena: ${resultado.numMovidas} clases reacomodadas sin empalmes.`, { duration: 4000 });
-      } else if (resultado.numMovidas === 2) {
-        // Buscar la otra celda para el toast de swap
+      if (resultadoLocal.numMovidas && resultadoLocal.numMovidas > 2) {
+        toast.success(`🔄 Reubicación en cadena: ${resultadoLocal.numMovidas} clases reacomodadas sin empalmes.`, { duration: 4000 });
+      } else if (resultadoLocal.numMovidas === 2) {
         const celdaDestino = horario.celdas.find(
           (c: any) =>
             c.diaSemana === targetDia &&
@@ -458,15 +548,62 @@ export default function EditorHorarios({
         const matDest = celdaDestino ? getNombreAsignaturaCelda(celdaDestino) : "otra materia";
         toast.success(`🔄 Swap: "${matNombre}" ⇄ "${matDest}"`);
       } else {
-        toast.success(`✅ "${matNombre}" reubicada al Día ${targetDia}, Hora ${targetPeriodo}`);
+        toast.success(`✅ "${matNombre}" reubicada al Día ${diasLectivos[targetDia - 1] || targetDia}, Hora ${targetPeriodo}`);
       }
       return;
     }
 
-    // Error del solver
-    toast.error(resultado.error || "No fue posible reubicar la clase.");
+    // 2. Si el movimiento local requiere reorganización profunda multianual:
+    // ACTIVAR REOPTIMIZACIÓN GLOBAL AUTOMÁTICA (Solver Global CSP)
     draggedCeldaRef.current = null;
     setDraggedCelda(null);
+
+    const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
+    const diaDestNombre = diasLectivos[targetDia - 1] || `Día ${targetDia}`;
+    const toastId = toast.loading(`⚡ Reoptimizando horario global para colocar "${matNombre}" en ${diaDestNombre} Hora ${targetPeriodo}...`);
+    setRegenerandoHorario(true);
+
+    try {
+      // Remover la celda de su posición original y fijarla en la nueva
+      const celdasBase = (horario.celdas || []).filter(
+        (c: any) => !(c.diaSemana === sourceDia && c.periodo === sourcePeriodo && normalizarId(c.grupoId) === normalizarId(celdaArrastrada.grupoId))
+      );
+
+      const celdaFijada = {
+        ...celdaArrastrada,
+        diaSemana: targetDia,
+        periodo: targetPeriodo,
+        esBloqueado: true
+      };
+
+      const celdasParaEnviar = [...celdasBase, celdaFijada];
+
+      const res = await fetch("/api/horarios/regenerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          horarioId: horario.id,
+          slotsLibresBloqueados: Array.from(slotsLibresBloqueados),
+          celdas: celdasParaEnviar
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.horario?.celdas) {
+        setHorario(data.horario);
+        if (onGuardarHorario) {
+          onGuardarHorario(data.horario);
+        }
+        setHayCambiosSinGuardar(false);
+        toast.success(`✨ ¡"${matNombre}" reubicada exitosamente y horario reacomodado con Solver Global!`, { id: toastId, duration: 4000 });
+      } else {
+        toast.error(data.error || "No fue posible reacomodar el horario con este movimiento debido a colisiones estrictas de jornada o bloqueos.", { id: toastId, duration: 5000 });
+      }
+    } catch (err) {
+      toast.error("Error de conexión al reoptimizar horario global", { id: toastId });
+    } finally {
+      setRegenerandoHorario(false);
+    }
   };
 
   const getCeldaInfo = (diaSemana: number, periodo: number) => {
@@ -1289,29 +1426,69 @@ export default function EditorHorarios({
                               }}
                             >
                               <div>
-                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.2rem" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.2rem" }}>
                                   <p style={{ fontSize: "0.75rem", fontWeight: 900, color: estiloColor.text, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={uacNombre}>
                                     {uacNombre}
                                   </p>
-                                  <button
-                                    onClick={(e) => toggleBloquearCelda(celda, e)}
-                                    title={celda.esBloqueado ? "🔒 Celda protegida con candado (Clic para desbloquear)" : "Clic para fijar con candado"}
-                                    style={{
-                                      background: celda.esBloqueado ? "rgba(245, 158, 11, 0.25)" : "transparent",
-                                      borderRadius: "4px",
-                                      border: celda.esBloqueado ? "1px solid #f59e0b" : "none",
-                                      cursor: "pointer",
-                                      padding: "1px 3px",
-                                      display: "inline-flex",
-                                      alignItems: "center"
-                                    }}
-                                  >
-                                    {celda.esBloqueado ? (
-                                      <Lock style={{ width: "12px", height: "12px", color: "#fbbf24" }} />
-                                    ) : (
-                                      <Unlock style={{ width: "11px", height: "11px", color: "#64748b", opacity: 0.5 }} />
+                                  <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                                    {/* Botón Candado (Fijar materia) */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleBloquearCelda(celda, e)}
+                                      title={celda.esBloqueado ? "🔒 Materia fijada con candado (La IA y el Solver no la moverán). Clic para desbloquear." : "🔓 Clic para fijar materia con candado"}
+                                      style={{
+                                        background: celda.esBloqueado ? "#f59e0b" : "rgba(15, 23, 42, 0.6)",
+                                        color: celda.esBloqueado ? "#000000" : "#94a3b8",
+                                        borderRadius: "4px",
+                                        border: celda.esBloqueado ? "1px solid #d97706" : "1px solid #334155",
+                                        cursor: "pointer",
+                                        padding: "1px 4px",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "2px",
+                                        fontSize: "0.625rem",
+                                        fontWeight: 800,
+                                        transition: "all 0.15s ease"
+                                      }}
+                                    >
+                                      {celda.esBloqueado ? (
+                                        <>
+                                          <Lock style={{ width: "10px", height: "10px" }} />
+                                          <span>Fijada</span>
+                                        </>
+                                      ) : (
+                                        <Unlock style={{ width: "10px", height: "10px", opacity: 0.7 }} />
+                                      )}
+                                    </button>
+
+                                    {/* Botón Bloquear Hora (Liberar Slot con Reubicación) */}
+                                    {(vistaTab === "DOCENTE" || vistaTab === "GRUPO") && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const filtroId = vistaTab === "DOCENTE" ? docenteSeleccionadoId : grupoSeleccionadoId;
+                                          handleBloquearSlotOcupado(dia, p, filtroId, celda);
+                                        }}
+                                        title="🚫 Bloquear esta hora para este docente/grupo (Reubicará la clase automáticamente a otra hora libre)"
+                                        style={{
+                                          background: "rgba(239, 68, 68, 0.15)",
+                                          color: "#f87171",
+                                          borderRadius: "4px",
+                                          border: "1px solid rgba(239, 68, 68, 0.4)",
+                                          cursor: "pointer",
+                                          padding: "1px 4px",
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          fontSize: "0.625rem",
+                                          fontWeight: 800,
+                                          transition: "all 0.15s ease"
+                                        }}
+                                      >
+                                        🚫 Bloquear
+                                      </button>
                                     )}
-                                  </button>
+                                  </div>
                                 </div>
                                 <p style={{ fontSize: "0.7rem", fontWeight: 800, color: "#f8fafc", margin: "0.15rem 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {vistaTab === "DOCENTE" ? getNombreGrupoCelda(celda) : getNombreDocenteCelda(celda)}
