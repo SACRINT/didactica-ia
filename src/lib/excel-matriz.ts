@@ -112,17 +112,29 @@ function coincideMateria(textoExcel: string, uacNombreOficial: string, uacTipo?:
 
   // Formación Laboral
   if (normExcel.includes('LABORAL') && uacTipo?.includes('LABORAL')) {
-    if (normExcel.includes('\"A\"') || normExcel.includes(' A') || normExcel.endsWith('A')) {
+    if (normExcel.includes('"A"') || normExcel.includes(' A') || normExcel.endsWith('A') || normExcel.includes('LABORAL A') || normExcel.includes('LABORAL 1') || normExcel.includes('1')) {
       if (uacTipo === 'LABORAL_A') return true;
     }
-    if (normExcel.includes('\"B\"') || normExcel.includes(' B') || normExcel.endsWith('B')) {
+    if (normExcel.includes('"B"') || normExcel.includes(' B') || normExcel.endsWith('B') || normExcel.includes('LABORAL B') || normExcel.includes('LABORAL 2') || normExcel.includes('2')) {
       if (uacTipo === 'LABORAL_B') return true;
     }
     return true;
   }
 
   // FFE Optativas
-  if (normExcel.includes('OPTATIVA') || normExcel.includes('EXTENDIDA')) {
+  if (normExcel.includes('OPTATIVA') || normExcel.includes('EXTENDIDA') || normExcel.includes('FFE')) {
+    if (normExcel.includes('1') || (normExcel.includes(' I') && !normExcel.includes('II') && !normExcel.includes('III') && !normExcel.includes('IV'))) {
+      if (uacTipo === 'FFE_1') return true;
+    }
+    if (normExcel.includes('2') || (normExcel.includes(' II') && !normExcel.includes('III'))) {
+      if (uacTipo === 'FFE_2') return true;
+    }
+    if (normExcel.includes('3') || normExcel.includes(' III')) {
+      if (uacTipo === 'FFE_3') return true;
+    }
+    if (normExcel.includes('4') || normExcel.includes(' IV')) {
+      if (uacTipo === 'FFE_4') return true;
+    }
     if (uacTipo?.includes('FFE')) return true;
   }
 
@@ -131,7 +143,7 @@ function coincideMateria(textoExcel: string, uacNombreOficial: string, uacTipo?:
   const palabrasOficial = normOficial.split(/\s+/).filter(p => p.length > 3);
   const coincidencias = palabrasExcel.filter(p => palabrasOficial.includes(p));
 
-  if (palabrasOficial.length > 0 && coincidencias.length / palabrasOficial.length >= 0.5) {
+  if (palabrasOficial.length > 0 && coincidencias.length / palabrasOficial.length >= 0.4) {
     return true;
   }
 
@@ -270,6 +282,11 @@ export async function parsearExcelMatriz(
 
       // Si encontramos columnas de grupos en esta fila, procesar las filas de materias siguientes
       if (columnasGrupos.length > 0) {
+        const sem = columnasGrupos[0].grupo.semestre;
+        const gruposSem = gruposActivos.filter(g => g.semestre === sem);
+        const uacsBase = gruposSem.length > 0 ? getUACsGrupoFn(gruposSem[0]) : [];
+        let materiaFilaIdx = 0;
+
         for (let mRow = r + 1; mRow < data.length; mRow++) {
           const filaMateria = data[mRow];
           if (!filaMateria || filaMateria.length === 0) continue;
@@ -286,11 +303,24 @@ export async function parsearExcelMatriz(
             continue;
           }
 
+          const uacBaseFila = uacsBase[materiaFilaIdx];
+
           // Para cada grupo detectado en este bloque
           for (const { colIdx, grupo } of columnasGrupos) {
             const uacsGrupo = getUACsGrupoFn(grupo);
-            // Encontrar qué UAC corresponde a esta fila
-            const uacMatch = uacsGrupo.find(u => coincideMateria(textoMateria, u.uacName, u.tipo));
+
+            // 1. Encontrar qué UAC corresponde a esta fila por nombre o tipo directo
+            let uacMatch = uacsGrupo.find(u => coincideMateria(textoMateria, u.uacName, u.tipo));
+
+            // 2. Si no coincide por nombre (por ser una UAC específica de Formación Laboral o FFE de otro grupo):
+            if (!uacMatch && uacBaseFila) {
+              if (uacBaseFila.tipo) {
+                uacMatch = uacsGrupo.find(u => u.tipo === uacBaseFila.tipo);
+              }
+              if (!uacMatch && uacsGrupo[materiaFilaIdx]) {
+                uacMatch = uacsGrupo[materiaFilaIdx];
+              }
+            }
 
             const textoDocente = String(filaMateria[colIdx] || '').trim();
             if (!textoDocente) continue;
@@ -313,6 +343,8 @@ export async function parsearExcelMatriz(
               valido: resultadoMatch.confianza === 'EXACTA' || resultadoMatch.confianza === 'MEDIA',
             });
           }
+
+          materiaFilaIdx++;
         }
       }
     }
@@ -595,11 +627,30 @@ export function descargarPlantillaIntegralHorarios(
 
     const uacsBase = getUACsGrupoFn(gruposSem[0]);
 
-    uacsBase.forEach((uac, uacIdx) => {
-      const filaMateria: any[] = [uac.uacName, `${uac.horasSemanales || 3}h`];
-      gruposSem.forEach((g) => {
-        const uacsG = getUACsGrupoFn(g);
-        const uacG = uacsG[uacIdx] || uac;
+    uacsBase.forEach((uac) => {
+      let nombreUacMostrar = uac.uacName;
+      if (uac.tipo === 'LABORAL_A') {
+        const caps = Array.from(new Set(gruposSem.map(g => g.capacitacionNombre).filter(Boolean)));
+        if (caps.length > 1) {
+          nombreUacMostrar = `Formación Laboral "A"`;
+        }
+      } else if (uac.tipo === 'LABORAL_B') {
+        const caps = Array.from(new Set(gruposSem.map(g => g.capacitacionNombre).filter(Boolean)));
+        if (caps.length > 1) {
+          nombreUacMostrar = `Formación Laboral "B"`;
+        }
+      } else if (uac.tipo === 'FFE_1') {
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 1)`;
+      } else if (uac.tipo === 'FFE_2') {
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 2)`;
+      } else if (uac.tipo === 'FFE_3') {
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 3)`;
+      } else if (uac.tipo === 'FFE_4') {
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 4)`;
+      }
+
+      const filaMateria: any[] = [nombreUacMostrar, `${uac.horasSemanales || 3}h`];
+      gruposSem.forEach(() => {
         filaMateria.push('');
       });
       filasMatriz.push(filaMateria);
