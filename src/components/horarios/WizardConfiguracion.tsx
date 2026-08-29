@@ -1700,44 +1700,21 @@ export default function WizardConfiguracion({
                 type="button"
                 onClick={() => {
                   const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
-                  descargarPlantillaMatrizDocente(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
+                  descargarPlantillaIntegralHorarios(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
                 }}
-                style={{
-                  background: "#334155",
-                  color: "#38bdf8",
-                  border: "1px solid #475569",
-                  padding: "0.55rem 0.9rem",
-                  borderRadius: "8px",
-                  fontWeight: 700,
-                  fontSize: "0.8125rem",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem"
-                }}
+                title="Descargar libro de Excel unificado (Personal + Horarios)"
+                style={{ background: "#1e293b", color: "#38bdf8", border: "1px solid #0284c7", padding: "0.625rem 0.85rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem" }}
               >
-                <Download style={{ width: "15px", height: "15px" }} /> 📄 Formato Matriz Excel
+                <Download style={{ width: "15px", height: "15px" }} /> 📑 Plantilla Integral (.xlsx)
               </button>
 
               <button
                 type="button"
                 onClick={() => setMostrarModalMatrizExcel(true)}
-                style={{
-                  background: "#047857",
-                  color: "#ffffff",
-                  border: "1px solid #10b981",
-                  padding: "0.55rem 1rem",
-                  borderRadius: "8px",
-                  fontWeight: 800,
-                  fontSize: "0.8125rem",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  boxShadow: "0 2px 8px rgba(16,185,129,0.3)"
-                }}
+                title="Subir archivo Excel o CSV con la plantilla docente y horarios"
+                style={{ background: "#047857", color: "#ffffff", border: "1px solid #10b981", padding: "0.625rem 1rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", boxShadow: "0 2px 8px rgba(16,185,129,0.3)" }}
               >
-                <FileSpreadsheet style={{ width: "16px", height: "16px" }} /> 📥 Cargar Horario Excel
+                <FileSpreadsheet style={{ width: "15px", height: "15px" }} /> 📥 Importar Excel
               </button>
 
               <div style={{ background: "#0f172a", padding: "0.5rem 1rem", borderRadius: "10px", border: "1px solid #334155", textAlign: "right" }}>
@@ -2342,11 +2319,11 @@ export default function WizardConfiguracion({
                     type="button"
                     onClick={() => {
                       const gruposDelPeriodoActual = grupos.filter(g => (periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6]).includes(g.semestre));
-                      descargarPlantillaMatrizDocente(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
+                      descargarPlantillaIntegralHorarios(gruposDelPeriodoActual, periodoActivo, getUACsIndividualesGrupo, docentes);
                     }}
                     style={{ background: "#334155", color: "#38bdf8", border: "1px solid #475569", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer" }}
                   >
-                    ⬇️ Descargar Formato Vacío
+                    ⬇️ Descargar Plantilla Integral
                   </button>
                 </div>
               </div>

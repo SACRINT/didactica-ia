@@ -560,13 +560,6 @@ export function descargarPlantillaIntegralHorarios(
         d.email || '',
       ]);
     });
-  } else {
-    // Filas de ejemplo si la escuela aún no tiene personal
-    filasPersonal.push(['Juan Carlos', 'Pérez', 'González', 'Docente', 20, 'juan.perez@escuela.edu.mx']);
-    filasPersonal.push(['María Elena', 'Hernández', 'López', 'Docente', 30, 'maria.hernandez@escuela.edu.mx']);
-    filasPersonal.push(['Carlos Alberto', 'Rodríguez', 'Sánchez', 'Docente', 15, 'carlos.rodriguez@escuela.edu.mx']);
-    filasPersonal.push(['Rosa María', 'Martínez', 'Torres', 'Directivo', 0, 'directora@escuela.edu.mx']);
-    filasPersonal.push(['Fernando', 'Gómez', 'Ramírez', 'Administrativo', 0, 'admin@escuela.edu.mx']);
   }
 
   const wsPersonal = XLSX.utils.aoa_to_sheet(filasPersonal);
