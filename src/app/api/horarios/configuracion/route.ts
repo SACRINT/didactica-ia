@@ -54,15 +54,19 @@ export async function GET(req: NextRequest) {
       `;
     } catch { /* tabla no existe */ }
 
-    // Estructura de escuela (usando datos del teacher + config)
+    // Estructura de escuela (usando datos del teacher + config + conteo real de grupos)
     const tieneGruposDB = gruposRows.length > 0;
+    const g1Count = gruposRows.filter(g => g.semestre === 1 || g.semestre === 2).length;
+    const g2Count = gruposRows.filter(g => g.semestre === 3 || g.semestre === 4).length;
+    const g3Count = gruposRows.filter(g => g.semestre === 5 || g.semestre === 6).length;
+
     const escuela = {
       id: teacherId,
       cct: teacher.cct || teacher.school_name || "SIN CCT",
       nombre: teacher.school_name || "Mi Plantel",
-      gruposPrimerAno: configDB?.g1 ?? 1,
-      gruposSegundoAno: configDB?.g2 ?? 1,
-      gruposTercerAno: configDB?.g3 ?? 1,
+      gruposPrimerAno: configDB?.g1 ?? (g1Count > 0 ? g1Count : 3),
+      gruposSegundoAno: configDB?.g2 ?? (g2Count > 0 ? g2Count : 3),
+      gruposTercerAno: configDB?.g3 ?? (g3Count > 0 ? g3Count : 3),
       mapaCurricularCompletado: configDB?.mapa_curricular_completado !== undefined ? Boolean(configDB.mapa_curricular_completado) : tieneGruposDB,
     };
 

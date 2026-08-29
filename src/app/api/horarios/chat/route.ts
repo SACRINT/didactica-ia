@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { sql, getTeacherByEmail } from "@/lib/db";
 import { procesarComandoIA, RespuestaIAHorario } from "@/lib/horarios/ai-assistant";
 import { resolverHorario } from "@/lib/horarios/solver";
+import { moverCelda, intercambiarCeldas, bloquearLibre } from "@/lib/horarios/mutations";
 
 export async function POST(req: NextRequest) {
   try {
@@ -120,13 +121,75 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Si la IA solicita regenerar con restricciones
-    let celdasResultado = clientCeldas;
-    let scoreMetricas: any = { slotsLibresBloqueados };
+    // 4. Router de Acciones: Mutaciones Quirúrgicas vs Macro-Restricciones
+    let celdasResultado = [...clientCeldas];
+    let slotsLibresActualizados = new Set<string>(slotsLibresBloqueados || []);
+    let scoreMetricas: any = { slotsLibresBloqueados: Array.from(slotsLibresActualizados) };
+
+    const gruposInfo = grupos.map((g: any) => ({
+      id: g.id,
+      nombre: g.nombre,
+      semestre: g.semestre || 1,
+      horasPorDia: g.semestre === 1 ? 5 : horasPorDia
+    }));
 
     if (respuestaIA.acciones && respuestaIA.acciones.length > 0) {
       for (const accion of respuestaIA.acciones) {
-        if (accion.tipo === "REGENERAR_CON_RESTRICCIONES") {
+        if (accion.tipo === "MOVER_CELDA") {
+          const resMover = moverCelda(
+            celdasResultado,
+            {
+              asignatura: accion.asignatura,
+              grupoId: accion.grupoId,
+              docenteId: accion.docenteId,
+              diaOrigen: accion.diaOrigen,
+              periodoOrigen: accion.periodoOrigen,
+              diaDestino: accion.diaDestino || 1,
+              periodoDestino: accion.periodoDestino || 1
+            },
+            slotsLibresActualizados,
+            gruposInfo,
+            horasPorDia
+          );
+          if (resMover.success) {
+            celdasResultado = resMover.celdas;
+          }
+        } else if (accion.tipo === "INTERCAMBIAR" && accion.origen && accion.destino) {
+          const resSwap = intercambiarCeldas(
+            celdasResultado,
+            { origen: accion.origen, destino: accion.destino },
+            slotsLibresActualizados,
+            gruposInfo,
+            horasPorDia
+          );
+          if (resSwap.success) {
+            celdasResultado = resSwap.celdas;
+          }
+        } else if (accion.tipo === "BLOQUEAR_LIBRE") {
+          const resBloq = bloquearLibre(
+            celdasResultado,
+            {
+              docenteId: accion.docenteId,
+              grupoId: accion.grupoId,
+              dias: accion.dias,
+              periodos: accion.periodos,
+              intermedias: accion.intermedias
+            },
+            slotsLibresActualizados,
+            gruposInfo,
+            horasPorDia,
+            diasLectivos
+          );
+          if (resBloq.success) {
+            celdasResultado = resBloq.celdas;
+            slotsLibresActualizados = resBloq.slotsActualizados;
+          } else {
+            // Si la mutación quirúrgica no pudo encontrar huecos libres, ejecutar regeneración macro
+            accion.tipo = "REGENERAR_CON_RESTRICCIONES";
+          }
+        }
+
+        if (accion.tipo === "REGENERAR_CON_RESTRICCIONES" || accion.tipo === "MACRO_RESTRICCION") {
           // Extraer celdas fijadas con candado
           const celdasFijasExistentes = clientCeldas
             .filter((c: any) => c.esBloqueado)
@@ -201,23 +264,18 @@ export async function POST(req: NextRequest) {
             };
           });
 
-          // Resolver con el nuevo Solver Min-Conflicts
+          // Resolver con el nuevo Solver Min-Conflicts respetando slotsLibresBloqueados
           const resultadoSolver = resolverHorario({
             diasLectivos,
             horasPorDia,
             restriccionMaxHrsDia,
-            grupos: grupos.map((g: any) => ({
-              id: g.id,
-              nombre: g.nombre,
-              semestre: g.semestre || 1,
-              horasPorDia: g.semestre === 1 ? 5 : horasPorDia
-            })),
+            grupos: gruposInfo,
             docentes: docentes.map((d: any) => ({ id: d.id, nombreCompleto: d.nombreCompleto })),
             aulas: [{ id: "aula-general", nombre: "Aula General", tipo: "REGULAR" }],
             cargas: cargasParaSolver,
             celdasFijas: celdasFijasExistentes,
             restriccionesDocentes: restriccionesSanitizadas,
-            slotsLibresBloqueados
+            slotsLibresBloqueados: Array.from(slotsLibresActualizados)
           });
 
           if (resultadoSolver.celdas && resultadoSolver.celdas.length > 0) {
@@ -241,7 +299,7 @@ export async function POST(req: NextRequest) {
             });
             scoreMetricas = {
               ...resultadoSolver.metricas,
-              slotsLibresBloqueados
+              slotsLibresBloqueados: Array.from(slotsLibresActualizados)
             };
           }
         }

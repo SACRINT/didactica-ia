@@ -131,7 +131,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
     };
   }
 
-  // 2. Mapear restricciones de docentes
+  // 2. Mapear restricciones de docentes y slots libres bloqueados
   const docenteIndisponibleSet = new Set<string>();
   for (const r of restriccionesDocentes) {
     if (r.diasIndisponibles) {
@@ -145,6 +145,14 @@ export function resolverHorario(params: SolverParams): SolverResult {
       for (const item of r.periodosIndisponibles) {
         docenteIndisponibleSet.add(`${item.dia}_${item.periodo}_${r.docenteId}`);
       }
+    }
+  }
+
+  const slotLibreBloqueadoSet = new Set<string>();
+  if (slotsLibresBloqueados) {
+    const arr = Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : Array.from(slotsLibresBloqueados as Set<string>);
+    for (const k of arr) {
+      slotLibreBloqueadoSet.add(k);
     }
   }
 
@@ -164,7 +172,10 @@ export function resolverHorario(params: SolverParams): SolverResult {
 
     for (let d = 1; d <= diasLectivos; d++) {
       for (let p = 1; p <= maxP; p++) {
-        slotsDisponibles.push({ dia: d, periodo: p });
+        // Excluir si el grupo tiene ese slot bloqueado
+        if (!slotLibreBloqueadoSet.has(`${d}_${p}_${g.id}`)) {
+          slotsDisponibles.push({ dia: d, periodo: p });
+        }
       }
     }
 
@@ -203,48 +214,61 @@ export function resolverHorario(params: SolverParams): SolverResult {
       }
     }
 
-    // Ubicar en slots disponibles
-    const slotsNoFijos = slotsDisponibles.filter(s => !units.some(u => u.esFija && u.dia === s.dia && u.periodo === s.periodo));
+    // Asignar slots disponibles (mezclados aleatoriamente)
+    const shuffledSlots = [...slotsDisponibles].sort(() => Math.random() - 0.5);
+    const usedSlots = new Set<string>();
 
-    // Mezclar no fijos
+    for (const f of fijasGrupo) {
+      usedSlots.add(`${f.diaSemana}_${f.periodo}`);
+      const key = `${f.diaSemana}_${f.periodo}_${f.docenteId}`;
+      docOccupancy.set(key, (docOccupancy.get(key) || 0) + 1);
+    }
+
     let slotIdx = 0;
     for (const u of units) {
-      if (!u.esFija && slotIdx < slotsNoFijos.length) {
-        u.dia = slotsNoFijos[slotIdx].dia;
-        u.periodo = slotsNoFijos[slotIdx].periodo;
+      if (u.esFija) continue;
+      while (slotIdx < shuffledSlots.length && usedSlots.has(`${shuffledSlots[slotIdx].dia}_${shuffledSlots[slotIdx].periodo}`)) {
         slotIdx++;
       }
-      if (u.dia > 0 && u.periodo > 0) {
-        const k = `${u.dia}_${u.periodo}_${u.docenteId}`;
-        docOccupancy.set(k, (docOccupancy.get(k) || 0) + 1);
+      if (slotIdx < shuffledSlots.length) {
+        const s = shuffledSlots[slotIdx++];
+        u.dia = s.dia;
+        u.periodo = s.periodo;
+        usedSlots.add(`${s.dia}_${s.periodo}`);
+        const key = `${s.dia}_${s.periodo}_${u.docenteId}`;
+        docOccupancy.set(key, (docOccupancy.get(key) || 0) + 1);
       }
     }
 
     groupGrid.set(g.id, units);
   }
 
-  // 4. Algoritmo Min-Conflicts Dirigido con Simulated Annealing
+  // 4. Min-Conflicts Local Search con Penalización de Restricciones
+  const MAX_ITER = 3000;
+  let iter = 0;
+
   function getConflictedCells(): UnitCell[] {
-    const conflicted: UnitCell[] = [];
+    const list: UnitCell[] = [];
     for (const [, cells] of groupGrid) {
-      for (const c of cells) {
-        if (c.esFija) continue;
-        const kDoc = `${c.dia}_${c.periodo}_${c.docenteId}`;
-        const count = docOccupancy.get(kDoc) || 0;
-        const estaIndisponible = docenteIndisponibleSet.has(kDoc);
-        if (count > 1 || estaIndisponible) {
-          conflicted.push(c);
+      for (const u of cells) {
+        if (u.esFija) continue;
+        const key = `${u.dia}_${u.periodo}_${u.docenteId}`;
+        const keyGrp = `${u.dia}_${u.periodo}_${u.grupoId}`;
+        const occ = docOccupancy.get(key) || 0;
+        const isIndisp = docenteIndisponibleSet.has(key);
+        const isBloqDoc = slotLibreBloqueadoSet.has(key);
+        const isBloqGrp = slotLibreBloqueadoSet.has(keyGrp);
+
+        if (occ > 1 || isIndisp || isBloqDoc || isBloqGrp) {
+          list.push(u);
         }
       }
     }
-    return conflicted;
+    return list;
   }
 
-  let step = 0;
-  const maxSteps = 15000;
-
-  while (step < maxSteps) {
-    step++;
+  while (iter < MAX_ITER) {
+    iter++;
     const conflicted = getConflictedCells();
     if (conflicted.length === 0) break;
 
@@ -265,11 +289,19 @@ export function resolverHorario(params: SolverParams): SolverResult {
       const k1_new = `${c2.dia}_${c2.periodo}_${c1.docenteId}`;
       const k2_new = `${c1.dia}_${c1.periodo}_${c2.docenteId}`;
 
+      // Si alguno de los nuevos slots es hora libre bloqueada para ese docente o grupo, penalizar fuertemente
+      const bloqC1 = slotLibreBloqueadoSet.has(k1_new) || slotLibreBloqueadoSet.has(`${c2.dia}_${c2.periodo}_${c1.grupoId}`);
+      const bloqC2 = slotLibreBloqueadoSet.has(k2_new) || slotLibreBloqueadoSet.has(`${c1.dia}_${c1.periodo}_${c2.grupoId}`);
+
+      if (bloqC1 || bloqC2) continue;
+
       // Evaluar costo actual vs nuevo costo
       const curCost = (docOccupancy.get(k1_old)! > 1 ? 1 : 0) +
                       (docOccupancy.get(k2_old)! > 1 ? 1 : 0) +
                       (docenteIndisponibleSet.has(k1_old) ? 2 : 0) +
-                      (docenteIndisponibleSet.has(k2_old) ? 2 : 0);
+                      (docenteIndisponibleSet.has(k2_old) ? 2 : 0) +
+                      (slotLibreBloqueadoSet.has(k1_old) ? 3 : 0) +
+                      (slotLibreBloqueadoSet.has(k2_old) ? 3 : 0);
 
       const newCost = ((docOccupancy.get(k1_new) || 0) >= 1 ? 1 : 0) +
                       ((docOccupancy.get(k2_new) || 0) >= 1 ? 1 : 0) +
