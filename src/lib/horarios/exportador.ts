@@ -647,8 +647,8 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         page: {
           size: {
             orientation: PageOrientation.LANDSCAPE,
-            width: 15840, // 11 in (Carta Horizontal)
-            height: 12240 // 8.5 in
+            width: 12240, // 8.5 in (docx library swaps width and height when LANDSCAPE is set)
+            height: 15840 // 11 in -> genera w:w="15840" w:h="12240" (Horizontal nativo en Word)
           },
           margin: { top: 540, bottom: 540, left: 720, right: 720 }
         }

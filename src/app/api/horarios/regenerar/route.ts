@@ -90,9 +90,18 @@ export async function POST(req: NextRequest) {
       return gMatch && c.docenteId && c.grupoId && c.horasSemanales > 0;
     });
 
-    // 5. Extraer celdas fijas con candado
+    // 5. Extraer celdas fijas con candado (excluyendo las que colisionen con bloqueos recién fijados)
+    const slotsBloqArr: string[] = Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : [];
+    const slotsBloqSet = new Set<string>(slotsBloqArr);
+
     const celdasFijas = (Array.isArray(celdas) ? celdas : [])
-      .filter((c: any) => c.esBloqueado)
+      .filter((c: any) => {
+        if (!c.esBloqueado) return false;
+        const kDoc = `${c.diaSemana}_${c.periodo}_${c.docenteId}`;
+        const kGrp = `${c.diaSemana}_${c.periodo}_${c.grupoId}`;
+        if (slotsBloqSet.has(kDoc) || slotsBloqSet.has(kGrp)) return false;
+        return true;
+      })
       .map((c: any) => {
         const gMatch = grupos.find((g: any) => g.id === c.grupoId || g.nombre === c.grupoId);
         const grpId = gMatch ? gMatch.id : c.grupoId;
@@ -108,7 +117,6 @@ export async function POST(req: NextRequest) {
       });
 
     // 6. Validación Previa de Factibilidad Matemática (Capacidad vs Bloqueos)
-    const slotsBloqArr: string[] = Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : [];
     const conflictosInfactibles: string[] = [];
 
     // Validar capacidad por grupo
