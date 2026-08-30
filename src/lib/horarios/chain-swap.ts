@@ -79,7 +79,7 @@ export function buscarCadenaSwap(
   slotsLibresBloqueados: Set<string> = new Set(),
   gruposInfo?: GrupoLimiteInfo[],
   numHorasPorDia: number = 6,
-  maxDepth: number = 5
+  maxDepth: number = 8
 ): ChainResult {
   const celdasBase: CeldaHorario[] = celdasOriginales.map((c) => ({ ...c }));
 

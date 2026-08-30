@@ -107,7 +107,60 @@ export async function POST(req: NextRequest) {
         };
       });
 
-    // 6. Preparar parámetros del Solver Global
+    // 6. Validación Previa de Factibilidad Matemática (Capacidad vs Bloqueos)
+    const slotsBloqArr: string[] = Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : [];
+    const conflictosInfactibles: string[] = [];
+
+    // Validar capacidad por grupo
+    for (const g of grupos) {
+      const maxP = g.horasPorDia || (g.semestre === 1 ? 5 : horasPorDia);
+      const totalCapacidadTeorica = diasLectivos * maxP;
+      const slotsBloqGrupo = slotsBloqArr.filter((k: string) => {
+        const parts = k.split("_");
+        return parts.length >= 3 && (parts[2] === g.id || parts[2] === g.nombre);
+      }).length;
+
+      const capacidadRealGrupo = totalCapacidadTeorica - slotsBloqGrupo;
+      const hrsRequeridasGrupo = cargas
+        .filter((c: any) => c.grupoId === g.id)
+        .reduce((sum: number, c: any) => sum + (c.horasSemanales || 0), 0);
+
+      if (hrsRequeridasGrupo > capacidadRealGrupo) {
+        conflictosInfactibles.push(
+          `El Grupo ${g.nombre} requiere ${hrsRequeridasGrupo} hrs de clase pero solo tiene ${capacidadRealGrupo} hrs disponibles por los bloqueos fijados (${slotsBloqGrupo} hrs bloqueadas).`
+        );
+      }
+    }
+
+    // Validar capacidad por docente
+    for (const d of docentes) {
+      const totalCapacidadTeorica = diasLectivos * horasPorDia;
+      const slotsBloqDoc = slotsBloqArr.filter((k: string) => {
+        const parts = k.split("_");
+        return parts.length >= 3 && parts[2] === d.id;
+      }).length;
+
+      const capacidadRealDoc = totalCapacidadTeorica - slotsBloqDoc;
+      const hrsRequeridasDoc = cargas
+        .filter((c: any) => c.docenteId === d.id)
+        .reduce((sum: number, c: any) => sum + (c.horasSemanales || 0), 0);
+
+      if (hrsRequeridasDoc > capacidadRealDoc) {
+        conflictosInfactibles.push(
+          `El docente ${d.nombreCompleto} tiene ${hrsRequeridasDoc} hrs asignadas pero solo tiene ${capacidadRealDoc} hrs disponibles en la semana por los bloqueos fijados (${slotsBloqDoc} hrs bloqueadas).`
+        );
+      }
+    }
+
+    if (conflictosInfactibles.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: conflictosInfactibles.join(" | "),
+        conflictos: conflictosInfactibles
+      }, { status: 422 });
+    }
+
+    // 7. Preparar parámetros del Solver Global
     const params: SolverParams = {
       diasLectivos,
       horasPorDia,
@@ -116,17 +169,21 @@ export async function POST(req: NextRequest) {
       aulas: [{ id: "aula-gen", nombre: "Aula General", tipo: "REGULAR" }],
       cargas,
       celdasFijas,
-      slotsLibresBloqueados: Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : []
+      slotsLibresBloqueados: slotsBloqArr
     };
 
-    // 7. Ejecutar el Solver Global CSP + Min-Conflicts
+    // 8. Ejecutar el Solver Global CSP + Min-Conflicts
     const resultado = resolverHorario(params);
 
     if (!resultado.exito && resultado.celdas.length === 0) {
+      const errorDetalle = resultado.conflictos && resultado.conflictos.length > 0
+        ? resultado.conflictos.join(". ")
+        : "No fue posible generar un horario válido con las restricciones y bloqueos actuales.";
+
       return NextResponse.json({
         success: false,
-        error: "No fue posible generar un horario válido con las restricciones y bloqueos actuales.",
-        conflictos: resultado.conflictos
+        error: errorDetalle,
+        conflictos: resultado.conflictos || []
       }, { status: 422 });
     }
 

@@ -20,10 +20,19 @@ import {
   Check,
   Trash2,
   Save,
-  RefreshCw
+  RefreshCw,
+  Smartphone,
+  Share2
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { exportarHorarioExcel, exportarHorarioPDF, exportarHorarioDOCX, exportarSumarioExcel, getHashColor } from "@/lib/horarios/exportador";
+import {
+  exportarHorarioExcel,
+  exportarHorarioPDF,
+  exportarHorarioDOCX,
+  exportarSumarioExcel,
+  exportarHorarioWhatsApp,
+  getHashColor
+} from "@/lib/horarios/exportador";
 import { reacomodarHorarioConRipple } from "@/lib/horarios/ripple-solver";
 
 function normalizarId(val: any): string {
@@ -760,12 +769,12 @@ export default function EditorHorarios({
 
   const ejecutarExportacion = async (
     opcion: "VISTA_ACTUAL" | "PAQUETE_DOCENTES" | "PAQUETE_GRUPOS" | "SUMARIO_MAESTRO" | "SUMARIO_GRUPO",
-    formato: "PDF" | "EXCEL" | "DOCX"
+    formato: "PDF" | "EXCEL" | "DOCX" | "WHATSAPP_SQUARE" | "WHATSAPP_STORY"
   ) => {
     setMostrarModalExportar(false);
 
     if (opcion === "SUMARIO_MAESTRO") {
-      exportarSumarioExcel(
+      await exportarSumarioExcel(
         {
           nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
           cct: escuela?.cct || "CCT",
@@ -792,7 +801,7 @@ export default function EditorHorarios({
     }
 
     if (opcion === "SUMARIO_GRUPO") {
-      exportarSumarioExcel(
+      await exportarSumarioExcel(
         {
           nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
           cct: escuela?.cct || "CCT",
@@ -899,15 +908,30 @@ export default function EditorHorarios({
       filas: filasExport
     };
 
-    if (formato === "EXCEL") {
-      exportarHorarioExcel(payload);
-      toast.success("Excel generado correctamente");
-    } else if (formato === "DOCX") {
-      await exportarHorarioDOCX(payload);
-      toast.success("📝 Word (.docx) generado correctamente");
-    } else {
-      exportarHorarioPDF(payload);
-      toast.success("PDF generado exitosamente");
+    try {
+      if (formato === "EXCEL") {
+        await exportarHorarioExcel(payload);
+        toast.success("Excel generado correctamente");
+      } else if (formato === "DOCX") {
+        await exportarHorarioDOCX(payload);
+        toast.success("📝 Word (.docx) generado correctamente");
+      } else if (formato === "WHATSAPP_SQUARE") {
+        toast.loading("Generando tarjeta de WhatsApp...");
+        await exportarHorarioWhatsApp(payload, "square");
+        toast.dismiss();
+        toast.success("📱 Imagen WhatsApp (1:1) generada correctamente");
+      } else if (formato === "WHATSAPP_STORY") {
+        toast.loading("Generando historia vertical...");
+        await exportarHorarioWhatsApp(payload, "story");
+        toast.dismiss();
+        toast.success("📱 Imagen Historia (9:16) generada correctamente");
+      } else {
+        exportarHorarioPDF(payload);
+        toast.success("PDF generado exitosamente");
+      }
+    } catch (err: any) {
+      console.error("Error al exportar:", err);
+      toast.error("Ocurrió un error al generar la exportación");
     }
   };
 
@@ -1686,15 +1710,64 @@ export default function EditorHorarios({
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
               {/* Opción 1: Vista Actual */}
-              <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1e293b" }}>
-                <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>📄 Vista Actual en Pantalla</div>
-                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Exporta exactamente el filtro visible ({vistaTab})</div>
+              <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.6rem", background: "#1e293b" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>📄 Vista Actual en Pantalla</div>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Exporta exactamente el filtro visible ({vistaTab})</div>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "PDF")} style={{ background: "#2563eb", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>PDF</button>
+                    <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "EXCEL")} style={{ background: "#16a34a", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Excel</button>
+                    <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "DOCX")} style={{ background: "#7c3aed", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Word</button>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "PDF")} style={{ background: "#2563eb", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>PDF</button>
-                  <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "EXCEL")} style={{ background: "#16a34a", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Excel</button>
-                  <button onClick={() => ejecutarExportacion("VISTA_ACTUAL", "DOCX")} style={{ background: "#7c3aed", color: "white", border: "none", padding: "0.4rem 0.65rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>Word</button>
+
+                {/* Formatos Redes Sociales / WhatsApp */}
+                <div style={{ borderTop: "1px solid #334155", paddingTop: "0.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#22d3ee", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                    <Smartphone style={{ width: "14px", height: "14px" }} /> Imagen Redes / WhatsApp (Neón):
+                  </div>
+                  <div style={{ display: "flex", gap: "0.35rem" }}>
+                    <button
+                      onClick={() => ejecutarExportacion("VISTA_ACTUAL", "WHATSAPP_SQUARE")}
+                      style={{
+                        background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                        color: "white",
+                        border: "1px solid #34d399",
+                        padding: "0.35rem 0.6rem",
+                        borderRadius: "6px",
+                        fontSize: "0.7rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem"
+                      }}
+                      title="Post Cuadrado 1080x1080px (Ideal para WhatsApp, Instagram, Telegram)"
+                    >
+                      📱 Cuadrado (1:1)
+                    </button>
+                    <button
+                      onClick={() => ejecutarExportacion("VISTA_ACTUAL", "WHATSAPP_STORY")}
+                      style={{
+                        background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                        color: "white",
+                        border: "1px solid #2dd4bf",
+                        padding: "0.35rem 0.6rem",
+                        borderRadius: "6px",
+                        fontSize: "0.7rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem"
+                      }}
+                      title="Historia Vertical 1080x1920px (Ideal para Estados de WhatsApp, Stories de Instagram)"
+                    >
+                      📱 Historia (9:16)
+                    </button>
+                  </div>
                 </div>
               </div>
 
