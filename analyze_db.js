@@ -1,19 +1,89 @@
-const fs = require('fs');
+const { neon } = require('@neondatabase/serverless');
 
-const uacs = JSON.parse(fs.readFileSync('C:\\Users\\samue\\.gemini\\antigravity\\brain\\ed37a3e5-9696-4fbc-8cdc-fecebfd91fe5\\scratch\\uacs_list.json', 'utf8'));
+async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.error("Falta DATABASE_URL en el archivo .env");
+    process.exit(1);
+  }
+  const sql = neon(process.env.DATABASE_URL);
+  
+  // Buscar un teacher_id. Como no tengo el ID a mano, obtendré el primer horario_config con datos
+  const configs = await sql`
+    SELECT * FROM horario_config
+    WHERE config_data IS NOT NULL
+    LIMIT 1
+  `;
+  
+  if (configs.length === 0) {
+    console.log("No se encontraron configuraciones guardadas.");
+    return;
+  }
+  
+  const config = configs[0].config_data;
+  
+  const docentes = config.docentes || [];
+  const grupos = config.grupos || [];
+  const cargas = config.cargas || [];
+  const restriccionesDocentes = config.restriccionesDocentes || [];
+  
+  console.log("=== Análisis de viabilidad ===\n");
+  console.log(`- Días lectivos: ${config.diasLectivos || 5}`);
+  console.log(`- Horas por día: ${config.horasPorDia || 6}`);
+  const TOTAL_SLOTS = (config.diasLectivos || 5) * (config.horasPorDia || 6);
+  console.log(`- Total slots semanales: ${TOTAL_SLOTS}\n`);
+  
+  let esViable = true;
+  
+  // Análisis de docentes
+  console.log("--- DOCENTES ---");
+  for (const doc of docentes) {
+    // Horas requeridas por las cargas
+    const horasCarga = cargas
+        .filter(c => c.docenteId === doc.id || c.personalId === doc.id)
+        .reduce((sum, c) => sum + Number(c.horasSemanales || c.horas_semanales || 0), 0);
+    
+    // Slots bloqueados
+    const res = restriccionesDocentes.find(r => r.docenteId === doc.id);
+    const slotsBloqueados = res && Array.isArray(res.bloqueos) ? res.bloqueos.length : 0;
+    const slotsDisponibles = TOTAL_SLOTS - slotsBloqueados;
+    
+    console.log(`Profesor: ${doc.nombreCompleto || doc.nombre}`);
+    console.log(`  Horas requeridas: ${horasCarga}`);
+    console.log(`  Slots bloqueados: ${slotsBloqueados}`);
+    console.log(`  Slots disponibles: ${slotsDisponibles}`);
+    
+    if (horasCarga > slotsDisponibles) {
+        console.log(`  [ERROR] IMPOSIBLE: Necesita dar ${horasCarga} horas pero solo tiene ${slotsDisponibles} libres.`);
+        esViable = false;
+    } else if (horasCarga === slotsDisponibles) {
+        console.log(`  [ALERTA] CRÍTICO: No tiene slots de margen (0 horas libres extra).`);
+    } else {
+        console.log(`  [OK] Tiene ${slotsDisponibles - horasCarga} slots de margen.`);
+    }
+  }
+  
+  console.log("\n--- GRUPOS ---");
+  for (const grp of grupos) {
+    const grpId = grp.id || grp.nombre;
+    const horasCarga = cargas
+        .filter(c => c.grupoId === grpId || c.grupo_nombre === grp.nombre)
+        .reduce((sum, c) => sum + Number(c.horasSemanales || c.horas_semanales || 0), 0);
+        
+    console.log(`Grupo: ${grp.nombre}`);
+    console.log(`  Horas a recibir: ${horasCarga}`);
+    
+    if (horasCarga > TOTAL_SLOTS) {
+        console.log(`  [ERROR] IMPOSIBLE: El grupo debe recibir ${horasCarga} horas pero solo hay ${TOTAL_SLOTS} en la semana.`);
+        esViable = false;
+    }
+  }
+  
+  console.log("\n--- RESULTADO FINAL ---");
+  if (!esViable) {
+    console.log("El horario es matemáticamente IMPOSIBLE debido a la falta de slots disponibles para los docentes.");
+  } else {
+    console.log("El horario es matemáticamente POSIBLE en base a la cantidad total de horas y slots libres.");
+  }
+}
 
-console.log('--- REVISIÓN DE UACS EXISTENTES EN DB ---');
-console.log('Total UACs en DB:', uacs.length);
-
-const compCount = {};
-uacs.forEach(u => {
-  compCount[u.component] = (compCount[u.component] ? compCount[u.component] : 0) + 1;
-});
-console.log('Por componente en DB actual:\n', JSON.stringify(compCount, null, 2));
-
-const semComp = {};
-uacs.forEach(u => {
-  const k = 'Semestre ' + u.semester + ' - ' + u.component;
-  semComp[k] = (semComp[k] ? semComp[k] : 0) + 1;
-});
-console.log('\nPor Semestre y Componente en DB actual:\n', JSON.stringify(semComp, null, 2));
+main().catch(console.error);

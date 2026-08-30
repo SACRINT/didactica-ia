@@ -96,6 +96,7 @@ interface UnitCell {
   aulaId?: string;
   cargaId?: string;
   esFija?: boolean;
+  esHueco?: boolean;
 }
 
 export function resolverHorario(params: SolverParams): SolverResult {
@@ -110,7 +111,6 @@ export function resolverHorario(params: SolverParams): SolverResult {
     slotsLibresBloqueados
   } = params;
 
-  // 1. Validaciones iniciales
   if (!grupos || grupos.length === 0) {
     return {
       exito: false,
@@ -119,6 +119,9 @@ export function resolverHorario(params: SolverParams): SolverResult {
       metricas: { totalClasesProgramadas: 0, totalClasesRequeridas: 0, huecosDocentes: 0, huecosGrupos: 0 }
     };
   }
+
+  const globalStartTime = Date.now();
+  const GLOBAL_TIME_LIMIT = 12000; // 12 segundos máximo de ejecución
 
   if (!cargas || cargas.length === 0) {
     return {
@@ -211,6 +214,20 @@ export function resolverHorario(params: SolverParams): SolverResult {
         }
       }
 
+      // Inyectar huecos hasta llenar todos los slots disponibles
+      const huecosFaltantes = slotsDisponibles.length - units.length;
+      for (let h = 0; h < huecosFaltantes; h++) {
+        units.push({
+          dia: 0,
+          periodo: 0,
+          grupoId: g.id,
+          docenteId: "HUECO",
+          asignaturaId: "HUECO",
+          esFija: false,
+          esHueco: true
+        });
+      }
+
       // Asignar slots disponibles (mezclados aleatoriamente)
       const shuffledSlots = [...slotsDisponibles].sort(() => Math.random() - 0.5);
       const usedSlots = new Set<string>();
@@ -232,8 +249,10 @@ export function resolverHorario(params: SolverParams): SolverResult {
           u.dia = s.dia;
           u.periodo = s.periodo;
           usedSlots.add(`${s.dia}_${s.periodo}`);
-          const key = `${s.dia}_${s.periodo}_${u.docenteId}`;
-          docOccupancy.set(key, (docOccupancy.get(key) || 0) + 1);
+          if (!u.esHueco) {
+            const key = `${s.dia}_${s.periodo}_${u.docenteId}`;
+            docOccupancy.set(key, (docOccupancy.get(key) || 0) + 1);
+          }
         }
       }
 
@@ -241,14 +260,27 @@ export function resolverHorario(params: SolverParams): SolverResult {
     }
 
     // Min-Conflicts Local Search
-    const MAX_ITER = 25000;
+    const MAX_ITER = 100000;
     let iter = 0;
+
+    function getCellPenalty(dia: number, periodo: number, docenteId: string, grupoId: string, esHueco: boolean, occOffset: number): number {
+      if (esHueco) return 0;
+      const kDoc = `${dia}_${periodo}_${docenteId}`;
+      const kGrp = `${dia}_${periodo}_${grupoId}`;
+      let cost = 0;
+      const occ = (docOccupancy.get(kDoc) || 0) + occOffset;
+      if (occ > 1) cost += 1;
+      if (docenteIndisponibleSet.has(kDoc)) cost += 2;
+      if (slotLibreBloqueadoSet.has(kDoc)) cost += 3;
+      if (slotLibreBloqueadoSet.has(kGrp)) cost += 3;
+      return cost;
+    }
 
     function getConflictedCells(): UnitCell[] {
       const list: UnitCell[] = [];
       for (const [, cells] of groupGrid) {
         for (const u of cells) {
-          if (u.esFija) continue;
+          if (u.esFija || u.esHueco) continue;
           const key = `${u.dia}_${u.periodo}_${u.docenteId}`;
           const keyGrp = `${u.dia}_${u.periodo}_${u.grupoId}`;
           const occ = docOccupancy.get(key) || 0;
@@ -265,6 +297,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
     }
 
     while (iter < MAX_ITER) {
+      if (Date.now() - globalStartTime > GLOBAL_TIME_LIMIT) break;
       iter++;
       const conflicted = getConflictedCells();
       if (conflicted.length === 0) break;
@@ -276,62 +309,61 @@ export function resolverHorario(params: SolverParams): SolverResult {
       let bestDelta = 9999;
       const k1_old = `${c1.dia}_${c1.periodo}_${c1.docenteId}`;
 
+      // Simular que sacamos a c1 de su lugar
+      if (!c1.esHueco) docOccupancy.set(k1_old, Math.max(0, (docOccupancy.get(k1_old) || 1) - 1));
+
       for (let i = 0; i < cells.length; i++) {
         const c2 = cells[i];
         if (c2 === c1 || c2.esFija) continue;
 
         const k2_old = `${c2.dia}_${c2.periodo}_${c2.docenteId}`;
-        const k1_new = `${c2.dia}_${c2.periodo}_${c1.docenteId}`;
-        const k2_new = `${c1.dia}_${c1.periodo}_${c2.docenteId}`;
+        
+        // Simular que sacamos a c2 de su lugar
+        if (!c2.esHueco) docOccupancy.set(k2_old, Math.max(0, (docOccupancy.get(k2_old) || 1) - 1));
 
-        const bloqC1 = slotLibreBloqueadoSet.has(k1_new) || slotLibreBloqueadoSet.has(`${c2.dia}_${c2.periodo}_${c1.grupoId}`);
-        const bloqC2 = slotLibreBloqueadoSet.has(k2_new) || slotLibreBloqueadoSet.has(`${c1.dia}_${c1.periodo}_${c2.grupoId}`);
+        const curCost = getCellPenalty(c1.dia, c1.periodo, c1.docenteId, c1.grupoId, !!c1.esHueco, 1) +
+                        getCellPenalty(c2.dia, c2.periodo, c2.docenteId, c2.grupoId, !!c2.esHueco, 1);
 
-        if (bloqC1 || bloqC2) continue;
-
-        const curCost = (docOccupancy.get(k1_old)! > 1 ? 1 : 0) +
-                        (docOccupancy.get(k2_old)! > 1 ? 1 : 0) +
-                        (docenteIndisponibleSet.has(k1_old) ? 2 : 0) +
-                        (docenteIndisponibleSet.has(k2_old) ? 2 : 0) +
-                        (slotLibreBloqueadoSet.has(k1_old) ? 3 : 0) +
-                        (slotLibreBloqueadoSet.has(k2_old) ? 3 : 0);
-
-        const newCost = ((docOccupancy.get(k1_new) || 0) >= 1 ? 1 : 0) +
-                        ((docOccupancy.get(k2_new) || 0) >= 1 ? 1 : 0) +
-                        (docenteIndisponibleSet.has(k1_new) ? 2 : 0) +
-                        (docenteIndisponibleSet.has(k2_new) ? 2 : 0);
+        const newCost = getCellPenalty(c2.dia, c2.periodo, c1.docenteId, c1.grupoId, !!c1.esHueco, 1) +
+                        getCellPenalty(c1.dia, c1.periodo, c2.docenteId, c2.grupoId, !!c2.esHueco, 1);
 
         const delta = newCost - curCost;
         if (delta < bestDelta || (delta === bestDelta && Math.random() < 0.25)) {
           bestDelta = delta;
           bestIdx = i;
         }
+
+        // Regresamos c2 a su lugar para la siguiente evaluación
+        if (!c2.esHueco) docOccupancy.set(k2_old, (docOccupancy.get(k2_old) || 0) + 1);
       }
+
+      // Regresamos c1 a su lugar
+      if (!c1.esHueco) docOccupancy.set(k1_old, (docOccupancy.get(k1_old) || 0) + 1);
 
       if (bestIdx !== -1 && (bestDelta < 0 || Math.random() < 0.15)) {
         const c2 = cells[bestIdx];
         const d1 = c1.dia, p1 = c1.periodo;
         const d2 = c2.dia, p2 = c2.periodo;
 
-        const k1_old = `${d1}_${p1}_${c1.docenteId}`;
-        const k2_old = `${d2}_${p2}_${c2.docenteId}`;
-        docOccupancy.set(k1_old, Math.max(0, (docOccupancy.get(k1_old) || 1) - 1));
-        docOccupancy.set(k2_old, Math.max(0, (docOccupancy.get(k2_old) || 1) - 1));
+        const k1_cur = `${d1}_${p1}_${c1.docenteId}`;
+        const k2_cur = `${d2}_${p2}_${c2.docenteId}`;
+        if (!c1.esHueco) docOccupancy.set(k1_cur, Math.max(0, (docOccupancy.get(k1_cur) || 1) - 1));
+        if (!c2.esHueco) docOccupancy.set(k2_cur, Math.max(0, (docOccupancy.get(k2_cur) || 1) - 1));
 
         c1.dia = d2; c1.periodo = p2;
         c2.dia = d1; c2.periodo = p1;
 
         const k1_new = `${d2}_${p2}_${c1.docenteId}`;
         const k2_new = `${d1}_${p1}_${c2.docenteId}`;
-        docOccupancy.set(k1_new, (docOccupancy.get(k1_new) || 0) + 1);
-        docOccupancy.set(k2_new, (docOccupancy.get(k2_new) || 0) + 1);
+        if (!c1.esHueco) docOccupancy.set(k1_new, (docOccupancy.get(k1_new) || 0) + 1);
+        if (!c2.esHueco) docOccupancy.set(k2_new, (docOccupancy.get(k2_new) || 0) + 1);
       }
     }
 
     const celdasFinales: CeldaResultado[] = [];
     for (const [, cells] of groupGrid) {
       for (const u of cells) {
-        if (u.dia > 0 && u.periodo > 0) {
+        if (u.dia > 0 && u.periodo > 0 && !u.esHueco) {
           celdasFinales.push({
             diaSemana: u.dia,
             periodo: u.periodo,
@@ -364,9 +396,12 @@ export function resolverHorario(params: SolverParams): SolverResult {
     };
   }
 
-  // Ejecutar hasta 5 intentos con reinicio aleatorio si hay conflictos
+  // Ejecutar intentos continuamente hasta que el tiempo se agote o encontremos 0 conflictos
   let bestResult = attemptSolve();
-  for (let attempt = 1; attempt < 5 && bestResult.conflictos.length > 0; attempt++) {
+  let attempt = 1;
+  
+  while (bestResult.conflictos.length > 0 && (Date.now() - globalStartTime < GLOBAL_TIME_LIMIT)) {
+    attempt++;
     const nextAttempt = attemptSolve();
     if (nextAttempt.conflictos.length < bestResult.conflictos.length) {
       bestResult = nextAttempt;
