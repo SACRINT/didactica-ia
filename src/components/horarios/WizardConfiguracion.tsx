@@ -100,8 +100,12 @@ export default function WizardConfiguracion({
   const [cctEscuela, setCctEscuela] = useState<string>(() => configInicial?.escuela?.cct || "");
   const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "086");
 
+  const [inicializadoConfig, setInicializadoConfig] = useState(false);
+
   // Sincronizar g1, g2, g3 y datos de escuela cuando cambia configInicial o escuelaId
   useEffect(() => {
+    if (inicializadoConfig) return;
+
     if (configInicial?.escuela) {
       if (configInicial.escuela.gruposPrimerAno) setG1(Number(configInicial.escuela.gruposPrimerAno));
       if (configInicial.escuela.gruposSegundoAno) setG2(Number(configInicial.escuela.gruposSegundoAno));
@@ -111,6 +115,7 @@ export default function WizardConfiguracion({
       if (configInicial.escuela.zonaEscolar || configInicial.escuela.zona) {
         setZonaEscolar(configInicial.escuela.zonaEscolar || configInicial.escuela.zona);
       }
+      setInicializadoConfig(true);
     } else if (gruposIniciales && gruposIniciales.length > 0) {
       const c1 = Math.max(
         gruposIniciales.filter(g => g.semestre === 1).length,
@@ -127,8 +132,9 @@ export default function WizardConfiguracion({
       if (c1 > 0) setG1(c1);
       if (c2 > 0) setG2(c2);
       if (c3 > 0) setG3(c3);
+      setInicializadoConfig(true);
     }
-  }, [configInicial, escuelaId, gruposIniciales]);
+  }, [configInicial, escuelaId, gruposIniciales, inicializadoConfig]);
 
   // ─── PRIORIDAD ABSOLUTA BD: Los grupos de la BD recargan y generan los grupos completos ───
   useEffect(() => {
@@ -226,6 +232,9 @@ export default function WizardConfiguracion({
         if (parsed.grupoActivoManual) setGrupoActivoManual(parsed.grupoActivoManual);
         if (parsed.cargas && parsed.cargas.length > 0) setCargas(parsed.cargas);
         if (parsed.periodoActivo === "A" || parsed.periodoActivo === "B") setPeriodoActivo(parsed.periodoActivo);
+        if (parsed.zonaEscolar) setZonaEscolar(parsed.zonaEscolar);
+        if (parsed.nombreEscuela) setNombreEscuela(parsed.nombreEscuela);
+        if (parsed.cctEscuela) setCctEscuela(parsed.cctEscuela);
       }
     } catch (e) {
       console.warn("No se pudo cargar estado local previo", e);
@@ -248,7 +257,10 @@ export default function WizardConfiguracion({
           curriculoManualPorGrupo,
           grupoActivoManual,
           cargas,
-          periodoActivo
+          periodoActivo,
+          zonaEscolar,
+          nombreEscuela,
+          cctEscuela
         })
       );
     } catch (e) {
@@ -258,7 +270,7 @@ export default function WizardConfiguracion({
 
   useEffect(() => {
     guardarProgresoLocal();
-  }, [paso, g1, g2, g3, numPeriodos, grupos, horasDocentes, cargas, curriculoManualPorGrupo, grupoActivoManual, periodoActivo]);
+  }, [paso, g1, g2, g3, numPeriodos, grupos, horasDocentes, cargas, curriculoManualPorGrupo, grupoActivoManual, periodoActivo, zonaEscolar, nombreEscuela, cctEscuela]);
 
   useEffect(() => {
     cargarPersonalCompleto();
