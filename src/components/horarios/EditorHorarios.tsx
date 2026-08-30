@@ -627,9 +627,10 @@ export default function EditorHorarios({
            idsValidos.includes(c.grupo?.nombre))
       );
     } else if (vistaTab === "DOCENTE") {
+      const selDocId = normalizarId(docenteSeleccionadoId);
       return horario.celdas.find(
         (c: any) => c.diaSemana === diaSemana && c.periodo === periodo &&
-          normalizarId(c.docenteId) === normalizarId(docenteSeleccionadoId)
+          (normalizarId(c.docenteId) === selDocId || (c.docente && normalizarId(c.docente.id) === selDocId))
       );
     } else if (vistaTab === "AULA") {
       return horario.celdas.find(
@@ -1273,10 +1274,17 @@ export default function EditorHorarios({
           )}
 
           {vistaTab === "DOCENTE" && docenteActivoObj && (() => {
-            const celdasDoc = (horario?.celdas || []).filter((c: any) => c.docenteId === docenteSeleccionadoId);
+            const selDocId = normalizarId(docenteSeleccionadoId);
+            const celdasDoc = (horario?.celdas || []).filter((c: any) => 
+              normalizarId(c.docenteId) === selDocId || 
+              (c.docente && normalizarId(c.docente.id) === selDocId)
+            );
             const totalHrsDoc = celdasDoc.length;
             const materiasDoc = Array.from(new Set(celdasDoc.map((c: any) => getNombreAsignaturaCelda(c))));
-            const gruposDoc = Array.from(new Set(celdasDoc.map((c: any) => { const grp = grupos.find((g: any) => g.id === c.grupoId); return grp ? grp.nombre : c.grupoId; })));
+            const gruposDoc = Array.from(new Set(celdasDoc.map((c: any) => { 
+              const grp = grupos.find((g: any) => normalizarId(g.id) === normalizarId(c.grupoId) || g.nombre === c.grupoId); 
+              return grp ? grp.nombre : c.grupoId; 
+            })));
 
             return (
               <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
