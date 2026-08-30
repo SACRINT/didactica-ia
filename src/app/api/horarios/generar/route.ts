@@ -40,7 +40,11 @@ export async function POST(req: NextRequest) {
     // Normalizar cargas (soportar docenteId / personalId, grupoId / grupo_nombre, asignaturaId / uacName)
     const cargas = cargasRaw.map((c: any, idx: number) => {
       const docId = String(c.docenteId || c.personalId || '');
-      const grpId = String(c.grupoId || c.grupo_nombre || '');
+      const rawGrp = String(c.grupoId || c.grupo_nombre || '');
+      const matchedGroup = grupos.find(
+        (g: any) => g.id === rawGrp || g.nombre === rawGrp || g.nombre?.replace(/º/g, '°') === rawGrp.replace(/º/g, '°')
+      );
+      const grpId = matchedGroup ? matchedGroup.id : rawGrp;
       const asigId = String(c.uacName || c.asignaturaId || `uac_${idx}`);
       const horas = Number(c.horasSemanales || c.horas_semanales || 3);
 
@@ -78,6 +82,18 @@ export async function POST(req: NextRequest) {
     }
 
     const resultado = resolverHorario(params);
+
+    if (!resultado.exito) {
+      const errorDetalle = resultado.conflictos && resultado.conflictos.length > 0
+        ? resultado.conflictos.join(". ")
+        : "No fue posible generar un horario válido con las restricciones y bloqueos actuales.";
+
+      return NextResponse.json({
+        success: false,
+        error: errorDetalle,
+        conflictos: resultado.conflictos || []
+      }, { status: 422 });
+    }
 
     const horarioGenerado = {
       id: `horario_${Date.now()}`,

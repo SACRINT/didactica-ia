@@ -34,9 +34,9 @@ export default function HorariosDashboardClient({
     id: teacherId,
     cct,
     nombre: schoolName,
-    gruposPrimerAno: 1,
-    gruposSegundoAno: 1,
-    gruposTercerAno: 1,
+    gruposPrimerAno: 3,
+    gruposSegundoAno: 3,
+    gruposTercerAno: 3,
     mapaCurricularCompletado: false,
   };
 

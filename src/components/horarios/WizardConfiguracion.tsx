@@ -71,41 +71,59 @@ export default function WizardConfiguracion({
 
   // Número de grupos por grado independiente (1º, 3º, 5º)
   const [g1, setG1] = useState<number>(() => {
-    if (configInicial?.escuela?.gruposPrimerAno) return configInicial.escuela.gruposPrimerAno;
-    const g1Count = (gruposIniciales || []).filter(g => g.semestre === 1 || g.semestre === 2).length;
+    if (configInicial?.escuela?.gruposPrimerAno) return Number(configInicial.escuela.gruposPrimerAno);
+    const g1Count = Math.max(
+      (gruposIniciales || []).filter(g => g.semestre === 1).length,
+      (gruposIniciales || []).filter(g => g.semestre === 2).length
+    );
     return g1Count > 0 ? g1Count : 3;
   });
   const [g2, setG2] = useState<number>(() => {
-    if (configInicial?.escuela?.gruposSegundoAno) return configInicial.escuela.gruposSegundoAno;
-    const g2Count = (gruposIniciales || []).filter(g => g.semestre === 3 || g.semestre === 4).length;
+    if (configInicial?.escuela?.gruposSegundoAno) return Number(configInicial.escuela.gruposSegundoAno);
+    const g2Count = Math.max(
+      (gruposIniciales || []).filter(g => g.semestre === 3).length,
+      (gruposIniciales || []).filter(g => g.semestre === 4).length
+    );
     return g2Count > 0 ? g2Count : 3;
   });
   const [g3, setG3] = useState<number>(() => {
-    if (configInicial?.escuela?.gruposTercerAno) return configInicial.escuela.gruposTercerAno;
-    const g3Count = (gruposIniciales || []).filter(g => g.semestre === 5 || g.semestre === 6).length;
+    if (configInicial?.escuela?.gruposTercerAno) return Number(configInicial.escuela.gruposTercerAno);
+    const g3Count = Math.max(
+      (gruposIniciales || []).filter(g => g.semestre === 5).length,
+      (gruposIniciales || []).filter(g => g.semestre === 6).length
+    );
     return g3Count > 0 ? g3Count : 3;
   });
 
   // Datos del Plantel y Supervisión Escolar dinámicos
   const [nombreEscuela, setNombreEscuela] = useState<string>(() => configInicial?.escuela?.nombre || configInicial?.escuela?.school_name || "Mi Plantel");
   const [cctEscuela, setCctEscuela] = useState<string>(() => configInicial?.escuela?.cct || "");
-  const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "004");
+  const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "086");
 
   // Sincronizar g1, g2, g3 y datos de escuela cuando cambia configInicial o escuelaId
   useEffect(() => {
     if (configInicial?.escuela) {
-      if (configInicial.escuela.gruposPrimerAno) setG1(configInicial.escuela.gruposPrimerAno);
-      if (configInicial.escuela.gruposSegundoAno) setG2(configInicial.escuela.gruposSegundoAno);
-      if (configInicial.escuela.gruposTercerAno) setG3(configInicial.escuela.gruposTercerAno);
+      if (configInicial.escuela.gruposPrimerAno) setG1(Number(configInicial.escuela.gruposPrimerAno));
+      if (configInicial.escuela.gruposSegundoAno) setG2(Number(configInicial.escuela.gruposSegundoAno));
+      if (configInicial.escuela.gruposTercerAno) setG3(Number(configInicial.escuela.gruposTercerAno));
       if (configInicial.escuela.nombre) setNombreEscuela(configInicial.escuela.nombre);
       if (configInicial.escuela.cct) setCctEscuela(configInicial.escuela.cct);
       if (configInicial.escuela.zonaEscolar || configInicial.escuela.zona) {
         setZonaEscolar(configInicial.escuela.zonaEscolar || configInicial.escuela.zona);
       }
     } else if (gruposIniciales && gruposIniciales.length > 0) {
-      const c1 = gruposIniciales.filter(g => g.semestre === 1 || g.semestre === 2).length;
-      const c2 = gruposIniciales.filter(g => g.semestre === 3 || g.semestre === 4).length;
-      const c3 = gruposIniciales.filter(g => g.semestre === 5 || g.semestre === 6).length;
+      const c1 = Math.max(
+        gruposIniciales.filter(g => g.semestre === 1).length,
+        gruposIniciales.filter(g => g.semestre === 2).length
+      );
+      const c2 = Math.max(
+        gruposIniciales.filter(g => g.semestre === 3).length,
+        gruposIniciales.filter(g => g.semestre === 4).length
+      );
+      const c3 = Math.max(
+        gruposIniciales.filter(g => g.semestre === 5).length,
+        gruposIniciales.filter(g => g.semestre === 6).length
+      );
       if (c1 > 0) setG1(c1);
       if (c2 > 0) setG2(c2);
       if (c3 > 0) setG3(c3);
@@ -198,10 +216,7 @@ export default function WizardConfiguracion({
       const guardado = localStorage.getItem(STORAGE_KEY);
       if (guardado) {
         const parsed = JSON.parse(guardado);
-        if (parsed.paso) setPaso(parsed.paso);
-        if (parsed.g1) setG1(parsed.g1);
-        if (parsed.g2) setG2(parsed.g2);
-        if (parsed.g3) setG3(parsed.g3);
+        // NOTA: NO sobreescribir 'paso', 'g1', 'g2', 'g3' desde localStorage para respetar la base de datos y la navegación directa del usuario
         if (parsed.numPeriodos) setNumPeriodos(parsed.numPeriodos);
         if ((!gruposIniciales || gruposIniciales.length === 0) && parsed.grupos && parsed.grupos.length > 0) {
           setGrupos(parsed.grupos);
@@ -795,13 +810,34 @@ export default function WizardConfiguracion({
     }
   };
 
+  const matchGrupoCarga = (cargaGrupoId: string, grpIdOrNombre: string) => {
+    if (!cargaGrupoId || !grpIdOrNombre) return false;
+    if (cargaGrupoId === grpIdOrNombre) return true;
+    const grp = grupos.find(g => g.id === grpIdOrNombre || g.nombre === grpIdOrNombre);
+    if (grp) {
+      if (cargaGrupoId === grp.id || cargaGrupoId === grp.nombre) return true;
+      if (normalizarNombreGrupo(cargaGrupoId) === normalizarNombreGrupo(grp.nombre)) return true;
+    }
+    return normalizarNombreGrupo(cargaGrupoId) === normalizarNombreGrupo(grpIdOrNombre);
+  };
+
+  const matchUacCarga = (cargaUac: string, cargaAsigId: string, uacObj: any) => {
+    if (!uacObj) return false;
+    if (cargaUac === uacObj.uacName || (cargaAsigId && cargaAsigId === uacObj.id)) return true;
+    const normCarga = (cargaUac || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+    const normObj = (uacObj.uacName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+    if (normCarga === normObj) return true;
+    if (normCarga.includes('TALLER DE CIENCIAS') && normObj.includes('TALLER DE CIENCIAS')) return true;
+    return false;
+  };
+
   const handleAsignarDocenteMatriz = (grupoId: string, uacObj: any, personalId: string) => {
     const uacName = uacObj.uacName;
     const asignaturaId = uacObj.id;
     const horasSemanales = uacObj.horasSemanales || 3;
 
     const cargasLimpias = cargas.filter(
-      (c) => !(c.grupoId === grupoId && (c.uacName === uacName || c.asignaturaId === asignaturaId))
+      (c) => !(matchGrupoCarga(c.grupoId, grupoId) && matchUacCarga(c.uacName, c.asignaturaId, uacObj))
     );
 
     if (!personalId) {
@@ -824,7 +860,7 @@ export default function WizardConfiguracion({
 
   const getDocenteAsignado = (grupoId: string, uacObj: any) => {
     const matches = cargas.filter(
-      (c) => c.grupoId === grupoId && (c.uacName === uacObj.uacName || c.asignaturaId === uacObj.id)
+      (c) => matchGrupoCarga(c.grupoId, grupoId) && matchUacCarga(c.uacName, c.asignaturaId, uacObj)
     );
     const asignacion = matches.length > 0 ? matches[matches.length - 1] : undefined;
     return asignacion?.personalId || "";
@@ -847,6 +883,44 @@ export default function WizardConfiguracion({
     });
 
     return total;
+  };
+
+  const handleAvanzarPaso1 = () => {
+    generarGruposSegunEstructura(g1, g2, g3);
+    try {
+      fetch("/api/horarios/configuracion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          escuelaId,
+          config: {
+            diasLectivos: 5,
+            horasPorDia: numPeriodos,
+            horaInicio,
+            periodoActivo,
+            g1, g2, g3,
+            zonaEscolar
+          },
+          escuela: {
+            id: escuelaId,
+            nombre: nombreEscuela,
+            cct: cctEscuela,
+            zonaEscolar,
+            zona: zonaEscolar,
+            gruposPrimerAno: g1,
+            gruposSegundoAno: g2,
+            gruposTercerAno: g3,
+            mapaCurricularCompletado: true
+          }
+        })
+      }).catch(() => {});
+    } catch {}
+    setPaso(2);
+  };
+
+  const handleAvanzarPaso2 = () => {
+    guardarProgresoLocal();
+    setPaso(3);
   };
 
   const handleGuardarConfiguracion = async () => {
@@ -1304,7 +1378,12 @@ export default function WizardConfiguracion({
                   min={1}
                   max={20}
                   value={g1}
-                  onChange={(e) => { setG1(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
+                  onChange={(e) => {
+                    const val = Math.max(1, Number(e.target.value));
+                    setG1(val);
+                    setUsuarioCambioGrupos(true);
+                    generarGruposSegunEstructura(val, g2, g3);
+                  }}
                   style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#ffffff" }}
                 />
                 <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8" }}>
@@ -1324,7 +1403,12 @@ export default function WizardConfiguracion({
                   min={1}
                   max={20}
                   value={g2}
-                  onChange={(e) => { setG2(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
+                  onChange={(e) => {
+                    const val = Math.max(1, Number(e.target.value));
+                    setG2(val);
+                    setUsuarioCambioGrupos(true);
+                    generarGruposSegunEstructura(g1, val, g3);
+                  }}
                   style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#ffffff" }}
                 />
                 <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8" }}>
@@ -1344,7 +1428,12 @@ export default function WizardConfiguracion({
                   min={1}
                   max={20}
                   value={g3}
-                  onChange={(e) => { setG3(Math.max(1, Number(e.target.value))); setUsuarioCambioGrupos(true); }}
+                  onChange={(e) => {
+                    const val = Math.max(1, Number(e.target.value));
+                    setG3(val);
+                    setUsuarioCambioGrupos(true);
+                    generarGruposSegunEstructura(g1, g2, val);
+                  }}
                   style={{ width: "70px", padding: "0.4rem", borderRadius: "8px", border: "2px solid #3b82f6", background: "#0f172a", fontWeight: 800, textAlign: "center", fontSize: "1.125rem", color: "#ffffff" }}
                 />
                 <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8" }}>
@@ -1646,7 +1735,7 @@ export default function WizardConfiguracion({
 
           <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "1rem" }}>
             <button
-              onClick={() => setPaso(2)}
+              onClick={handleAvanzarPaso1}
               style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.75rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}
             >
               Siguiente: Plantilla Docente →
@@ -1797,7 +1886,7 @@ export default function WizardConfiguracion({
               ← Atrás
             </button>
             <button
-              onClick={() => setPaso(3)}
+              onClick={handleAvanzarPaso2}
               style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.75rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}
             >
               Siguiente: Matriz por Semestre →

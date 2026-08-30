@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     // 8. Ejecutar el Solver Global CSP + Min-Conflicts
     const resultado = resolverHorario(params);
 
-    if (!resultado.exito && resultado.celdas.length === 0) {
+    if (!resultado.exito) {
       const errorDetalle = resultado.conflictos && resultado.conflictos.length > 0
         ? resultado.conflictos.join(". ")
         : "No fue posible generar un horario válido con las restricciones y bloqueos actuales.";

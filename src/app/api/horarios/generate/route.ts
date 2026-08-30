@@ -27,6 +27,18 @@ export async function POST(req: Request) {
 
     const resultado = resolverHorario(params);
 
+    if (!resultado.exito) {
+      const errorDetalle = resultado.conflictos && resultado.conflictos.length > 0
+        ? resultado.conflictos.join(". ")
+        : "No fue posible generar un horario válido con las restricciones y bloqueos actuales.";
+      
+      return NextResponse.json({
+        success: false,
+        error: errorDetalle,
+        conflictos: resultado.conflictos || []
+      }, { status: 422 });
+    }
+
     return NextResponse.json({ success: true, resultado });
   } catch (e: any) {
     console.error('API /api/horarios/generate error:', e);

@@ -56,9 +56,18 @@ export async function GET(req: NextRequest) {
 
     // Estructura de escuela (usando datos del teacher + config + conteo real de grupos)
     const tieneGruposDB = gruposRows.length > 0;
-    const g1Count = gruposRows.filter(g => g.semestre === 1 || g.semestre === 2).length;
-    const g2Count = gruposRows.filter(g => g.semestre === 3 || g.semestre === 4).length;
-    const g3Count = gruposRows.filter(g => g.semestre === 5 || g.semestre === 6).length;
+    const g1Count = Math.max(
+      gruposRows.filter(g => g.semestre === 1).length,
+      gruposRows.filter(g => g.semestre === 2).length
+    );
+    const g2Count = Math.max(
+      gruposRows.filter(g => g.semestre === 3).length,
+      gruposRows.filter(g => g.semestre === 4).length
+    );
+    const g3Count = Math.max(
+      gruposRows.filter(g => g.semestre === 5).length,
+      gruposRows.filter(g => g.semestre === 6).length
+    );
 
     const zonaGuardada = configDB?.zona_escolar || (teacher.custom_preferences as any)?.zonaEscolar || (teacher.custom_preferences as any)?.zona || "004";
     const escuela = {
@@ -67,9 +76,9 @@ export async function GET(req: NextRequest) {
       nombre: teacher.school_name || "Mi Plantel",
       zonaEscolar: zonaGuardada,
       zona: zonaGuardada,
-      gruposPrimerAno: configDB?.g1 ?? (g1Count > 0 ? g1Count : 3),
-      gruposSegundoAno: configDB?.g2 ?? (g2Count > 0 ? g2Count : 3),
-      gruposTercerAno: configDB?.g3 ?? (g3Count > 0 ? g3Count : 3),
+      gruposPrimerAno: Math.max(configDB?.g1 || 0, g1Count || 0, 3),
+      gruposSegundoAno: Math.max(configDB?.g2 || 0, g2Count || 0, 3),
+      gruposTercerAno: Math.max(configDB?.g3 || 0, g3Count || 0, 3),
       mapaCurricularCompletado: configDB?.mapa_curricular_completado !== undefined ? Boolean(configDB.mapa_curricular_completado) : tieneGruposDB,
     };
 
@@ -210,6 +219,17 @@ export async function POST(req: NextRequest) {
           zona_escolar              = EXCLUDED.zona_escolar,
           updated_at                = NOW()
       `;
+
+      // Sincronizar zona_escolar en preferencias del perfil docente
+      try {
+        const currentPrefs = (teacher.custom_preferences as any) || {};
+        const updatedPrefs = { ...currentPrefs, zonaEscolar, zona: zonaEscolar };
+        await sql()`
+          UPDATE teachers
+          SET custom_preferences = ${JSON.stringify(updatedPrefs)}::jsonb
+          WHERE id = ${teacherId}::uuid
+        `;
+      } catch {}
     } catch (e) {
       console.error("[api/horarios/configuracion POST] Error guardando config:", e);
     }
