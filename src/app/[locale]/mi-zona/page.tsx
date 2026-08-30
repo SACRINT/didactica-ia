@@ -6,7 +6,7 @@ import MiZonaClient from './MiZonaClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Mi Zona de Supervisión · DidactecaIA',
+  title: 'Mi Zona de Supervisión · SIGPDA-EMS',
   description: 'Gestión de los planteles de tu zona de supervisión.',
 };
 

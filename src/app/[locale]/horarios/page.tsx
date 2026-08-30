@@ -6,7 +6,7 @@ import HorariosDashboardClient from './HorariosDashboardClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Generador de Horarios Escolar IA (Directores) · DidactecaIA',
+  title: 'Generador de Horarios Escolares IA (Directores) · SIGPDA-EMS',
 };
 
 export default async function HorariosDashboardPage({

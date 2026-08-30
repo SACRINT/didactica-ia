@@ -60,10 +60,13 @@ export async function GET(req: NextRequest) {
     const g2Count = gruposRows.filter(g => g.semestre === 3 || g.semestre === 4).length;
     const g3Count = gruposRows.filter(g => g.semestre === 5 || g.semestre === 6).length;
 
+    const zonaGuardada = configDB?.zona_escolar || (teacher.custom_preferences as any)?.zonaEscolar || (teacher.custom_preferences as any)?.zona || "004";
     const escuela = {
       id: teacherId,
       cct: teacher.cct || teacher.school_name || "SIN CCT",
       nombre: teacher.school_name || "Mi Plantel",
+      zonaEscolar: zonaGuardada,
+      zona: zonaGuardada,
       gruposPrimerAno: configDB?.g1 ?? (g1Count > 0 ? g1Count : 3),
       gruposSegundoAno: configDB?.g2 ?? (g2Count > 0 ? g2Count : 3),
       gruposTercerAno: configDB?.g3 ?? (g3Count > 0 ? g3Count : 3),
@@ -179,12 +182,13 @@ export async function POST(req: NextRequest) {
     const g1 = escuelaBody?.gruposPrimerAno  ?? config?.g1  ?? 1;
     const g2 = escuelaBody?.gruposSegundoAno ?? config?.g2  ?? 1;
     const g3 = escuelaBody?.gruposTercerAno  ?? config?.g3  ?? 1;
+    const zonaEscolar = escuelaBody?.zonaEscolar || escuelaBody?.zona || config?.zonaEscolar || "004";
     const mapaDone = true; // Si se guarda configuración desde el Wizard, siempre está completado
 
     try {
       await sql()`
         INSERT INTO horario_config
-          (teacher_id, dias_lectivos, horas_por_dia, hora_inicio, periodo_activo, g1, g2, g3, mapa_curricular_completado)
+          (teacher_id, dias_lectivos, horas_por_dia, hora_inicio, periodo_activo, g1, g2, g3, mapa_curricular_completado, zona_escolar)
         VALUES
           (${teacherId}::uuid,
            ${config?.diasLectivos ?? 5},
@@ -192,7 +196,8 @@ export async function POST(req: NextRequest) {
            ${config?.horaInicio   ?? "08:00"},
            ${config?.periodoActivo ?? "A"},
            ${g1}, ${g2}, ${g3},
-           ${mapaDone})
+           ${mapaDone},
+           ${zonaEscolar})
         ON CONFLICT (teacher_id) DO UPDATE SET
           dias_lectivos             = EXCLUDED.dias_lectivos,
           horas_por_dia             = EXCLUDED.horas_por_dia,
@@ -202,6 +207,7 @@ export async function POST(req: NextRequest) {
           g2                        = EXCLUDED.g2,
           g3                        = EXCLUDED.g3,
           mapa_curricular_completado= TRUE,
+          zona_escolar              = EXCLUDED.zona_escolar,
           updated_at                = NOW()
       `;
     } catch (e) {

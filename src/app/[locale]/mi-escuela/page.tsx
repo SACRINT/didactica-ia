@@ -6,7 +6,7 @@ import MiEscuelaClient from './MiEscuelaClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Mi Plantel · DidactecaIA',
+  title: 'Mi Plantel · SIGPDA-EMS',
   description: 'Gestión del personal docente y administrativo de tu plantel.',
 };
 

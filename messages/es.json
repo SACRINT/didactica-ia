@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "DidácticaIA",
-    "tagline": "Tu secuencia didáctica, perfectamente alineada al MCCEMS",
-    "description": "Genera planeaciones didácticas oficiales DBEPA 2026-2027 con IA"
+    "name": "SIGPDA-EMS",
+    "tagline": "Sistema Integral de Gestión de Planeación Didáctica Automatizada",
+    "description": "Genera planeaciones didácticas oficiales y horarios escolares con IA para Educación Media Superior"
   },
   "nav": {
     "dashboard": "Mis planeaciones",
@@ -11,8 +11,8 @@
     "login": "Iniciar sesión"
   },
   "auth": {
-    "title": "Bienvenido a DidácticaIA",
-    "subtitle": "Plataforma oficial para docentes del Bachillerato General Estatal, Digital y EMSAD — Estado de Puebla",
+    "title": "Bienvenido a SIGPDA-EMS",
+    "subtitle": "Sistema Integral de Gestión de Planeación Didáctica Automatizada — Educación Media Superior",
     "loginWithGoogle": "Iniciar sesión con Google",
     "loginDescription": "Usa tu correo institucional de la SEP Puebla",
     "termsNotice": "Al iniciar sesión, aceptas que tus planeaciones se almacenen de forma privada y segura."

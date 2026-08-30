@@ -8,7 +8,7 @@ interface Props {
 }
 
 export const metadata = {
-  title: 'Mi Progreso Pedagógico — DidácticaIA',
+  title: 'Mi Progreso Pedagógico — SIGPDA-EMS',
   description: 'Estadísticas personales de calidad educativa y uso de IA en tus planeaciones.',
 };
 

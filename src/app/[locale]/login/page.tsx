@@ -6,8 +6,8 @@ import type { Metadata } from 'next';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Iniciar sesión — DidácticaIA',
-    description: 'Accede a DidácticaIA con tu correo institucional de la SEP Puebla',
+    title: 'Iniciar sesión — SIGPDA-EMS',
+    description: 'Accede a SIGPDA-EMS con tu cuenta institucional',
   };
 }
 
@@ -32,9 +32,9 @@ export default async function LoginPage({
         <div className="login-header">
           <div className="login-logo">
             <span className="logo-icon">📚</span>
-            <h1 className="logo-text">DidácticaIA</h1>
+            <h1 className="logo-text">SIGPDA-EMS</h1>
           </div>
-          <div className="dbepa-badge">DBEPA · Puebla · 2026-2027</div>
+          <div className="dbepa-badge">Educación Media Superior · MCCEMS</div>
         </div>
 
         {/* Card */}

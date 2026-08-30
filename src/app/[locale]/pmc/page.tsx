@@ -8,7 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import DeletePmcButton from './DeletePmcButton';
 
 export const metadata: Metadata = {
-  title: 'Plan de Mejora Continua — DidácticaIA',
+  title: 'Plan de Mejora Continua — SIGPDA-EMS',
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {

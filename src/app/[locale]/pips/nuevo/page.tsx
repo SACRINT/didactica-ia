@@ -7,7 +7,7 @@ import { Suspense } from 'react';
 import PipsWizard from './PipsWizard';
 
 export const metadata: Metadata = {
-  title: 'Nuevo PIPS — Plan de Intervención Pedagógica de Supervisión · DidácticaIA',
+  title: 'Nuevo PIPS — Plan de Intervención Pedagógica de Supervisión · SIGPDA-EMS',
 };
 
 export default async function NuevoPipsPage({

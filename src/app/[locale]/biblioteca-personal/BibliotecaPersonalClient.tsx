@@ -106,7 +106,7 @@ export function BibliotecaPersonalClient() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-800">Biblioteca Documental Personal</h1>
         <p className="text-slate-600 mt-2">
-          Sube tus diagnósticos de grupo, FODA, y lineamientos escolares. La Inteligencia Artificial de DidactecaIA leerá estos documentos y los tomará en cuenta automáticamente al generar tus planeaciones, PAEC, y proyectos.
+          Sube tus diagnósticos de grupo, FODA, y lineamientos escolares. La Inteligencia Artificial de SIGPDA-EMS leerá estos documentos y los tomará en cuenta automáticamente al generar tus planeaciones, PAEC, y proyectos.
         </p>
       </div>
 

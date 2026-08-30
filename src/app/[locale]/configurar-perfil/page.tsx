@@ -5,7 +5,7 @@ import ConfigurarPerfilClient from './ConfigurarPerfilClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Configura tu perfil — DidácticaIA',
+  title: 'Configura tu perfil — SIGPDA-EMS',
 };
 
 export default async function ConfigurarPerfilPage({

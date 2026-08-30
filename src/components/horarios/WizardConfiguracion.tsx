@@ -86,12 +86,22 @@ export default function WizardConfiguracion({
     return g3Count > 0 ? g3Count : 3;
   });
 
-  // Sincronizar g1, g2, g3 cuando cambia configInicial o escuelaId
+  // Datos del Plantel y Supervisión Escolar dinámicos
+  const [nombreEscuela, setNombreEscuela] = useState<string>(() => configInicial?.escuela?.nombre || configInicial?.escuela?.school_name || "Mi Plantel");
+  const [cctEscuela, setCctEscuela] = useState<string>(() => configInicial?.escuela?.cct || "");
+  const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "004");
+
+  // Sincronizar g1, g2, g3 y datos de escuela cuando cambia configInicial o escuelaId
   useEffect(() => {
     if (configInicial?.escuela) {
       if (configInicial.escuela.gruposPrimerAno) setG1(configInicial.escuela.gruposPrimerAno);
       if (configInicial.escuela.gruposSegundoAno) setG2(configInicial.escuela.gruposSegundoAno);
       if (configInicial.escuela.gruposTercerAno) setG3(configInicial.escuela.gruposTercerAno);
+      if (configInicial.escuela.nombre) setNombreEscuela(configInicial.escuela.nombre);
+      if (configInicial.escuela.cct) setCctEscuela(configInicial.escuela.cct);
+      if (configInicial.escuela.zonaEscolar || configInicial.escuela.zona) {
+        setZonaEscolar(configInicial.escuela.zonaEscolar || configInicial.escuela.zona);
+      }
     } else if (gruposIniciales && gruposIniciales.length > 0) {
       const c1 = gruposIniciales.filter(g => g.semestre === 1 || g.semestre === 2).length;
       const c2 = gruposIniciales.filter(g => g.semestre === 3 || g.semestre === 4).length;
@@ -895,6 +905,14 @@ export default function WizardConfiguracion({
           aulas: aulasIniciales.length > 0 ? aulasIniciales : [{ nombre: "Aula General", tipo: "REGULAR" }],
           cargas: cargasCompletas,
           escuela: {
+            id: escuelaId,
+            nombre: nombreEscuela,
+            cct: cctEscuela,
+            zonaEscolar,
+            zona: zonaEscolar,
+            gruposPrimerAno: g1,
+            gruposSegundoAno: g2,
+            gruposTercerAno: g3,
             mapaCurricularCompletado: true,
           }
         })
@@ -911,7 +929,19 @@ export default function WizardConfiguracion({
             diasLectivos: 5,
             horasPorDia: numPeriodos,
             horaInicio,
-            periodoActivo
+            periodoActivo,
+            zonaEscolar
+          },
+          escuela: {
+            id: escuelaId,
+            nombre: nombreEscuela,
+            cct: cctEscuela,
+            zonaEscolar,
+            zona: zonaEscolar,
+            gruposPrimerAno: g1,
+            gruposSegundoAno: g2,
+            gruposTercerAno: g3,
+            mapaCurricularCompletado: true
           },
           diasLectivos: 5,
           horasPorDia: numPeriodos,
@@ -1165,6 +1195,55 @@ export default function WizardConfiguracion({
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Datos del Plantel y Supervisión Escolar */}
+          <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "14px", padding: "1.25rem", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.85rem" }}>
+              <span style={{ fontSize: "1.25rem" }}>🏫</span>
+              <div>
+                <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>Datos Oficiales del Plantel y Supervisión Escolar</div>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Personalice el nombre del plantel, clave CCT y su Supervisión / Zona Escolar correspondiente (se reflejará en todos los membretes oficiales).</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                  🏛️ Nombre del Plantel / Escuela:
+                </label>
+                <input
+                  type="text"
+                  value={nombreEscuela}
+                  onChange={(e) => setNombreEscuela(e.target.value)}
+                  placeholder="Ej. Bachillerato General Oficial..."
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", color: "#ffffff", fontSize: "0.8125rem", fontWeight: 600 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                  📋 Clave de Centro de Trabajo (C.C.T.):
+                </label>
+                <input
+                  type="text"
+                  value={cctEscuela}
+                  onChange={(e) => setCctEscuela(e.target.value)}
+                  placeholder="Ej. 21EBH0000X"
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", color: "#ffffff", fontSize: "0.8125rem", fontWeight: 600 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#38bdf8", marginBottom: "0.3rem" }}>
+                  📍 Supervisión / Zona Escolar:
+                </label>
+                <input
+                  type="text"
+                  value={zonaEscolar}
+                  onChange={(e) => setZonaEscolar(e.target.value)}
+                  placeholder="Ej. 004, 012, Zona 025..."
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "2px solid #38bdf8", background: "#0f172a", color: "#38bdf8", fontSize: "0.875rem", fontWeight: 800 }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Banner Selector de Modo de Carga */}
           <div style={{ background: "#1e293b", padding: "1.25rem", borderRadius: "14px", border: "1px solid #334155", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
             <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>

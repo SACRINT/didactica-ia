@@ -120,6 +120,9 @@ export default function HorariosDashboardClient({
       if (paramsFromWizard?.docentes) setDocentes(paramsFromWizard.docentes);
       if (paramsFromWizard?.cargas) setCargas(paramsFromWizard.cargas);
       if (paramsFromWizard?.config) setConfig(paramsFromWizard.config);
+      if (paramsFromWizard?.escuela) {
+        setEscuelaState((prev: any) => ({ ...prev, ...paramsFromWizard.escuela }));
+      }
 
       const res = await fetch('/api/horarios/generar', {
         method: 'POST',

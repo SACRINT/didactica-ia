@@ -1,6 +1,6 @@
 /**
  * subject-colors.ts — Sistema Unificado de Paletas y Colores Determinísticos por Materia
- * DidactecaIA · DBEPA Puebla
+ * SIGPDA-EMS · Educación Media Superior
  *
  * Garantiza que la misma materia tenga exactamente los mismos colores armónicos
  * en PDF Oficial, Word Editable (.docx), Excel Estilizado (ExcelJS) y Tarjeta WhatsApp (Neón).

@@ -242,7 +242,7 @@ function TTSControls({ text }: { text: string }) {
 
 const GREETING_MESSAGE: ChatMessage = {
   role: 'assistant',
-  content: '¡Hola! 👋 Soy DidactecaBot, tu Asistente Técnico-Pedagógico de DidactecaIA.\n\nPuedo orientarte en cualquier momento sobre secuencias didácticas, momentos metodológicos (apertura, desarrollo y cierre), rúbricas de evaluación formativa, vinculación con el PAEC o lineamientos del MCCEMS 2026-2027. ¿En qué te puedo apoyar hoy?'
+  content: '¡Hola! 👋 Soy SIGPDA Bot, tu Asistente Técnico-Pedagógico de SIGPDA-EMS.\n\nPuedo orientarte en cualquier momento sobre secuencias didácticas, momentos metodológicos (apertura, desarrollo y cierre), rúbricas de evaluación formativa, vinculación con el PAEC o lineamientos del MCCEMS. ¿En qué te puedo apoyar hoy?'
 };
 
 export default function PedagogicalChatWidget({ uacContext, paecContext }: { uacContext?: string; paecContext?: string }) {
@@ -268,11 +268,9 @@ export default function PedagogicalChatWidget({ uacContext, paecContext }: { uac
     if (!textToSend || loading) return;
 
     setInput('');
-    setLoading(true);
-
-    const userMsg: ChatMessage = { role: 'user', content: textToSend };
-    const newMessages: ChatMessage[] = [...messages, userMsg];
+    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: textToSend }];
     setMessages(newMessages);
+    setLoading(true);
 
     try {
       const res = await fetch('/api/pedagogical-chat', {
@@ -282,22 +280,24 @@ export default function PedagogicalChatWidget({ uacContext, paecContext }: { uac
           messages: newMessages,
           uacContext,
           paecContext
-        }),
+        })
       });
 
+      if (!res.ok) {
+        throw new Error('Error al consultar al asistente pedagógico');
+      }
+
       const data = await res.json();
-      if (data.success && data.reply) {
-        setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
-      } else {
+      if (data.reply) {
         setMessages([
           ...newMessages,
-          { role: 'assistant', content: '⚠️ ' + (data.error || 'No fue posible procesar tu consulta pedagógica en este momento.') }
+          { role: 'assistant', content: data.reply }
         ]);
       }
     } catch (err: any) {
       setMessages([
         ...newMessages,
-        { role: 'assistant', content: '⚠️ Error de conexión con el Asistente DidactecaBot.' }
+        { role: 'assistant', content: '⚠️ Error de conexión con el Asistente SIGPDA Bot.' }
       ]);
     } finally {
       setLoading(false);
@@ -365,11 +365,11 @@ export default function PedagogicalChatWidget({ uacContext, paecContext }: { uac
               </div>
               <div>
                 <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
-                  DidactecaBot IA
+                  SIGPDA Bot IA
                 </h3>
                 <span style={{ fontSize: '0.6875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
-                  MCCEMS 2026-2027 • Asesor Pedagógico
+                  MCCEMS • Asesor Pedagógico
                 </span>
               </div>
             </div>

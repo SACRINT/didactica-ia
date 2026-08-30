@@ -6,7 +6,7 @@ import AdminClient from './AdminClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Panel de Administrador — Didáctica-IA',
+  title: 'Panel de Administrador — SIGPDA-EMS',
 };
 
 async function isAdmin(email: string): Promise<boolean> {

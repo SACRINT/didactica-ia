@@ -4,7 +4,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import MisDocumentosClient from './MisDocumentosClient';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Mis Documentos — Didáctica-IA' };
+export const metadata: Metadata = { title: 'Mis Documentos — SIGPDA-EMS' };
 
 export default async function MisDocumentosPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

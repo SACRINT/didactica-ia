@@ -1,6 +1,6 @@
 /**
  * planeaciones-evaluator.ts
- * Motor de evaluación y co-piloto de Planeaciones Didácticas con IA (DidactecaIA 2026-2027)
+ * Motor de evaluación y co-piloto de Planeaciones Didácticas con IA (SIGPDA-EMS)
  *
  * Soporta tres rutas de evaluación oficial:
  *  - Semestres 1-4 : MCCEMS (Propósitos Formativos y Contenidos) → Anexo 12 USICAMM 1-4

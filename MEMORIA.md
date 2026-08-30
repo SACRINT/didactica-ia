@@ -1,13 +1,13 @@
-# MEMORIA.md — DidactecaIA
+# MEMORIA.md — SIGPDA-EMS
 
-> Última actualización: 2026-08-05
-> Estado: Módulos 1-4 completos. Módulo 5 (Normativa) en planificación.
+> Última actualización: 2026-08-30
+> Estado: Plataforma Integral de Planeación Didáctica y Horarios Escolares MCCEMS.
 
 ---
 
 ## 1. DESCRIPCIÓN DEL PROYECTO
 
-**DidactecaIA** es una plataforma SaaS de suscripción para docentes del Bachillerato General Estatal (BGE), Bachillerato Digital y EMSAD del Estado de Puebla. Genera con IA documentos pedagógicos institucionales: Planeaciones Didácticas, PAEC-PEC, PMC y PIPS.
+**SIGPDA-EMS** (Sistema Integral de Gestión de Planeación Didáctica Automatizada de la Educación Media Superior) es una plataforma SaaS para docentes, directores y supervisores del Bachillerato General Estatal (BGE), Bachillerato Digital y EMSAD. Genera con IA documentos pedagógicos institucionales: Planeaciones Didácticas, Horarios Escolares Inteligentes, PAEC-PEC, PMC y PIPS.
 
 **Dominio de negocio:** Plataforma privada. Las cuentas son personales. Nadie puede revisar el contenido de otro usuario, ni directores ni supervisores. El administrador del sistema es la única excepción técnica. El control de entregas (expedientes, validaciones OCR) es exclusivo de SISAT-ATP, proyecto separado.
 

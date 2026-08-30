@@ -1,7 +1,7 @@
 /**
  * gemini.ts — Pool de API Keys con Rotación Determinista Round-Robin
  *
- * Motor de IA de DidactecaIA con:
+ * Motor de IA de SIGPDA-EMS con:
  * - Rotación secuencial (Round-Robin) de API Keys para generaciones granulares
  * - Soporte de perfil Estándar (gemini-3.5-flash-lite / gemini-3.1-flash-lite)
  * - Soporte de perfil Premium (modelo configurado por el Administrador en /es/admin)
@@ -52,7 +52,7 @@ export async function callGeminiPool(
   responseSchema?: object
 ): Promise<string> {
   if (!process.env.DATABASE_URL) {
-    throw new Error('[didacteca-ia] DATABASE_URL no configurada.');
+    throw new Error('[sigpda-ems] DATABASE_URL no configurada.');
   }
 
   const sql = neon(process.env.DATABASE_URL);
@@ -84,7 +84,7 @@ export async function callGeminiPool(
       AND error_count >= 5
       AND last_error_at IS NOT NULL
       AND last_error_at <= ${cooldownTime.toISOString()}
-  `.catch(err => console.error('[didacteca-ia] Error reactivando llaves:', err));
+  `.catch(err => console.error('[sigpda-ems] Error reactivando llaves:', err));
 
   // 4. Cargar llaves activas del pool (Gemini)
   const keys = await sql`
@@ -95,7 +95,7 @@ export async function callGeminiPool(
   `;
 
   if (keys.length === 0) {
-    throw new Error('[didacteca-ia] No hay API Keys de Gemini activas en el pool.');
+    throw new Error('[sigpda-ems] No hay API Keys de Gemini activas en el pool.');
   }
 
   // 5. Descifrar llaves
@@ -128,7 +128,7 @@ export async function callGeminiPool(
   ];
 
   console.log(
-    `[didacteca-ia] 🔄 Generando con Llave: "${rotatedKeys[0].label}" ` +
+    `[sigpda-ems] 🔄 Generando con Llave: "${rotatedKeys[0].label}" ` +
     `(Índice: ${startIndex + 1}/${decryptedKeys.length}) - Modelo: ${modelToUse} ` +
     `[${isPremium ? '⭐ Premium' : '⚡ Estándar'}]`
   );
@@ -157,7 +157,7 @@ export async function callGeminiPool(
 
       return result;
     } catch (err: any) {
-      console.warn(`[didacteca-ia] Advertencia en llave "${keyRecord.label}": ${err.message}`);
+      console.warn(`[sigpda-ems] Advertencia en llave "${keyRecord.label}": ${err.message}`);
 
       const is429 =
         err.message?.includes('429') ||
@@ -178,7 +178,7 @@ export async function callGeminiPool(
     }
   }
 
-  throw new Error('[didacteca-ia] Todas las API Keys del pool fallaron o alcanzaron su cuota.');
+  throw new Error('[sigpda-ems] Todas las API Keys del pool fallaron o alcanzaron su cuota.');
 }
 
 // ── Ejecutor con cadena de modelos (fallback ante 404) ────────────────────────
@@ -220,7 +220,7 @@ async function executeWithModelFallback(
         const errText = await res.text();
         // 404 = modelo descontinuado → intentar el siguiente de la cadena
         if (res.status === 404 || errText.toLowerCase().includes('not found')) {
-          console.warn(`[didacteca-ia] Modelo "${currentModel}" no encontrado (404), probando siguiente...`);
+          console.warn(`[sigpda-ems] Modelo "${currentModel}" no encontrado (404), probando siguiente...`);
           continue;
         }
         throw new Error(`HTTP ${res.status}: ${errText}`);
@@ -239,7 +239,7 @@ async function executeWithModelFallback(
     }
   }
 
-  throw lastError || new Error('[didacteca-ia] Todos los modelos de la cadena fallaron.');
+  throw lastError || new Error('[sigpda-ems] Todos los modelos de la cadena fallaron.');
 }
 
 // ── Planning (streaming) ──────────────────────────────────────────────────────

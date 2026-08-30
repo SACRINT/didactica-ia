@@ -373,11 +373,11 @@ export default function EditorHorarios({
   const getNombreDocenteCelda = (celda: any) => {
     if (!celda) return "";
     if (celda.docente?.nombre) {
-      return `${celda.docente.nombre} ${celda.docente.apellidoPaterno || ""}`.trim();
+      return `${celda.docente.nombre} ${celda.docente.apellidoPaterno || ""} ${celda.docente.apellidoMaterno || ""}`.trim();
     }
     const docObj = docentes.find(d => d.id === celda.docenteId);
     if (docObj) {
-      return `${docObj.nombre} ${docObj.apellidoPaterno || ""}`.trim();
+      return `${docObj.nombre} ${docObj.apellidoPaterno || ""} ${docObj.apellidoMaterno || ""}`.trim();
     }
     return celda.docenteId || "Docente";
   };
@@ -781,16 +781,19 @@ export default function EditorHorarios({
       horario?.celdas?.some((c: any) => c.docenteId === d.id)
     );
 
+    const zonaEscolarEfectiva = (escuela as any)?.zonaEscolar || (escuela as any)?.zona || "004";
+
     if (opcion === "SUMARIO_MAESTRO") {
       await exportarSumarioExcel(
         {
           nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
           cct: escuela?.cct || "CCT",
+          zonaEscolar: zonaEscolarEfectiva,
           dias: diasLectivos,
           numHorasPorDia,
           entidades: (docentesActivos.length > 0 ? docentesActivos : docentes).map(d => ({
             id: d.id,
-            etiqueta: `${d.apellidoPaterno || ""} ${d.nombre || ""}`.trim()
+            etiqueta: `${d.apellidoPaterno || ""} ${d.apellidoMaterno || ""} ${d.nombre || ""}`.trim()
           })),
           obtenerCelda: (docenteId, dia, periodo) => {
             const c = horario?.celdas?.find(
@@ -813,6 +816,7 @@ export default function EditorHorarios({
         {
           nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
           cct: escuela?.cct || "CCT",
+          zonaEscolar: zonaEscolarEfectiva,
           dias: diasLectivos,
           numHorasPorDia,
           entidades: (gruposActivos.length > 0 ? gruposActivos : grupos).map(g => ({ id: g.id, etiqueta: `Grupo ${g.nombre}` })),
@@ -852,7 +856,7 @@ export default function EditorHorarios({
         filasExport.push({ encabezado: `GRUPO: ${g?.nombre || ""}`, celdas: celdasMapa });
       } else if (vistaTab === "DOCENTE") {
         const dObj = docentes.find(item => item.id === docenteSeleccionadoId);
-        const nomDoc = dObj ? `${dObj.nombre} ${dObj.apellidoPaterno || ""}`.trim() : "DOCENTE";
+        const nomDoc = dObj ? `${dObj.nombre} ${dObj.apellidoPaterno || ""} ${dObj.apellidoMaterno || ""}`.trim() : "DOCENTE";
         tituloTabla = `HORARIO PERSONAL DEL DOCENTE: ${nomDoc}`;
         const celdasMapa: any = {};
         for (let d = 1; d <= 5; d++) {
@@ -875,7 +879,7 @@ export default function EditorHorarios({
       tipoVistaPDF = "PAQUETE_DOCENTES";
       const listaDocentes = docentesActivos.length > 0 ? docentesActivos : docentes;
       for (const docObj of listaDocentes) {
-        const nomDoc = `${docObj.nombre} ${docObj.apellidoPaterno || ""}`.trim();
+        const nomDoc = `${docObj.nombre} ${docObj.apellidoPaterno || ""} ${docObj.apellidoMaterno || ""}`.trim();
         const celdasMapa: any = {};
         for (let d = 1; d <= 5; d++) {
           for (let p = 1; p <= numHorasPorDia; p++) {
@@ -909,7 +913,7 @@ export default function EditorHorarios({
     const payload = {
       nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
       cct: escuela?.cct || "CCT",
-      zonaEscolar: (escuela as any)?.zona || "004",
+      zonaEscolar: zonaEscolarEfectiva,
       cicloEscolar: (horario as any)?.cicloEscolar?.nombre || "2026-2027",
       tipoVista: tipoVistaPDF,
       tituloTabla,
@@ -1584,7 +1588,7 @@ export default function EditorHorarios({
                 <div>
                   <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "white", margin: 0 }}>Asistente IA de Horarios</h3>
                   {esAdmin && (
-                    <p style={{ fontSize: "0.65rem", color: "#94a3b8", margin: 0 }}>Gemini 3.5 Flash Lite | DidactecaIA Pool</p>
+                    <p style={{ fontSize: "0.65rem", color: "#94a3b8", margin: 0 }}>Gemini 3.5 Flash Lite | SIGPDA-EMS Pool</p>
                   )}
                 </div>
               </div>

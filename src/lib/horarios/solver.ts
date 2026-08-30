@@ -1,6 +1,6 @@
 /**
  * Motor Solver de Restricciones para Generación de Horarios Escolares
- * DidactecaIA - Algoritmo Híbrido CSP con Min-Conflicts Dirigido y Simulated Annealing
+ * SIGPDA-EMS - Algoritmo Híbrido CSP con Min-Conflicts Dirigido y Simulated Annealing
  * Resuelve problemas complejos de horarios escolares (255+ horas) en milisegundos con 0 empalmes.
  */
 

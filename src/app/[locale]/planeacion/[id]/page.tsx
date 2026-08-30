@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import type { Planning, PlanningExtra } from '@/types/planning';
 
 export const metadata: Metadata = {
-  title: 'Ver UAC y Recursos — DidácticaIA',
+  title: 'Ver UAC y Recursos — SIGPDA-EMS',
 };
 
 export default async function PlanningDetailPage({

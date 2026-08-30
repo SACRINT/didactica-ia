@@ -8,7 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import DeletePaecButton from './DeletePaecButton';
 
 export const metadata: Metadata = {
-  title: 'Proyectos PAEC-PEC — DidácticaIA',
+  title: 'Proyectos PAEC-PEC — SIGPDA-EMS',
 };
 
 const CYCLE_LABELS: Record<string, string> = {

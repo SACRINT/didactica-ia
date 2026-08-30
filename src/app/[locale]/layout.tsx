@@ -6,9 +6,9 @@ import type { Metadata } from 'next';
 import '../globals.css';
 
 export const metadata: Metadata = {
-  title: 'DidácticaIA — Planeaciones DBEPA 2026-2027',
-  description: 'Genera planeaciones didácticas oficiales DBEPA 2026-2027 con IA para el Bachillerato General Estatal, Digital y EMSAD de Puebla.',
-  keywords: 'planeación didáctica, DBEPA, Puebla, NEM, MCCEMS, secuencia didáctica, IA',
+  title: 'SIGPDA-EMS — Sistema Integral de Gestión de Planeación Didáctica Automatizada',
+  description: 'Sistema Integral de Gestión de Planeación Didáctica Automatizada y Horarios Escolares para Educación Media Superior.',
+  keywords: 'planeación didáctica, SIGPDA, SIGPDA-EMS, NEM, MCCEMS, secuencia didáctica, horarios escolares, IA',
 };
 
 type Props = {

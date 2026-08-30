@@ -9,7 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import DeletePipsButton from './DeletePipsButton';
 
 export const metadata: Metadata = {
-  title: 'PIPS — Plan de Intervención Pedagógica de Supervisión · DidácticaIA',
+  title: 'PIPS — Plan de Intervención Pedagógica de Supervisión · SIGPDA-EMS',
 };
 
 export default async function PipsDashboardPage({

@@ -63,7 +63,7 @@ export async function procesarComandoIA(
   },
   escuelaId?: string
 ): Promise<RespuestaIAHorario> {
-  const systemInstruction = `Eres el Asistente Inteligente de Horarios Escolares para DidactecaIA (DBEPA Puebla).
+  const systemInstruction = `Eres el Asistente Inteligente de Horarios Escolares para SIGPDA-EMS (Sistema Integral de Gestión de Planeación Didáctica Automatizada).
 Tu tarea es analizar en lenguaje natural los comandos de directores, VALIDAR LA FACTIBILIDAD MATEMÁTICA de sus peticiones y ejecutar la acción óptima mediante Mutaciones Quirúrgicas o el Solver de Restricciones.
 
 ROUTER DE INTENCIONES (ELIGE EL TIPO DE ACCIÓN CORRECTO):

@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: '¡Suscripción activada! — DidácticaIA',
+  title: '¡Suscripción activada! — SIGPDA-EMS',
 };
 
 export default async function SuscripcionExitoPage({

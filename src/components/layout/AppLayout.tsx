@@ -88,7 +88,7 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
             borderRadius: 10, padding: '12px 20px',
             fontSize: 13, color: '#818cf8',
           }}>
-            📚 DidácticaIA · DBEPA Puebla 2026-2027
+            📚 SIGPDA-EMS · Educación Media Superior
           </div>
           <form action={signOutPlain} style={{ marginTop: 24 }}>
             <button type="submit" style={{
@@ -111,8 +111,8 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
         <div className="header-logo">
           <span className="header-logo-icon">📚</span>
           <div>
-            <div className="header-logo-text">DidácticaIA</div>
-            <div className="header-logo-sub">DBEPA Puebla 2026-2027</div>
+            <div className="header-logo-text">SIGPDA-EMS</div>
+            <div className="header-logo-sub">Planeación & Horarios MCCEMS</div>
           </div>
         </div>
         <div className="header-right">

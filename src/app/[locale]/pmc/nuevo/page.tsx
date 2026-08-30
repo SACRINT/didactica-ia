@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import { neon } from '@neondatabase/serverless';
 
 export const metadata: Metadata = {
-  title: 'Nuevo PMC — DidácticaIA',
+  title: 'Nuevo PMC — SIGPDA-EMS',
 };
 
 export default async function PmcNuevoPage({

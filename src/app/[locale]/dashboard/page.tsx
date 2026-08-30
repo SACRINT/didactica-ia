@@ -10,7 +10,7 @@ import SubscriptionBanner from '@/components/dashboard/SubscriptionBanner';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Mis planeaciones — DidácticaIA',
+  title: 'Mis planeaciones — SIGPDA-EMS',
 };
 
 const STATUS_LABELS: Record<string, string> = {

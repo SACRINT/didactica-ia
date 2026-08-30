@@ -84,8 +84,8 @@ async function pingProvider(provider: string, model: string, apiKey: string): Pr
         method: 'GET',
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://didactica-ia.vercel.app',
-          'X-Title': 'DidacteCA',
+          'HTTP-Referer': 'https://sigpda-ems.vercel.app',
+          'X-Title': 'SIGPDA-EMS',
         },
         signal: AbortSignal.timeout(12000),
       });

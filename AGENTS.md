@@ -4,7 +4,7 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Reglas de IA y Modelos (DidactecaIA)
+# Reglas de IA y Modelos (SIGPDA-EMS)
 
 ## Modelos autorizados
 - **Modelo estándar y premium por defecto**: `gemini-3.5-flash-lite` (proveedor `gemini`). Definidos en `src/lib/ai-provider/index.ts` (`DEFAULT_STANDARD_MODEL`, `DEFAULT_PREMIUM_MODEL`).

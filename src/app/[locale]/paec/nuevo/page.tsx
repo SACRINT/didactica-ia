@@ -6,7 +6,7 @@ import PaecWizardClient from './PaecWizardClient';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Asistente PAEC-PEC — DidácticaIA',
+  title: 'Asistente PAEC-PEC — SIGPDA-EMS',
 };
 
 interface PageProps {
