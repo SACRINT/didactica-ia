@@ -773,6 +773,14 @@ export default function EditorHorarios({
   ) => {
     setMostrarModalExportar(false);
 
+    // Filtrar únicamente grupos y docentes que tienen clases activas asignadas en este semestre
+    const gruposActivos = grupos.filter(g =>
+      horario?.celdas?.some((c: any) => c.grupoId === g.id)
+    );
+    const docentesActivos = docentes.filter(d =>
+      horario?.celdas?.some((c: any) => c.docenteId === d.id)
+    );
+
     if (opcion === "SUMARIO_MAESTRO") {
       await exportarSumarioExcel(
         {
@@ -780,7 +788,7 @@ export default function EditorHorarios({
           cct: escuela?.cct || "CCT",
           dias: diasLectivos,
           numHorasPorDia,
-          entidades: docentes.map(d => ({
+          entidades: (docentesActivos.length > 0 ? docentesActivos : docentes).map(d => ({
             id: d.id,
             etiqueta: `${d.apellidoPaterno || ""} ${d.nombre || ""}`.trim()
           })),
@@ -807,7 +815,7 @@ export default function EditorHorarios({
           cct: escuela?.cct || "CCT",
           dias: diasLectivos,
           numHorasPorDia,
-          entidades: grupos.map(g => ({ id: g.id, etiqueta: `Grupo ${g.nombre}` })),
+          entidades: (gruposActivos.length > 0 ? gruposActivos : grupos).map(g => ({ id: g.id, etiqueta: `Grupo ${g.nombre}` })),
           obtenerCelda: (grupoId, dia, periodo) => {
             const c = horario?.celdas?.find(
               (cc: any) => cc.diaSemana === dia && cc.periodo === periodo && cc.grupoId === grupoId
@@ -865,7 +873,8 @@ export default function EditorHorarios({
     } else if (opcion === "PAQUETE_DOCENTES") {
       tituloTabla = "PAQUETE OFICIAL DE HORARIOS INDIVIDUALES POR DOCENTE";
       tipoVistaPDF = "PAQUETE_DOCENTES";
-      for (const docObj of docentes) {
+      const listaDocentes = docentesActivos.length > 0 ? docentesActivos : docentes;
+      for (const docObj of listaDocentes) {
         const nomDoc = `${docObj.nombre} ${docObj.apellidoPaterno || ""}`.trim();
         const celdasMapa: any = {};
         for (let d = 1; d <= 5; d++) {
@@ -882,7 +891,8 @@ export default function EditorHorarios({
     } else if (opcion === "PAQUETE_GRUPOS") {
       tituloTabla = "PAQUETE OFICIAL DE HORARIOS POR GRUPO";
       tipoVistaPDF = "PAQUETE_GRUPOS";
-      for (const g of grupos) {
+      const listaGrupos = gruposActivos.length > 0 ? gruposActivos : grupos;
+      for (const g of listaGrupos) {
         const celdasMapa: any = {};
         for (let d = 1; d <= 5; d++) {
           for (let p = 1; p <= numHorasPorDia; p++) {
