@@ -1909,7 +1909,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                   <option value="fundamental">Currículum Fundamental</option>
                   <option value="laboral">Formación Laboral / Profesional</option>
                   <option value="ampliado">Currículum Ampliado</option>
-                  <option value="ffeo">Formación Extendida Obligatoria (FFEO)</option>
+                  <option value="ext_obligatorio">Formación Extendida Obligatoria (FFEO)</option>
                   <option value="ext_optativo">Formación Extendida Optativa</option>
                 </select>
                 {(curriculaSubsystem !== 'todos' || curriculaSemester !== 'todos' || curriculaComponent !== 'todos' || curriculaSearch.trim()) && (
@@ -1952,7 +1952,15 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     const semPrograms = curriculaPrograms.filter(p => {
                       if (p.semester !== sem) return false;
                       if (curriculaSubsystem !== 'todos' && p.subsystem !== curriculaSubsystem && p.subsystem !== 'all' && p.subsystem) return false;
-                      if (curriculaComponent !== 'todos' && p.component !== curriculaComponent) return false;
+                      if (curriculaComponent !== 'todos') {
+                        if (curriculaComponent === 'ext_obligatorio' || curriculaComponent === 'ffeo') {
+                          if (p.component !== 'ext_obligatorio' && p.component !== 'ffeo') return false;
+                        } else if (curriculaComponent === 'ext_optativo' || curriculaComponent === 'ffe_optativa') {
+                          if (p.component !== 'ext_optativo' && p.component !== 'ffe_optativa') return false;
+                        } else if (p.component !== curriculaComponent) {
+                          return false;
+                        }
+                      }
                       if (curriculaSearch.trim()) {
                         const q = curriculaSearch.toLowerCase();
                         const matchName = p.uac_name.toLowerCase().includes(q);
@@ -2007,12 +2015,14 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                             </div>
                           ) : (
                             semPrograms.map(p => {
+                              const isFfeo = p.component === 'ffeo' || p.component === 'ext_obligatorio';
+                              const isOptativa = p.component === 'ext_optativo' || p.component === 'ffe_optativa';
                               const weeklyLoad = Math.round((p.total_hours || 54) / 18);
                               const compColor =
                                 p.component === 'laboral' ? '#f59e0b' :
                                 p.component === 'ampliado' ? '#10b981' :
-                                p.component === 'ffeo' ? '#ec4899' :
-                                p.component === 'ext_optativo' ? '#8b5cf6' : '#3b82f6';
+                                isFfeo ? '#ec4899' :
+                                isOptativa ? '#8b5cf6' : '#3b82f6';
 
                               return (
                                 <div
@@ -2064,8 +2074,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                                       >
                                         {p.component === 'laboral' ? '💼 Laboral' :
                                          p.component === 'ampliado' ? '🌱 Ampliado' :
-                                         p.component === 'ffeo' ? '⭐ FFEO' :
-                                         p.component === 'ext_optativo' ? '🎯 Optativa' : '📘 Fundamental'}
+                                         isFfeo ? '⭐ FFEO' :
+                                         isOptativa ? '🎯 Optativa' : '📘 Fundamental'}
                                       </span>
                                     </div>
                                     <span
@@ -2185,7 +2195,15 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       .filter(p => {
                         if (curriculaSubsystem !== 'todos' && p.subsystem !== curriculaSubsystem && p.subsystem !== 'all' && p.subsystem) return false;
                         if (curriculaSemester !== 'todos' && p.semester !== parseInt(curriculaSemester, 10)) return false;
-                        if (curriculaComponent !== 'todos' && p.component !== curriculaComponent) return false;
+                        if (curriculaComponent !== 'todos') {
+                          if (curriculaComponent === 'ext_obligatorio' || curriculaComponent === 'ffeo') {
+                            if (p.component !== 'ext_obligatorio' && p.component !== 'ffeo') return false;
+                          } else if (curriculaComponent === 'ext_optativo' || curriculaComponent === 'ffe_optativa') {
+                            if (p.component !== 'ext_optativo' && p.component !== 'ffe_optativa') return false;
+                          } else if (p.component !== curriculaComponent) {
+                            return false;
+                          }
+                        }
                         if (curriculaSearch.trim()) {
                           const q = curriculaSearch.toLowerCase();
                           const matchName = p.uac_name.toLowerCase().includes(q);
@@ -2197,6 +2215,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       .map(p => {
                         const isProgresiones = p.model_type === 'progresiones' || (p.semester >= 5 && p.component !== 'laboral');
                         const isLaboral = p.component === 'laboral';
+                        const isFfeo = p.component === 'ffeo' || p.component === 'ext_obligatorio';
+                        const isOptativa = p.component === 'ext_optativo' || p.component === 'ffe_optativa';
                         const weeklyLoad = Math.round((p.total_hours || 54) / 18);
                         return (
                           <tr key={p.id}>
@@ -2218,8 +2238,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                             </td>
                             <td style={{ fontWeight: 700, textAlign: 'center' }}>{p.semester}°</td>
                             <td>
-                              <span className="badge" style={{ background: isLaboral ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(16,185,129,0.15)' : p.component === 'ffeo' ? 'rgba(236,72,153,0.15)' : p.component === 'ext_optativo' ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)', color: isLaboral ? '#fbbf24' : p.component === 'ampliado' ? '#34d399' : p.component === 'ffeo' ? '#f472b6' : p.component === 'ext_optativo' ? '#a78bfa' : '#60a5fa', fontSize: 11 }}>
-                                {isLaboral ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : p.component === 'ffeo' ? 'FFEO' : p.component === 'ext_optativo' ? 'Optativo' : 'Fundamental'}
+                              <span className="badge" style={{ background: isLaboral ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(16,185,129,0.15)' : isFfeo ? 'rgba(236,72,153,0.15)' : isOptativa ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)', color: isLaboral ? '#fbbf24' : p.component === 'ampliado' ? '#34d399' : isFfeo ? '#f472b6' : isOptativa ? '#a78bfa' : '#60a5fa', fontSize: 11 }}>
+                                {isLaboral ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : isFfeo ? 'FFEO' : isOptativa ? 'Optativo' : 'Fundamental'}
                               </span>
                             </td>
                             <td>
@@ -2297,8 +2317,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         <span className="badge" style={{ background: 'rgba(255,255,255,0.1)', color: '#e2e8f0', fontSize: 11 }}>
                           {selectedProgramDetail.component === 'laboral' ? '💼 Formación Laboral (Capacitación)' :
                            selectedProgramDetail.component === 'ampliado' ? '🌱 Currículum Ampliado (Socioemocional)' :
-                           selectedProgramDetail.component === 'ffeo' ? '⭐ FFEO' :
-                           selectedProgramDetail.component === 'ext_optativo' ? '🎯 Optativa / FFE' : '📘 Currículum Fundamental'}
+                           (selectedProgramDetail.component === 'ffeo' || selectedProgramDetail.component === 'ext_obligatorio') ? '⭐ FFEO' :
+                           (selectedProgramDetail.component === 'ext_optativo' || selectedProgramDetail.component === 'ffe_optativa') ? '🎯 Optativa / FFE' : '📘 Currículum Fundamental'}
                         </span>
                         <span className="badge" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', fontSize: 11 }}>
                           {selectedProgramDetail.total_hours} hrs ({Math.round((selectedProgramDetail.total_hours || 54) / 18)} h/sem)
@@ -2559,7 +2579,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                           <option value="fundamental">Currículum Fundamental</option>
                           <option value="ampliado">Currículum Ampliado (Socioemocional / PAEC)</option>
                           <option value="laboral">Formación Laboral / Profesional (Capacitación)</option>
-                          <option value="ffeo">Formación Fundamental Extendida Obligatoria (FFEO)</option>
+                          <option value="ext_obligatorio">Formación Fundamental Extendida Obligatoria (FFEO)</option>
                           <option value="ext_optativo">Formación Fundamental Extendida (Optativas / FFE)</option>
                         </select>
                       </div>
@@ -2843,7 +2863,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                           <option value="fundamental">Currículum Fundamental</option>
                           <option value="ampliado">Currículum Ampliado</option>
                           <option value="laboral">Formación Laboral / Profesional</option>
-                          <option value="ffeo">Formación Extendida Obligatoria (FFEO)</option>
+                          <option value="ext_obligatorio">Formación Extendida Obligatoria (FFEO)</option>
                           <option value="ext_optativo">Formación Extendida Optativa (FFE)</option>
                         </select>
                       </div>
