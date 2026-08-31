@@ -96,9 +96,11 @@ export default async function DashboardPage({
                 })}
               </p>
               <div className="planning-card-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Link href={`/${locale}/planeacion/${p.id as string}`} className="btn btn-secondary btn-sm">
-                  Ver
-                </Link>
+                {(p.status === 'generated' || p.status === 'downloaded') && (
+                  <Link href={`/${locale}/dashboard/planning/${p.id as string}`} className="btn btn-secondary btn-sm">
+                    ✏️ Editar
+                  </Link>
+                )}
                 {(p.status === 'generated' || p.status === 'downloaded') && (
                   <a href={`/api/docx/${p.id as string}`} className="btn btn-primary btn-sm">
                      ↓ DOCX

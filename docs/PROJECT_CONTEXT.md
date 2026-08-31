@@ -5,6 +5,25 @@
 
 ---
 
+## ⚖️ DEFINICIÓN DE PLATAFORMAS — REGLAS INQUEBRANTABLES
+
+### SIGPDA-EMS — Suite de Generación Pedagógica y Docente
+- **Misión**: Cada docente y directivo **crea, afina, personaliza y descarga** sus propios instrumentos pedagógicos de forma autónoma.
+- **Usuarios**: Docentes y Directores.
+- **Filosofía**: "Sin fiscalización cruzada" — el docente es dueño de sus planes.
+- **Instrumentos**: Planeaciones DBEPA, Secuencias, Horarios CSP, PMC, PAEC, PIPS/Cartografía, Rúbricas, Bundles Didácticos.
+- **NO hace**: Fiscalización entre usuarios, seguimiento de alumnos, calificaciones, deserción, ni supervisión institucional.
+
+### SISAT-ATP — Suite de Supervisión, Acompañamiento y Control de Zona Escolar
+- **Misión**: Automatizar el trabajo administrativo y técnico-pedagógico de la **Supervisión de Zona** (~17 planteles).
+- **Usuarios**: Supervisores, Asesores Técnicos-Pedagógicos (ATPs) y Directores (como remitentes).
+- **Filosofía**: "De la alerta a la acción" — trazabilidad, pre-evaluación IA y generación de oficios.
+- **Instrumentos**: Pre-evaluación IA de PMC/PAEC/CAPEMS, Cédulas de campo, Matriz de control de entregas, Oficios, Dictámenes, Reportes al Nivel (CEDAVIM, 25N, Minutas).
+- **NO hace**: Calificaciones ni deserción de alumnos individuales (eso lo cubren **SICEP** y **SiATECCE**).
+- **NO es**: Plataforma de generación pedagógica (eso es SIGPDA-EMS).
+
+---
+
 ## 1. Arquitectura Técnica del Sistema
 
 - **Frontend & Framework**: Next.js 16 (App Router con Turbopack), React 19, TypeScript, Vanilla CSS estructurado con diseño Glassmorphism/Dark UI de alta gama.
@@ -132,7 +151,79 @@ En la base de datos (`programs_catalog`), los programas se clasifican en 5 compo
 
 ---
 
-## 6. Convenciones de Desarrollo y Restricciones Críticas
+## 6. Fase 6: Suite de Co-Creación Pedagógica de Alta Precisión (EN PROGRESO)
+
+### ✅ Fase 6A: Editor Pedagógico Estructurado por Bloques (COMPLETADA)
+- **Dependencias instaladas**: `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `@tiptap/extension-placeholder`, `@tiptap/extension-underline`, `@tiptap/extension-text-align`, `@tiptap/extension-highlight`, `@tiptap/extension-table`, `@tiptap/extension-table-row`, `@tiptap/extension-table-cell`, `@tiptap/extension-table-header`, `@tiptap/extension-bullet-list`, `@tiptap/extension-ordered-list`, `qrcode`.
+- **Nodos semánticos personalizados** (`src/components/planeacion/editor-extensions.ts`): `BloqueApertura`, `BloqueDesarrollo`, `BloqueCierre`, `BloqueRubrica`, `BloqueProposito`, `BloqueActividad`, `BloqueSeccion`.
+- **Barra de herramientas con comandos IA** (`src/components/planeacion/editor-toolbar.tsx`): `/rubrica`, `/adaptar-abp`, `/simplificar-bap`, `/ejercicios`, `/contenido`, `/evaluacion`, `/reflexion`.
+- **Componente principal** (`src/components/planeacion/PlanningEditor.tsx`): Conversión `GeneratedPlanningContent` ↔ HTML, guardado JSON via `PUT /api/plannings/[id]`, exportación DOCX.
+- **API de guardado**: `PUT /api/plannings/[id]` con `updatePlanningContent()`.
+- **Página de detalle**: `/[locale]/dashboard/planning/[id]/page.tsx` con `PlanningEditorWrapper`.
+- **Dashboard**: Enlace "✏️ Editar" agregado en cada tarjeta de planeación.
+- **Build verificado**: `npm run build` Exit Code 0.
+
+### ✅ Fase 6B: Motor de RAG Curricular con pgvector (COMPLETADA)
+- **pgvector habilitado** en Neon DB con extensión `vector`.
+- **Tabla `curriculum_embeddings`**: id, program_id, uac_name, semester, component, subsystem, chunk_type, chunk_text, embedding (VECTOR 768), metadata (JSONB).
+- **Índice HNSW** para búsqueda por similitud de coseno.
+- **Función SQL `search_curriculum`**: Búsqueda vectorial con filtros por semestre, componente, subsistema.
+- **Módulo `src/lib/rag-curricular.ts`**: `generateEmbedding()` vía Gemini, `searchCurriculum()` con fallback text-based, `buildRagContextBlock()` para inyección en prompts.
+- **Script de ingesta** (`scripts/ingest-curriculum-embeddings.mjs`): Procesa los 449 programas, genera embeddings con Gemini `text-embedding-004`, almacena en pgvector.
+- **Integración en `build-prompt.ts`**: Parámetro `ragContext` para inyectar contexto curricular recuperado semánticamente.
+- **Build verificado**: Exit Code 0.
+
+### ✅ Fase 6C: Generador de Bundles Didácticos de Aula en 1-Click (COMPLETADA)
+- **Módulo `src/lib/bundle-generator.ts`**: Genera 4 materiales complementarios con IA:
+  - Guía de Trabajo del Alumno (imprimible A4)
+  - Instrumento de Coevaluación/Autoevaluación (fotocopiable)
+  - Guion de Diapositivas de la Lección (estructura visual)
+  - Quiz/Evaluación Diagnóstica (5-10 reactivos)
+- **API `/api/bundles/generate`**: Generación individual o completa de bundles.
+- **Componente UI** (`src/components/planeacion/BundleGenerator.tsx`): Botones de generación 1-Click con descarga en Markdown.
+- **Integración** en `/[locale]/dashboard/planning/[id]/` debajo del editor.
+- **Build verificado**: Exit Code 0.
+
+### ✅ Fase 6D: Firma Digital Criptográfica y Verificador Público con Código QR (COMPLETADA)
+- **Módulo `src/lib/digital-signature.ts`**: Firma SHA-256, generación QR, verificación, páginas de verificación HTML.
+- **Tabla `document_signatures`**: hash (UNIQUE), timestamp, signer_name, signer_role, cct, document_type, document_id.
+- **API `/api/signatures`**: Endpoint POST para firmar documentos.
+- **Ruta pública `/validar/[hash]`**: Página de verificación desde celular sin login.
+- **Build verificado**: Exit Code 0.
+
+### ⏳ Fase 7: Inteligencia de Supervisión, Control de Zona y Generación de Oficios (SISAT-ATP) (PENDIENTE)
+
+**NOTA CRÍTICA**: SISAT-ATP NO maneja calificaciones ni deserción de alumnos individuales. Eso lo cubren SICEP y SiATECCE. Esta fase se enfoca exclusivamente en automatizar el trabajo de Supervisión de Zona (~17 planteles).
+
+- **7A. Motor de Pre-evaluación y Auditoría IA de Documentos** (PMC, PAEC, CAPEMS):
+  - Análisis IA de documentos subidos por directores (PMC, PAEC, CAPEMS).
+  - Verificación automática de cumplimiento normativo (formato DBEPA, firmas, anexos).
+  - Score de calidad y observaciones automáticas antes de que el Supervisor revise.
+  - Comparación contra plantilla oficial SEP Puebla.
+
+- **7B. Cédulas Móviles de Supervisión con Dictado de Voz**:
+  - Formularios dinámicos para visitas de campo (Observación de Clase, Infraestructura, Diagnóstico de Plantel).
+  - Dictado por voz → transcripción automática → clasificación en cédula oficial.
+  - Modo offline para planteles rurales sin conectividad.
+  - Plantillas precargadas: Lista de cotejo de infraestructura, Registro de incidencias.
+
+- **7C. Matriz de Control de Entregas y Semáforos de Cumplimiento**:
+  - Vista tipo spreadsheet de todos los ~17 planteles de la zona.
+  - Semáforo por documento: PMC ✓/✗, PAEC ✓/✗, CAPEMS ✓/✗, Entrega de evidencias ✓/✗.
+  - Filtros por estatus: "Pendientes", "En revisión", "Aprobados", "Con observaciones".
+  - Recordatorios automáticos a directores con documentos faltantes.
+  - Exportación del estatus a Excel/PDF para reporte al Nivel.
+
+- **7D. Generador Inteligente de Oficios, Dictámenes y Reportes al Nivel**:
+  - Plantilla de oficios institucionales (CEDAVIM, 25N, Minutas).
+  - Generación automática de borradores con datos de la zona (director, CCT, fechas, asunto).
+  - Generador de Dictamen Técnico de Supervisión con acuerdos y compromisos.
+  - Generador de Reporte General de Supervisión Trimestral al Nivel.
+  - Exportación a DOCX con membrete oficial SEP Puebla.
+
+---
+
+## 7. Convenciones de Desarrollo y Restricciones Críticas
 1. **Integridad de Base de Datos**: Nunca alterar destructivamente las columnas existentes de `programs_catalog`, `pips_projects` ni `plannings`.
 2. **Llamadas a IA**: Utilizar siempre `getAIProvider()` o `generateWithRotation()` de `src/lib/ai-provider`.
 3. **Validación de Compilación**: Verificar siempre que `npm run build` pase con 0 errores de TypeScript antes de finalizar.

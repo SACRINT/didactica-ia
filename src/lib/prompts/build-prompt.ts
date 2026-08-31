@@ -1,5 +1,7 @@
 import type { ExtractedPdfData, TeacherContext } from '@/types/planning';
 import type { ProgramCatalogItem } from '@/lib/db';
+import type { RagContext } from '@/lib/rag-curricular';
+import { buildRagContextBlock } from '@/lib/rag-curricular';
 
 export interface AuditFeedbackContext {
   overall_score: number;
@@ -29,7 +31,8 @@ export function buildUserPrompt(
   component: string,
   officialProgram?: ProgramCatalogItem | null,
   auditFeedback?: AuditFeedbackContext | null,
-  continuityInfo?: FfeContinuityContext | null
+  continuityInfo?: FfeContinuityContext | null,
+  ragContext?: RagContext | null
 ): string {
   // ── Hour distribution math ─────────────────────────────────────────────────
   // The semester has 3 evaluation periods (cortes), each with 6 weeks.
@@ -196,9 +199,12 @@ ${recsList.length > 0 ? recsList.join('\n') : '  - Integrar metodologías activa
 `;
   }
 
+  // ── RAG Context Block ───────────────────────────────────────────────────────
+  const ragBlock = ragContext ? buildRagContextBlock(ragContext) : '';
+
   // ── Prompt Completo ────────────────────────────────────────────────────────
   return `Genera una Planeación Didáctica completa y de nivel EXCELENCIA en formato oficial DBEPA 2026-2027 para:
-
+${ragBlock}
 ═══════════ DATOS DE LA UAC (PROGRAMA OFICIAL AUTÉNTICO) ═══════════
 UAC: ${extractedData.uacName}
 Semestre: ${semester}° Semestre
