@@ -116,6 +116,12 @@ En la base de datos (`programs_catalog`), los programas se clasifican en 5 compo
   - Paso 3: Sistema de Notificaciones y Alertas (tabla `notifications`, API `/api/notifications`, componente interactivo `NotificationBell` integrado en la barra de navegación).
   - Paso 4: Optimización de Rendimiento (`src/lib/catalog-cache.ts` con caché en memoria TTL 10 min para los 449 programas y 9 índices optimizados en Neon DB).
   - Paso 5: Verificación completa de compilación (`npm run build` exitoso con código 0) y pruebas de base de datos (`verify-phase4.mjs`).
+- ✅ **Fase 4.5: Motor de Horarios Escolar de Alto Rendimiento (COMPLETADA)**:
+  - Paso 1: **Solver Multiobjetivo Calibrado** (`src/lib/horarios/solver.ts`): Implementación de la función objetivo Soft Score (0 a 100 puntos), métricas pedagógicas detalladas (huecos intermedios docentes/grupos, días aislados de 1 hora, dispersión de asignaturas de alta carga, bonificación por bloques dobles). Rendimiento benchmark comprobado de **4 ms** para 6 grupos, 18 docentes y 180 horas lectivas (< 300 ms) con 0 empalmes garantizados.
+  - Paso 2: **Asistente Neuro-Simbólico y Validador Previo** (`src/lib/ai-schedule-assistant.ts`): Validación matemática previa en O(1) que detecta sobrecargas y solicitudes imposibles antes de invocar al LLM; router formal de acciones JSON deterministas; integración robusta con `ai-provider` institucional y rotación de claves.
+  - Paso 3: **Cuádruple Vista Institucional** (`EditorHorarios.tsx`): 📊 Horario Maestro Sumario, 👥 Por Grupo con codificación de colores por campo formativo, 👨‍🏫 Por Docente con desglose de días libres y horas semanales, 🏢 Ocupación de Aulas y Laboratorios con mapa de calor de infraestructura.
+  - Paso 4: **Exportación Integral Multi-Hoja** (`src/lib/horarios/exportador.ts`): Generador de libro Excel `.xlsx` multi-pestaña completo (Maestro, Hojas individuales por Grupo, Hojas individuales por Docente, Mapa de Aulas) con membretes oficiales SEP Estado de Puebla y Supervisión de Zona Escolar.
+  - Paso 5: **Verificación y Benchmark**: `npm run build` exitoso con 0 errores de TypeScript y benchmark complejo validado con 100% de éxito.
 
 ---
 

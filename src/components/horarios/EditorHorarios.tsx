@@ -30,6 +30,7 @@ import {
   exportarHorarioPDF,
   exportarHorarioDOCX,
   exportarSumarioExcel,
+  exportarLibroIntegralExcel,
   exportarHorarioWhatsApp,
   getHashColor
 } from "@/lib/horarios/exportador";
@@ -769,7 +770,7 @@ export default function EditorHorarios({
   };
 
   const ejecutarExportacion = async (
-    opcion: "VISTA_ACTUAL" | "PAQUETE_DOCENTES" | "PAQUETE_GRUPOS" | "SUMARIO_MAESTRO" | "SUMARIO_GRUPO",
+    opcion: "VISTA_ACTUAL" | "PAQUETE_DOCENTES" | "PAQUETE_GRUPOS" | "SUMARIO_MAESTRO" | "SUMARIO_GRUPO" | "LIBRO_COMPLETO",
     formato: "PDF" | "EXCEL" | "DOCX" | "WHATSAPP_SQUARE" | "WHATSAPP_STORY"
   ) => {
     setMostrarModalExportar(false);
@@ -783,6 +784,58 @@ export default function EditorHorarios({
     );
 
     const zonaEscolarEfectiva = (escuela as any)?.zonaEscolar || (escuela as any)?.zona || "004";
+
+    if (opcion === "LIBRO_COMPLETO") {
+      await exportarLibroIntegralExcel({
+        nombreEscuela: escuela?.nombre || escuela?.school_name || "Mi Plantel",
+        cct: escuela?.cct || "CCT",
+        zonaEscolar: zonaEscolarEfectiva,
+        cicloEscolar: (horario as any)?.cicloEscolar?.nombre || "2026-2027",
+        dias: diasLectivos,
+        numHorasPorDia,
+        grupos: (gruposActivos.length > 0 ? gruposActivos : grupos).map(g => ({ id: g.id, nombre: g.nombre })),
+        docentes: (docentesActivos.length > 0 ? docentesActivos : docentes).map(d => ({
+          id: d.id,
+          nombre: `${d.nombre} ${d.apellidoPaterno || ""}`.trim()
+        })),
+        aulas: (aulas && aulas.length > 0 ? aulas : [{ id: "aula_gral", nombre: "Aulas Generales", tipo: "General" }]).map(a => ({
+          id: a.id,
+          nombre: a.nombre,
+          tipo: a.tipo
+        })),
+        obtenerCeldaGrupo: (grupoId, dia, periodo) => {
+          const c = horario?.celdas?.find((cc: any) => cc.diaSemana === dia && cc.periodo === periodo && cc.grupoId === grupoId);
+          if (!c) return null;
+          return {
+            materia: getNombreAsignaturaCelda(c),
+            docente: getNombreDocenteCelda(c),
+            aula: c.aula?.nombre || c.aulaId
+          };
+        },
+        obtenerCeldaDocente: (docenteId, dia, periodo) => {
+          const c = horario?.celdas?.find((cc: any) => cc.diaSemana === dia && cc.periodo === periodo && cc.docenteId === docenteId);
+          if (!c) return null;
+          const grpObj = grupos.find((g: any) => g.id === c.grupoId);
+          return {
+            materia: getNombreAsignaturaCelda(c),
+            grupo: grpObj?.nombre || c.grupoId,
+            aula: c.aula?.nombre || c.aulaId
+          };
+        },
+        obtenerCeldaAula: (aulaId, dia, periodo) => {
+          const c = horario?.celdas?.find((cc: any) => cc.diaSemana === dia && cc.periodo === periodo && (cc.aulaId === aulaId || cc.aula?.id === aulaId));
+          if (!c) return null;
+          const grpObj = grupos.find((g: any) => g.id === c.grupoId);
+          return {
+            materia: getNombreAsignaturaCelda(c),
+            grupo: grpObj?.nombre || c.grupoId,
+            docente: getNombreDocenteCelda(c)
+          };
+        }
+      });
+      toast.success("📗 Libro Institucional Multi-Hoja generado en Excel (.xlsx)");
+      return;
+    }
 
     if (opcion === "SUMARIO_MAESTRO") {
       await exportarSumarioExcel(
@@ -956,66 +1009,9 @@ export default function EditorHorarios({
       <div style={{ background: "#0f172a", padding: "1rem", borderRadius: "12px", border: "1px solid #334155", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <button
-            onClick={() => setVistaTab("GRUPO")}
-            style={{
-              padding: "0.45rem 0.9rem",
-              borderRadius: "8px",
-              border: vistaTab === "GRUPO" ? "1px solid #3b82f6" : "1px solid #334155",
-              background: vistaTab === "GRUPO" ? "#2563eb" : "#1e293b",
-              color: vistaTab === "GRUPO" ? "#ffffff" : "#cbd5e1",
-              fontWeight: vistaTab === "GRUPO" ? 800 : 700,
-              fontSize: "0.8125rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              cursor: "pointer",
-              transition: "all 0.15s ease"
-            }}
-          >
-            <Users style={{ width: "16px", height: "16px" }} /> Por Grupo
-          </button>
-          <button
-            onClick={() => setVistaTab("DOCENTE")}
-            style={{
-              padding: "0.45rem 0.9rem",
-              borderRadius: "8px",
-              border: vistaTab === "DOCENTE" ? "1px solid #3b82f6" : "1px solid #334155",
-              background: vistaTab === "DOCENTE" ? "#2563eb" : "#1e293b",
-              color: vistaTab === "DOCENTE" ? "#ffffff" : "#cbd5e1",
-              fontWeight: vistaTab === "DOCENTE" ? 800 : 700,
-              fontSize: "0.8125rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              cursor: "pointer",
-              transition: "all 0.15s ease"
-            }}
-          >
-            <UserCheck style={{ width: "16px", height: "16px" }} /> Por Docente
-          </button>
-          <button
-            onClick={() => setVistaTab("AULA")}
-            style={{
-              padding: "0.45rem 0.9rem",
-              borderRadius: "8px",
-              border: vistaTab === "AULA" ? "1px solid #3b82f6" : "1px solid #334155",
-              background: vistaTab === "AULA" ? "#2563eb" : "#1e293b",
-              color: vistaTab === "AULA" ? "#ffffff" : "#cbd5e1",
-              fontWeight: vistaTab === "AULA" ? 800 : 700,
-              fontSize: "0.8125rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              cursor: "pointer",
-              transition: "all 0.15s ease"
-            }}
-          >
-            <Building2 style={{ width: "16px", height: "16px" }} /> Por Aula
-          </button>
-          <button
             onClick={() => setVistaTab("SUMARIO")}
             style={{
-              padding: "0.45rem 0.9rem",
+              padding: "0.5rem 1rem",
               borderRadius: "8px",
               border: vistaTab === "SUMARIO" ? "1px solid #3b82f6" : "1px solid #334155",
               background: vistaTab === "SUMARIO" ? "#2563eb" : "#1e293b",
@@ -1026,10 +1022,71 @@ export default function EditorHorarios({
               alignItems: "center",
               gap: "0.4rem",
               cursor: "pointer",
-              transition: "all 0.15s ease"
+              transition: "all 0.15s ease",
+              boxShadow: vistaTab === "SUMARIO" ? "0 2px 8px rgba(37,99,235,0.3)" : "none"
             }}
           >
-            <Grid style={{ width: "16px", height: "16px" }} /> Sumario Maestro
+            <Grid style={{ width: "16px", height: "16px" }} /> 📊 Horario Maestro
+          </button>
+          <button
+            onClick={() => setVistaTab("GRUPO")}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: vistaTab === "GRUPO" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "GRUPO" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "GRUPO" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "GRUPO" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              boxShadow: vistaTab === "GRUPO" ? "0 2px 8px rgba(37,99,235,0.3)" : "none"
+            }}
+          >
+            <Users style={{ width: "16px", height: "16px" }} /> 👥 Por Grupo
+          </button>
+          <button
+            onClick={() => setVistaTab("DOCENTE")}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: vistaTab === "DOCENTE" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "DOCENTE" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "DOCENTE" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "DOCENTE" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              boxShadow: vistaTab === "DOCENTE" ? "0 2px 8px rgba(37,99,235,0.3)" : "none"
+            }}
+          >
+            <UserCheck style={{ width: "16px", height: "16px" }} /> 👨‍🏫 Por Docente
+          </button>
+          <button
+            onClick={() => setVistaTab("AULA")}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: vistaTab === "AULA" ? "1px solid #3b82f6" : "1px solid #334155",
+              background: vistaTab === "AULA" ? "#2563eb" : "#1e293b",
+              color: vistaTab === "AULA" ? "#ffffff" : "#cbd5e1",
+              fontWeight: vistaTab === "AULA" ? 800 : 700,
+              fontSize: "0.8125rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              boxShadow: vistaTab === "AULA" ? "0 2px 8px rgba(37,99,235,0.3)" : "none"
+            }}
+          >
+            <Building2 style={{ width: "16px", height: "16px" }} /> 🏢 Ocupación Aulas/Lab
           </button>
         </div>
 
@@ -1731,6 +1788,38 @@ export default function EditorHorarios({
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              {/* Opción 0: LIBRO INSTITUCIONAL MULTI-HOJA COMPLETO (.XLSX) */}
+              <div style={{ border: "2px solid #16a34a", borderRadius: "12px", padding: "1rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(135deg, rgba(22, 163, 74, 0.2) 0%, rgba(15, 23, 42, 0.9) 100%)", boxShadow: "0 4px 14px rgba(22, 163, 74, 0.25)" }}>
+                <div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 900, color: "#86efac", display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                    <FileSpreadsheet style={{ width: "20px", height: "20px", color: "#4ade80" }} /> 📗 Libro Institucional Multi-Hoja (.xlsx)
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#cbd5e1", marginTop: "0.2rem" }}>
+                    Genera 1 solo Excel con <strong>todas las pestañas</strong>: Maestro, cada Grupo, cada Docente y Aulas/Laboratorios con membrete oficial SEP.
+                  </div>
+                </div>
+                <button
+                  onClick={() => ejecutarExportacion("LIBRO_COMPLETO", "EXCEL")}
+                  style={{
+                    background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
+                    color: "#ffffff",
+                    border: "1px solid #4ade80",
+                    padding: "0.55rem 1.1rem",
+                    borderRadius: "8px",
+                    fontSize: "0.8125rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                    boxShadow: "0 2px 10px rgba(22, 163, 74, 0.4)",
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  <Download style={{ width: "15px", height: "15px" }} /> Descargar .xlsx
+                </button>
+              </div>
+
               {/* Opción 1: Vista Actual */}
               <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.6rem", background: "#1e293b" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

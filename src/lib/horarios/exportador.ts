@@ -892,6 +892,272 @@ export async function exportarSumarioExcel(datos: DatosSumario, tipo: "DOCENTE" 
   URL.revokeObjectURL(url);
 }
 
+export interface DatosLibroIntegralExcel {
+  nombreEscuela: string;
+  cct: string;
+  zonaEscolar?: string;
+  cicloEscolar?: string;
+  dias: string[];
+  numHorasPorDia: number;
+  grupos: { id: string; nombre: string }[];
+  docentes: { id: string; nombre: string }[];
+  aulas: { id: string; nombre: string; tipo?: string }[];
+  obtenerCeldaGrupo: (grupoId: string, dia: number, periodo: number) => { materia: string; docente?: string; aula?: string } | null;
+  obtenerCeldaDocente: (docenteId: string, dia: number, periodo: number) => { materia: string; grupo?: string; aula?: string } | null;
+  obtenerCeldaAula: (aulaId: string, dia: number, periodo: number) => { materia: string; grupo?: string; docente?: string } | null;
+}
+
+// 4. EXPORTACIÓN A LIBRO INTEGRAL MULTI-HOJA (.XLSX) CON TODAS LAS PESTAÑAS
+export async function exportarLibroIntegralExcel(datos: DatosLibroIntegralExcel) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "SIGPDA-EMS — Motor Institucional";
+  wb.created = new Date();
+  const zonaTexto = datos.zonaEscolar ? (datos.zonaEscolar.toLowerCase().includes("zona") ? datos.zonaEscolar.toUpperCase() : `ZONA ${datos.zonaEscolar}`) : "ZONA 004";
+
+  // Helper de membrete estándar para cada hoja
+  function aplicarMembreteHoja(ws: ExcelJS.Worksheet, tituloSeccion: string) {
+    ws.mergeCells("A1:F1");
+    const c1 = ws.getCell("A1");
+    c1.value = "GOBIERNO DEL ESTADO DE PUEBLA · SECRETARÍA DE EDUCACIÓN PÚBLICA";
+    c1.font = { bold: true, size: 11, color: { argb: "FF1E3A8A" } };
+    c1.alignment = { horizontal: "center", vertical: "middle" };
+
+    ws.mergeCells("A2:F2");
+    const c2 = ws.getCell("A2");
+    c2.value = `SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR · SUPERVISIÓN ESCOLAR ${zonaTexto}`;
+    c2.font = { bold: true, size: 10, color: { argb: "FF1E3A8A" } };
+    c2.alignment = { horizontal: "center", vertical: "middle" };
+
+    ws.mergeCells("A3:F3");
+    const c3 = ws.getCell("A3");
+    c3.value = `PLANTEL: ${datos.nombreEscuela.toUpperCase()}   C.C.T.: ${datos.cct.toUpperCase()}   CICLO: ${datos.cicloEscolar || "2026-2027"}`;
+    c3.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+    c3.font = { bold: true, size: 9, color: { argb: "FF334155" } };
+    c3.alignment = { horizontal: "center", vertical: "middle" };
+
+    ws.mergeCells("A4:F4");
+    const c4 = ws.getCell("A4");
+    c4.value = tituloSeccion.toUpperCase();
+    c4.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
+    c4.font = { bold: true, size: 10, color: { argb: "FF1E3A8A" } };
+    c4.alignment = { horizontal: "center", vertical: "middle" };
+
+    ws.getRow(5).height = 8;
+
+    const headerRow = ws.getRow(6);
+    headerRow.values = ["Periodo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+    headerRow.height = 24;
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF334155" } },
+        bottom: { style: "medium", color: { argb: "FF1E3A8A" } },
+        left: { style: "thin", color: { argb: "FF334155" } },
+        right: { style: "thin", color: { argb: "FF334155" } }
+      };
+    });
+
+    ws.columns = [
+      { width: 14 },
+      { width: 28 },
+      { width: 28 },
+      { width: 28 },
+      { width: 28 },
+      { width: 28 }
+    ];
+  }
+
+  // 1. Pestaña Horario Maestro
+  const wsMaestro = wb.addWorksheet("Horario Maestro", { views: [{ state: "frozen", ySplit: 5, xSplit: 1 }] });
+  const totalColsMaestro = 1 + (datos.dias.length * datos.numHorasPorDia);
+  wsMaestro.mergeCells(1, 1, 1, totalColsMaestro);
+  const cM1 = wsMaestro.getCell(1, 1);
+  cM1.value = `SECRETARÍA DE EDUCACIÓN PÚBLICA · SUPERVISIÓN ESCOLAR ${zonaTexto} · PLANTEL: ${datos.nombreEscuela.toUpperCase()}`;
+  cM1.font = { bold: true, size: 11, color: { argb: "FF1E3A8A" } };
+  cM1.alignment = { horizontal: "center" };
+
+  wsMaestro.mergeCells(2, 1, 2, totalColsMaestro);
+  const cM2 = wsMaestro.getCell(2, 1);
+  cM2.value = "HORARIO MAESTRO GENERAL DEL PLANTEL (TODOS LOS GRUPOS)";
+  cM2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+  cM2.font = { bold: true, size: 10, color: { argb: "FF334155" } };
+  cM2.alignment = { horizontal: "center" };
+
+  const headerMaestroVals = ["Grupo"];
+  for (let d = 0; d < datos.dias.length; d++) {
+    for (let h = 1; h <= datos.numHorasPorDia; h++) {
+      headerMaestroVals.push(`${datos.dias[d].substring(0, 3)}/H${h}`);
+    }
+  }
+  const hRowMaestro = wsMaestro.getRow(4);
+  hRowMaestro.values = headerMaestroVals;
+  hRowMaestro.height = 24;
+  hRowMaestro.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  });
+
+  datos.grupos.forEach((g, idx) => {
+    const row = wsMaestro.getRow(5 + idx);
+    row.height = 32;
+    const cG = row.getCell(1);
+    cG.value = `Grupo ${g.nombre}`;
+    cG.font = { bold: true, size: 9 };
+    cG.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+
+    let colIdx = 2;
+    for (let d = 1; d <= datos.dias.length; d++) {
+      for (let h = 1; h <= datos.numHorasPorDia; h++) {
+        const cell = row.getCell(colIdx++);
+        const celda = datos.obtenerCeldaGrupo(g.id, d, h);
+        if (celda && celda.materia) {
+          const colors = getSubjectColors(celda.materia);
+          cell.value = `${celda.materia}${celda.docente ? `\n[${celda.docente}]` : ""}`;
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${colors.pastelBg}` } };
+          cell.font = { bold: true, color: { argb: `FF${colors.pastelText}` }, size: 8 };
+        } else {
+          cell.value = "—";
+          cell.font = { color: { argb: "FF94A3B8" }, size: 8 };
+        }
+        cell.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
+      }
+    }
+  });
+
+  wsMaestro.columns = [{ width: 20 }, ...Array.from({ length: totalColsMaestro - 1 }, () => ({ width: 18 }))];
+
+  // 2. Pestañas de cada Grupo
+  for (const g of datos.grupos) {
+    const sheetName = `Gpo ${g.nombre}`.replace(/[\\/?*:[\]]/g, "_").slice(0, 30);
+    const wsG = wb.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: 6 }] });
+    aplicarMembreteHoja(wsG, `HORARIO DEL GRUPO: ${g.nombre}`);
+
+    for (let pIdx = 0; pIdx < datos.numHorasPorDia; pIdx++) {
+      const row = wsG.getRow(7 + pIdx);
+      row.height = 40;
+      const pCell = row.getCell(1);
+      pCell.value = `Hora ${pIdx + 1}`;
+      pCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+      pCell.font = { bold: true, color: { argb: "FF1E3A8A" }, size: 9 };
+      pCell.alignment = { horizontal: "center", vertical: "middle" };
+
+      for (let d = 1; d <= 5; d++) {
+        const cell = row.getCell(d + 1);
+        const celda = datos.obtenerCeldaGrupo(g.id, d, pIdx + 1);
+        if (celda && celda.materia) {
+          const colors = getSubjectColors(celda.materia);
+          const lineas = [celda.materia];
+          if (celda.docente) lineas.push(`Prof. ${celda.docente}`);
+          if (celda.aula) lineas.push(`[${celda.aula}]`);
+          cell.value = lineas.join("\n");
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${colors.pastelBg}` } };
+          cell.font = { bold: true, color: { argb: `FF${colors.pastelText}` }, size: 8.5 };
+        } else {
+          cell.value = "Libre";
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+          cell.font = { italic: true, color: { argb: "FF94A3B8" }, size: 8.5 };
+        }
+        cell.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
+        cell.border = { top: { style: "thin", color: { argb: "FFE2E8F0" } }, bottom: { style: "thin", color: { argb: "FFE2E8F0" } }, left: { style: "thin", color: { argb: "FFE2E8F0" } }, right: { style: "thin", color: { argb: "FFE2E8F0" } } };
+      }
+    }
+  }
+
+  // 3. Pestañas de cada Docente
+  for (const d of datos.docentes) {
+    const sheetName = `Doc ${d.nombre}`.replace(/[\\/?*:[\]]/g, "_").slice(0, 30);
+    const wsD = wb.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: 6 }] });
+    aplicarMembreteHoja(wsD, `HORARIO PERSONAL: ${d.nombre}`);
+
+    for (let pIdx = 0; pIdx < datos.numHorasPorDia; pIdx++) {
+      const row = wsD.getRow(7 + pIdx);
+      row.height = 40;
+      const pCell = row.getCell(1);
+      pCell.value = `Hora ${pIdx + 1}`;
+      pCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+      pCell.font = { bold: true, color: { argb: "FF1E3A8A" }, size: 9 };
+      pCell.alignment = { horizontal: "center", vertical: "middle" };
+
+      for (let dia = 1; dia <= 5; dia++) {
+        const cell = row.getCell(dia + 1);
+        const celda = datos.obtenerCeldaDocente(d.id, dia, pIdx + 1);
+        if (celda && celda.materia) {
+          const colors = getSubjectColors(celda.materia);
+          const lineas = [celda.materia];
+          if (celda.grupo) lineas.push(`Grupo: ${celda.grupo}`);
+          if (celda.aula) lineas.push(`[${celda.aula}]`);
+          cell.value = lineas.join("\n");
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${colors.pastelBg}` } };
+          cell.font = { bold: true, color: { argb: `FF${colors.pastelText}` }, size: 8.5 };
+        } else {
+          cell.value = "Libre";
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+          cell.font = { italic: true, color: { argb: "FF94A3B8" }, size: 8.5 };
+        }
+        cell.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
+        cell.border = { top: { style: "thin", color: { argb: "FFE2E8F0" } }, bottom: { style: "thin", color: { argb: "FFE2E8F0" } }, left: { style: "thin", color: { argb: "FFE2E8F0" } }, right: { style: "thin", color: { argb: "FFE2E8F0" } } };
+      }
+    }
+  }
+
+  // 4. Pestaña de Ocupación de Aulas y Laboratorios
+  const wsAulas = wb.addWorksheet("Ocupación Aulas y Labs", { views: [{ state: "frozen", ySplit: 5, xSplit: 1 }] });
+  wsAulas.mergeCells(1, 1, 1, totalColsMaestro);
+  const cA1 = wsAulas.getCell(1, 1);
+  cA1.value = `MAPA DE OCUPACIÓN DE AULAS, TALLERES Y LABORATORIOS · PLANTEL: ${datos.nombreEscuela.toUpperCase()}`;
+  cA1.font = { bold: true, size: 11, color: { argb: "FF1E3A8A" } };
+  cA1.alignment = { horizontal: "center" };
+
+  const hRowAulas = wsAulas.getRow(4);
+  hRowAulas.values = ["Espacio / Aula", ...headerMaestroVals.slice(1)];
+  hRowAulas.height = 24;
+  hRowAulas.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  });
+
+  datos.aulas.forEach((a, idx) => {
+    const row = wsAulas.getRow(5 + idx);
+    row.height = 32;
+    const cA = row.getCell(1);
+    cA.value = `${a.nombre} (${a.tipo || "General"})`;
+    cA.font = { bold: true, size: 9 };
+    cA.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+
+    let colIdx = 2;
+    for (let d = 1; d <= datos.dias.length; d++) {
+      for (let h = 1; h <= datos.numHorasPorDia; h++) {
+        const cell = row.getCell(colIdx++);
+        const celda = datos.obtenerCeldaAula(a.id, d, h);
+        if (celda && celda.materia) {
+          const colors = getSubjectColors(celda.materia);
+          cell.value = `${celda.materia}${celda.grupo ? `\n[${celda.grupo}]` : ""}`;
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${colors.pastelBg}` } };
+          cell.font = { bold: true, color: { argb: `FF${colors.pastelText}` }, size: 8 };
+        } else {
+          cell.value = "Disponible";
+          cell.font = { color: { argb: "FF94A3B8" }, size: 8 };
+        }
+        cell.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
+      }
+    }
+  });
+  wsAulas.columns = [{ width: 22 }, ...Array.from({ length: totalColsMaestro - 1 }, () => ({ width: 18 }))];
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const aEl = document.createElement("a");
+  aEl.href = url;
+  aEl.download = `Horario_Institucional_Completo_${datos.cct}.xlsx`;
+  aEl.click();
+  URL.revokeObjectURL(url);
+}
+
 // =========================================================================
 // 4. EXPORTACIÓN A WHATSAPP / REDES SOCIALES — Canvas 2D Nombres Completos y Cero Espacio Muerto
 // =========================================================================

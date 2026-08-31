@@ -78,16 +78,30 @@ export interface CeldaResultado {
   esBloqueado?: boolean;
 }
 
+export interface MetricasCalidadHorario {
+  totalClasesProgramadas: number;
+  totalClasesRequeridas: number;
+  huecosDocentes: number;
+  huecosGrupos: number;
+  diasAisladosDocentes: number;
+  materiasSinDispersion: number;
+  bloquesDoblesExitosos: number;
+  softScore: number; // 0 - 100 (Score de Calidad Pedagógica)
+  tiempoEjecucionMs: number;
+}
+
 export interface SolverResult {
   exito: boolean;
   celdas: CeldaResultado[];
   conflictos: string[];
-  metricas: {
-    totalClasesProgramadas: number;
-    totalClasesRequeridas: number;
-    huecosDocentes: number;
-    huecosGrupos: number;
-  };
+  metricas: MetricasCalidadHorario;
+  distribucionDocentes?: {
+    docenteId: string;
+    horasPorDia: number[];
+    totalHoras: number;
+    huecos: number;
+    diasActivos: number;
+  }[];
 }
 
 interface UnitInternal {
@@ -121,12 +135,25 @@ export function resolverHorario(params: SolverParams): SolverResult {
     slotsLibresBloqueados
   } = params;
 
+  const metricasVacias: MetricasCalidadHorario = {
+    totalClasesProgramadas: 0,
+    totalClasesRequeridas: 0,
+    huecosDocentes: 0,
+    huecosGrupos: 0,
+    diasAisladosDocentes: 0,
+    materiasSinDispersion: 0,
+    bloquesDoblesExitosos: 0,
+    softScore: 0,
+    tiempoEjecucionMs: 0
+  };
+
   if (!grupos || grupos.length === 0) {
     return {
       exito: false,
       celdas: [],
       conflictos: ["No se especificaron grupos para generar el horario."],
-      metricas: { totalClasesProgramadas: 0, totalClasesRequeridas: 0, huecosDocentes: 0, huecosGrupos: 0 }
+      metricas: metricasVacias,
+      distribucionDocentes: []
     };
   }
 
@@ -135,7 +162,8 @@ export function resolverHorario(params: SolverParams): SolverResult {
       exito: false,
       celdas: [],
       conflictos: ["No se especificaron cargas académicas."],
-      metricas: { totalClasesProgramadas: 0, totalClasesRequeridas: 0, huecosDocentes: 0, huecosGrupos: 0 }
+      metricas: metricasVacias,
+      distribucionDocentes: []
     };
   }
 
@@ -541,10 +569,16 @@ export function resolverHorario(params: SolverParams): SolverResult {
     conflictos.push(`El solver terminó con ${solverRun.conflicts} conflictos no resueltos por restricciones de capacidad.`);
   }
 
-  // 8. Cálculo de Métricas de Calidad
+  // 8. Cálculo de Métricas de Calidad Pedagógica (Soft Constraints)
   let huecosDocentes = 0;
-  for (const doc of docentes) {
+  let diasAisladosDocentes = 0;
+  const distribucionDocentes = docentes.map((doc) => {
     const docId = normalizarId(doc.id);
+    const horasPorDiaArr = Array(diasLectivos).fill(0);
+    let totalHoras = 0;
+    let docHuecos = 0;
+    let diasActivos = 0;
+
     for (let d = 1; d <= diasLectivos; d++) {
       const periods: number[] = [];
       for (const c of resultCeldas) {
@@ -552,24 +586,12 @@ export function resolverHorario(params: SolverParams): SolverResult {
           periods.push(c.periodo);
         }
       }
-      if (periods.length > 1) {
-        const minP = Math.min(...periods);
-        const maxP = Math.max(...periods);
-        const span = maxP - minP + 1;
-        const gaps = span - periods.length;
-        if (gaps > 0) huecosDocentes += gaps;
-      }
-    }
-  }
-
-  let huecosGrupos = 0;
-  for (const g of grupos) {
-    const grpId = normalizarId(g.id);
-    for (let d = 1; d <= diasLectivos; d++) {
-      const periods: number[] = [];
-      for (const c of resultCeldas) {
-        if (normalizarId(c.grupoId) === grpId && c.diaSemana === d) {
-          periods.push(c.periodo);
+      horasPorDiaArr[d - 1] = periods.length;
+      totalHoras += periods.length;
+      if (periods.length > 0) {
+        diasActivos++;
+        if (periods.length === 1 && totalHoras > 3) {
+          diasAisladosDocentes++;
         }
       }
       if (periods.length > 1) {
@@ -577,10 +599,78 @@ export function resolverHorario(params: SolverParams): SolverResult {
         const maxP = Math.max(...periods);
         const span = maxP - minP + 1;
         const gaps = span - periods.length;
+        if (gaps > 0) {
+          docHuecos += gaps;
+          huecosDocentes += gaps;
+        }
+      }
+    }
+
+    return {
+      docenteId: docId,
+      horasPorDia: horasPorDiaArr,
+      totalHoras,
+      huecos: docHuecos,
+      diasActivos
+    };
+  });
+
+  let huecosGrupos = 0;
+  let bloquesDoblesExitosos = 0;
+  let materiasSinDispersion = 0;
+
+  for (const g of grupos) {
+    const grpId = normalizarId(g.id);
+    for (let d = 1; d <= diasLectivos; d++) {
+      const celdasDia = resultCeldas.filter(
+        (c) => normalizarId(c.grupoId) === grpId && c.diaSemana === d
+      );
+      const periods = celdasDia.map((c) => c.periodo);
+      if (periods.length > 1) {
+        const minP = Math.min(...periods);
+        const maxP = Math.max(...periods);
+        const span = maxP - minP + 1;
+        const gaps = span - periods.length;
         if (gaps > 0) huecosGrupos += gaps;
+      }
+
+      // Conteo de bloques dobles y dispersión
+      const conteoMaterias: { [mat: string]: number[] } = {};
+      for (const c of celdasDia) {
+        const mat = c.asignaturaId;
+        if (!conteoMaterias[mat]) conteoMaterias[mat] = [];
+        conteoMaterias[mat].push(c.periodo);
+      }
+
+      for (const [mat, pers] of Object.entries(conteoMaterias)) {
+        if (pers.length >= 2) {
+          pers.sort((a, b) => a - b);
+          let consecutivo = false;
+          for (let i = 0; i < pers.length - 1; i++) {
+            if (pers[i + 1] === pers[i] + 1) consecutivo = true;
+          }
+          if (consecutivo) bloquesDoblesExitosos++;
+          if (pers.length > 2) materiasSinDispersion++;
+        }
       }
     }
   }
+
+  // Soft Score relativo normalizado de 0 a 100
+  const totalClases = resultCeldas.length || 1;
+  const tasaHuecos = huecosDocentes / (totalClases * 0.5 || 1);
+  const tasaDiasAislados = diasAisladosDocentes / (docentes.length || 1);
+  const tasaDispersion = materiasSinDispersion / (totalClases * 0.2 || 1);
+
+  let rawScore = 100;
+  rawScore -= Math.min(35, tasaHuecos * 20);
+  rawScore -= Math.min(15, tasaDiasAislados * 10);
+  rawScore -= Math.min(20, tasaDispersion * 15);
+  rawScore += Math.min(15, (bloquesDoblesExitosos / (grupos.length * 2 || 1)) * 10);
+  if (!solverRun.success) rawScore -= solverRun.conflicts * 25;
+  const softScore = Math.max(10, Math.min(100, Math.round(rawScore)));
+
+  const tiempoEjecucionMs = Date.now() - globalStartTime;
 
   return {
     exito: solverRun.success,
@@ -590,7 +680,13 @@ export function resolverHorario(params: SolverParams): SolverResult {
       totalClasesProgramadas: resultCeldas.length,
       totalClasesRequeridas: totalRequeridas,
       huecosDocentes,
-      huecosGrupos
-    }
+      huecosGrupos,
+      diasAisladosDocentes,
+      materiasSinDispersion,
+      bloquesDoblesExitosos,
+      softScore,
+      tiempoEjecucionMs
+    },
+    distribucionDocentes
   };
 }
