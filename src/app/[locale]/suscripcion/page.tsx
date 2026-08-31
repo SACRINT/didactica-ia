@@ -4,27 +4,44 @@ import { neon } from '@neondatabase/serverless';
 import Link from 'next/link';
 import SuscripcionClient from './SuscripcionClient';
 
-export default async function SuscripcionPage({ params }: { params: { locale: string } }) {
+export default async function SuscripcionPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
   const session = await auth();
   if (!session?.user?.email) {
-    redirect(`/${params.locale}/ingresar`);
+    redirect(`/${locale}/login`);
   }
 
   const db = neon(process.env.DATABASE_URL!);
   const existing = await db`
-    SELECT role, profile_completed
+    SELECT id, role, profile_completed, email, name
     FROM teachers
     WHERE email = ${session.user.email}
     LIMIT 1
   `;
 
   if (!existing.length || !existing[0].profile_completed) {
-    redirect(`/${params.locale}/configurar-perfil`);
+    redirect(`/${locale}/configurar-perfil`);
   }
 
   const teacher = existing[0];
 
-  // Si es administrador, lo dejamos pasar al dashboard
+  // Checar si tiene suscripción activa o stripe_customer_id
+  const subRows = await db`
+    SELECT id, plan_name, plan_subjects, status, current_period_end, stripe_customer_id
+    FROM subscriptions
+    WHERE teacher_id = ${teacher.id}::uuid
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+
+  const activeSub = subRows.length > 0 && subRows[0].status === 'active' ? subRows[0] : null;
+  const hasStripeCustomer = subRows.length > 0 && !!subRows[0].stripe_customer_id;
+
+  // Si es administrador
   if (teacher.role === 'administrador') {
     return (
       <div style={{
@@ -49,9 +66,9 @@ export default async function SuscripcionPage({ params }: { params: { locale: st
           <div style={{ fontSize: '48px', marginBottom: '20px' }}>👑</div>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>Acceso Administrativo</h1>
           <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '32px', lineHeight: '1.6' }}>
-            Tu cuenta tiene rol de administrador. Tienes acceso completo a todas las funciones sin necesidad de una suscripción.
+            Tu cuenta tiene rol de administrador del sistema SIGPDA-EMS. Tienes acceso completo e ilimitado a todas las herramientas sin costo.
           </p>
-          <Link href={`/${params.locale}/dashboard`} style={{
+          <Link href={`/${locale}/dashboard`} style={{
             display: 'inline-block',
             padding: '12px 24px',
             background: 'linear-gradient(135deg, #6366f1, #818cf8)',
@@ -59,14 +76,21 @@ export default async function SuscripcionPage({ params }: { params: { locale: st
             textDecoration: 'none',
             borderRadius: '12px',
             fontWeight: 'bold',
-            transition: 'transform 0.2s',
           }}>
-            Ir al Dashboard
+            Ir al Panel Principal
           </Link>
         </div>
       </div>
     );
   }
 
-  return <SuscripcionClient locale={params.locale} />;
+  return (
+    <SuscripcionClient
+      locale={locale}
+      userRole={teacher.role || 'docente'}
+      activePlanName={activeSub?.plan_name || null}
+      activePlanSubjects={activeSub?.plan_subjects || null}
+      hasStripeCustomer={hasStripeCustomer}
+    />
+  );
 }

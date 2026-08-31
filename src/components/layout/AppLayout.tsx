@@ -193,7 +193,7 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
               <span className="sidebar-link-icon">🗺️</span>Mi Zona
             </Link>
             <Link href={`/${locale}/pips`} className={`sidebar-link ${activeSection === 'pips' ? 'active' : ''}`}>
-              <span className="sidebar-link-icon">📋</span>Cartografía de Supervisión
+              <span className="sidebar-link-icon">📋</span>Cartografía de Zona Escolar
             </Link>
           </>
         )}

@@ -6,6 +6,8 @@ import type { GeneratedPlanningContent, Planning, PlanningExtra } from '@/types/
 import { ExtraPreviewModal } from '@/components/planeacion/ExtraPreviewModal';
 import DeletePlanningButton from '@/components/planeacion/DeletePlanningButton';
 import GenerationFeedback from '@/components/feedback/GenerationFeedback';
+import DocumentA4Viewer from '@/components/common/DocumentA4Viewer';
+import { generatePlanningPDF } from '@/lib/pdf-generator';
 
 interface PlanningDetailClientProps {
   locale: string;
@@ -25,7 +27,8 @@ export default function PlanningDetailClient({
   const prefix = isLaboral ? 'AC' : 'PC';
 
   // Tabs state
-  const [activeTab, setActiveTab] = useState<'planning' | 'extras' | 'lessonPlans'>('planning');
+  const [activeTab, setActiveTab] = useState<'planning' | 'extras' | 'lessonPlans' | 'a4print'>('planning');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Modal Checklist Supervisión DBEPA
   const [showChecklistModal, setShowChecklistModal] = useState(false);
@@ -154,6 +157,21 @@ export default function PlanningDetailClient({
     });
   }
 
+  // Download PDF handler
+  const handleDownloadPdf = () => {
+    try {
+      setDownloadingPdf(true);
+      const pdf = generatePlanningPDF(planning);
+      const filename = `Planeacion_${planning.uacName.replace(/\s+/g, '_')}_Semestre_${planning.semester}.pdf`;
+      pdf.save(filename);
+    } catch (e) {
+      console.error('Error generating PDF:', e);
+      alert('Hubo un error al generar el archivo PDF.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   if (!content) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -179,13 +197,6 @@ export default function PlanningDetailClient({
           <p style={{ lineHeight: 1.6, margin: 0, fontSize: '15px' }}>
             Esta planeación didáctica se encuentra en estado de <strong>Borrador</strong>. Las 7 secciones oficiales de la planeación y los instrumentos de evaluación no han sido generados.
           </p>
-          <p style={{ lineHeight: 1.6, margin: 0, fontSize: '14px', opacity: 0.9 }}>
-            Esto ocurre típicamente debido a una de las siguientes razones:
-            <ul style={{ listStyleType: 'disc', paddingLeft: '20px', marginTop: '6px' }}>
-              <li>La cuenta asociada a tu API Key se quedó sin saldo o créditos.</li>
-              <li>El proceso de generación fue cancelado o se interrumpió la conexión antes de finalizar.</li>
-            </ul>
-          </p>
           <div style={{ marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
             <Link href={`/${locale}/nueva-planeacion`} className="btn btn-primary" style={{ backgroundColor: 'var(--c-navy)', borderColor: 'var(--c-navy)' }}>
               Crear nueva planeación
@@ -208,11 +219,36 @@ export default function PlanningDetailClient({
         <p className="page-subtitle" style={{ color: 'var(--c-text-muted)', fontSize: '15px' }}>
           {planning.semester}° Semestre · Componente {planning.component === 'laboral' ? 'Formación Laboral' : 'Fundamental/Ampliado'}
         </p>
-        <div className="page-actions" style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="page-actions" style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           {content && (
-            <a href={`/api/docx/${planning.id}`} className="btn btn-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <span>↓</span> Descargar Planeación Completa (DOCX)
-            </a>
+            <>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+                className="btn"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#dc2626',
+                  borderColor: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+              >
+                <span>↓</span> {downloadingPdf ? 'Generando PDF…' : 'Descargar PDF'}
+              </button>
+              <a href={`/api/docx/${planning.id}`} className="btn btn-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span>↓</span> Descargar Word (DOCX)
+              </a>
+              <button
+                onClick={() => setActiveTab('a4print')}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <span>👁️</span> Vista Impresión A4
+              </button>
+            </>
           )}
           <DeletePlanningButton id={planning.id} locale={locale} redirectAfterDelete={true} />
         </div>
@@ -272,7 +308,7 @@ export default function PlanningDetailClient({
       </div>
 
       {/* Tabs Menu */}
-      <div style={{ display: 'flex', borderBottom: '2px solid var(--c-border)', gap: '16px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', borderBottom: '2px solid var(--c-border)', gap: '16px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveTab('planning')}
           className={`tab-btn ${activeTab === 'planning' ? 'active' : ''}`}
@@ -317,6 +353,21 @@ export default function PlanningDetailClient({
           }}
         >
           🕒 Planes de Clase ({lessonSessions.length} Sesiones)
+        </button>
+        <button
+          onClick={() => setActiveTab('a4print')}
+          className={`tab-btn ${activeTab === 'a4print' ? 'active' : ''}`}
+          style={{
+            padding: '12px 16px',
+            fontSize: '15px',
+            fontWeight: 600,
+            borderBottom: activeTab === 'a4print' ? '3px solid var(--c-blue-mid)' : '3px solid transparent',
+            color: activeTab === 'a4print' ? 'var(--c-blue-mid)' : 'var(--c-text-muted)',
+            background: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          🖨️ Formato Editorial A4
         </button>
       </div>
 
@@ -714,6 +765,16 @@ export default function PlanningDetailClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB CONTENT: A4 EDITORIAL PRINT VIEWER */}
+      {activeTab === 'a4print' && (
+        <DocumentA4Viewer
+          planning={planning}
+          onDownloadDocx={() => {
+            window.location.href = `/api/docx/${planning.id}`;
+          }}
+        />
       )}
 
       {/* Visor Modal Overlay */}

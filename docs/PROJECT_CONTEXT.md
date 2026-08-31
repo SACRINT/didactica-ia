@@ -123,9 +123,17 @@ En la base de datos (`programs_catalog`), los programas se clasifican en 5 compo
   - Paso 4: **Exportación Integral Multi-Hoja** (`src/lib/horarios/exportador.ts`): Generador de libro Excel `.xlsx` multi-pestaña completo (Maestro, Hojas individuales por Grupo, Hojas individuales por Docente, Mapa de Aulas) con membretes oficiales SEP Estado de Puebla y Supervisión de Zona Escolar.
   - Paso 5: **Verificación y Benchmark**: `npm run build` exitoso con 0 errores de TypeScript y benchmark complejo validado con 100% de éxito.
 
+- ✅ **Fase 5: Ecosistema Integral de Producción, Autenticación, Cartografía, Monetización y Visor Dual (COMPLETADA)**:
+  - Paso 1: **Autenticación Híbrida y Gestión de Cuentas** (`src/lib/auth.ts`, `src/lib/db.ts`, `src/components/auth/AuthCard.tsx`): Integración de `CredentialsProvider` con hashing `bcrypt` (10 rounds) junto a Google OAuth; endpoints `/api/auth/register`, `/api/auth/forgot-password`, `/api/auth/reset-password`; migración de columnas `password_hash`, `reset_token`, `reset_token_expires` en tabla `teachers`; pantalla de login con pestañas (Iniciar Sesión, Registrarse, Recuperar Contraseña) y selección de CCT/escuela/subsistema.
+  - Paso 2: **Consolidación de Cartografía de Zona Escolar (antes PIPS)** (`src/app/[locale]/pips`, `PipsWizard.tsx`, `src/lib/pips-docx-generator.ts`): Renombramiento oficial en UI, navegación, badges y generadores; estructuración del asistente en 4 fases territoriales de supervisión con soporte para hasta 30 planteles; generación de documentos oficiales con membrete SEP Puebla / DBEPA.
+  - Paso 3: **Monetización y Planes por Rol con Stripe** (`src/lib/stripe.ts`, `SuscripcionClient.tsx`, `/api/stripe/checkout`, `/api/stripe/webhook`, `/api/stripe/portal`): Planes segmentados por perfil (Docente 1/3/5/10 materias, Directivo Horarios+PMC, Supervisión Cartografía, Institucional Escuela Completa); enforzamiento de límites y portal de autoservicio para administración y cancelación de suscripciones.
+  - Paso 4: **Visor Editorial A4 y Exportación Dual (DOCX + PDF)** (`src/components/common/DocumentA4Viewer.tsx`, `src/lib/pdf-generator.ts`, `PlanningDetailClient.tsx`): Visor interactivo en proporción A4 con membrete oficial SEP, zoom responsivo (50%-150%), soporte de impresión directa, y botones de descarga dual 1-click para Word (.docx) y PDF con autoTable.
+  - Paso 5: **Verificación y Pruebas E2E**: `scripts/test-phase5-e2e.mjs` y `scripts/test-auth-cycle.mjs` aprobados al 100%; `npm run build` ejecutado exitosamente con **Exit Code 0** (98/98 páginas y APIs compiladas limpiamente).
+
 ---
 
 ## 6. Convenciones de Desarrollo y Restricciones Críticas
-1. **Integridad de Base de Datos**: Nunca alterar destructivamente las columnas existentes de `programs_catalog` ni `plannings`.
+1. **Integridad de Base de Datos**: Nunca alterar destructivamente las columnas existentes de `programs_catalog`, `pips_projects` ni `plannings`.
 2. **Llamadas a IA**: Utilizar siempre `getAIProvider()` o `generateWithRotation()` de `src/lib/ai-provider`.
 3. **Validación de Compilación**: Verificar siempre que `npm run build` pase con 0 errores de TypeScript antes de finalizar.
+

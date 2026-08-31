@@ -1,13 +1,13 @@
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import LoginButton from '@/components/auth/LoginButton';
+import AuthCard from '@/components/auth/AuthCard';
 import type { Metadata } from 'next';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Iniciar sesión — SIGPDA-EMS',
-    description: 'Accede a SIGPDA-EMS con tu cuenta institucional',
+    title: 'Acceso a la Plataforma — SIGPDA-EMS',
+    description: 'Accede o crea tu cuenta en SIGPDA-EMS para generar planeaciones, horarios y proyectos oficiales.',
   };
 }
 
@@ -27,7 +27,7 @@ export default async function LoginPage({
 
   return (
     <main className="login-page">
-      <div className="login-container">
+      <div className="login-container" style={{ maxWidth: '520px' }}>
         {/* Header */}
         <div className="login-header">
           <div className="login-logo">
@@ -38,15 +38,15 @@ export default async function LoginPage({
         </div>
 
         {/* Card */}
-        <div className="login-card">
-          <h2 className="login-title">{t('title')}</h2>
-          <p className="login-subtitle">{t('subtitle')}</p>
+        <div className="login-card" style={{ padding: '32px' }}>
+          <h2 className="login-title" style={{ fontSize: '22px', marginBottom: '8px' }}>Portal Docente y Directivo</h2>
+          <p className="login-subtitle" style={{ fontSize: '13px', marginBottom: '20px' }}>
+            Generación inteligente de planeaciones, horarios, PMC, PAEC y Cartografía
+          </p>
 
-          <div className="login-divider" />
+          <AuthCard locale={locale} />
 
-          <LoginButton />
-
-          <p className="login-terms">{t('termsNotice')}</p>
+          <p className="login-terms" style={{ marginTop: '20px' }}>{t('termsNotice')}</p>
         </div>
 
         {/* Footer */}

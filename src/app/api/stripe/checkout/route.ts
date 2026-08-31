@@ -29,9 +29,12 @@ export async function POST(req: Request) {
     }
 
     let limit = 1;
-    if (planId === 'standard') limit = 3;
-    if (planId === 'advanced') limit = 5;
-    if (planId === 'complete') limit = 10;
+    if (planId === 'basico' || planId === 'basic') limit = 1;
+    else if (planId === 'estandar' || planId === 'standard') limit = 3;
+    else if (planId === 'avanzado' || planId === 'advanced') limit = 5;
+    else if (planId === 'completo' || planId === 'complete') limit = 10;
+    else if (planId === 'director_pro' || planId === 'supervisor_pro' || planId === 'escuela_completa') limit = 999;
+    else limit = 1;
 
     if (!process.env.STRIPE_SECRET_KEY || !stripe) {
       console.warn('No STRIPE_SECRET_KEY found. Mocking successful checkout.');

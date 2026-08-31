@@ -9,7 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import DeletePipsButton from './DeletePipsButton';
 
 export const metadata: Metadata = {
-  title: 'PIPS — Plan de Intervención Pedagógica de Supervisión · SIGPDA-EMS',
+  title: 'Cartografía de Zona Escolar — Supervisión de Zona · SIGPDA-EMS',
 };
 
 export default async function PipsDashboardPage({
@@ -45,27 +45,30 @@ export default async function PipsDashboardPage({
   return (
     <AppLayout locale={locale} activeSection="pips">
       <div className="page-header">
-        <h1 className="page-title">Plan de Intervención Pedagógica (PIPS)</h1>
-        <p className="page-subtitle">
-          Supervisión Escolar · {projects.length} plan{projects.length !== 1 ? 'es' : ''} registrado{projects.length !== 1 ? 's' : ''}
-        </p>
+        <div>
+          <h1 className="page-title">🗺️ Cartografía de Zona Escolar</h1>
+          <p className="page-subtitle">
+            Diagnóstico territorial, prioridades de intervención y planeación estratégica de la supervisión
+            {projects.length > 0 ? ` · ${projects.length} cartografía${projects.length !== 1 ? 's' : ''} registrada${projects.length !== 1 ? 's' : ''}` : ''}
+          </p>
+        </div>
         <div className="page-actions">
-          <Link href={`/${locale}/pips/nuevo`} className="btn btn-primary">
-            + Nuevo PIPS
+          <Link href={`/${locale}/pips/nuevo`} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>+</span> Nueva Cartografía de Zona
           </Link>
         </div>
       </div>
 
       {projects.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">🏫</div>
-          <h2 className="empty-state-title">Aún no tienes planes PIPS</h2>
+          <div className="empty-state-icon">🗺️</div>
+          <h2 className="empty-state-title">Aún no tienes Cartografías registradas</h2>
           <p className="empty-state-text">
-            Elabora tu Plan de Intervención Pedagógica de Supervisión de forma guiada.
-            La IA analizará el diagnóstico de tu zona y generará objetivos, cronograma y estrategias completas.
+            Elabora la Cartografía de Supervisión de tu Zona Escolar de forma estructurada e inteligente.
+            La IA analizará el territorio, planteles y problemáticas de tu zona para generar objetivos, metas y cronograma con apego normativo SEP.
           </p>
           <Link href={`/${locale}/pips/nuevo`} className="btn btn-primary">
-            Crear primer PIPS
+            Generar primera Cartografía
           </Link>
         </div>
       ) : (

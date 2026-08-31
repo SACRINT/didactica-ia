@@ -83,6 +83,11 @@ export interface GeneratedPlanningContent {
     component: string;
     totalHours: number;
     subsystem: string;
+    schoolName?: string;
+    cct?: string;
+    period?: string;
+    totalHoursWeekly?: number;
+    totalHoursSemester?: number;
   };
   // Section II - Curricular Intent
   sectionII: {

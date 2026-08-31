@@ -161,8 +161,8 @@ export async function generatePipsDocx(row: Record<string, unknown>): Promise<Bu
   const totalM = planteles.reduce((s, pl) => s + (pl.mujeres || 0), 0);
 
   const doc = new Document({
-    creator: 'DidácticaIA',
-    title: `PIPS ${p_.zona_nombre} ${p_.ciclo_escolar}`,
+    creator: 'SIGPDA-EMS',
+    title: `Cartografía de Zona Escolar ${p_.zona_nombre} ${p_.ciclo_escolar}`,
     sections: [
       {
         properties: {
@@ -173,7 +173,7 @@ export async function generatePipsDocx(row: Record<string, unknown>): Promise<Bu
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [normal(`SECRETARÍA DE EDUCACIÓN PÚBLICA | DBEPA | ${p_.zona_nombre} | ${p_.ciclo_escolar}`, 9, '888888')],
+                children: [normal(`SECRETARÍA DE EDUCACIÓN PÚBLICA | DIRECCIÓN DE BACHILLERATOS ESTATALES | ${p_.zona_nombre} | ${p_.ciclo_escolar}`, 9, '888888')],
               }),
             ],
           }),
@@ -184,7 +184,7 @@ export async function generatePipsDocx(row: Record<string, unknown>): Promise<Bu
               new Paragraph({
                 alignment: AlignmentType.CENTER,
                 children: [
-                  normal(`PIPS ${p_.ciclo_escolar} — ${p_.zona_nombre} — ${p_.supervisor_name ?? ''}  |  Página `, 9, '888888'),
+                  normal(`Cartografía de Zona Escolar ${p_.ciclo_escolar} — ${p_.zona_nombre} — ${p_.supervisor_name ?? ''}  |  Página `, 9, '888888'),
                   new PageNumberElement(),
                 ],
               }),
@@ -193,11 +193,11 @@ export async function generatePipsDocx(row: Record<string, unknown>): Promise<Bu
         },
         children: [
           new Paragraph({ spacing: { after: 400 } }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [bold('SECRETARÍA DE EDUCACIÓN PÚBLICA', 12, NAVY)] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [bold('SUBSECRETARÍA DE EDUCACIÓN OBLIGATORIA', 12, NAVY)] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [bold('DIRECCIÓN GENERAL DE EDUCACIÓN BÁSICA SEGUNDO NIVEL', 12, NAVY)] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [bold('DIRECCIÓN DE BACHILLERATOS ESTATALES Y PREPARATORIA ABIERTA', 12, NAVY)] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100, after: 100 }, children: [bold('PLAN DE INTERVENCIÓN PEDAGÓGICA DE SUPERVISIÓN', 18, NAVY)] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [bold('SECRETARÍA DE EDUCACIÓN PÚBLICA DEL ESTADO DE PUEBLA', 12, NAVY)] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [bold('SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR', 12, NAVY)] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [bold('DIRECCIÓN DE BACHILLERATOS ESTATALES Y PREPARATORIA ABIERTA', 12, NAVY)] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 140, after: 100 }, children: [bold('CARTOGRAFÍA DE ZONA ESCOLAR', 18, NAVY)] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [bold('PLAN DE INTERVENCIÓN Y ACOMPAÑAMIENTO PEDAGÓGICO DE SUPERVISIÓN', 12, BLUE)] }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [bold(`CICLO ESCOLAR ${p_.ciclo_escolar}`, 14, BLUE)] }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 80 }, children: [bold(String(p_.zona_nombre), 13, NAVY)] }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [normal(`Clave: ${p_.zona_clave ?? ''}`, 11)] }),

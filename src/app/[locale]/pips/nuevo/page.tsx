@@ -7,7 +7,7 @@ import { Suspense } from 'react';
 import PipsWizard from './PipsWizard';
 
 export const metadata: Metadata = {
-  title: 'Nuevo PIPS — Plan de Intervención Pedagógica de Supervisión · SIGPDA-EMS',
+  title: 'Nueva Cartografía de Zona Escolar — Supervisión · SIGPDA-EMS',
 };
 
 export default async function NuevoPipsPage({
@@ -22,9 +22,9 @@ export default async function NuevoPipsPage({
   return (
     <AppLayout locale={locale} activeSection="pips">
       <div className="page-header">
-        <h1 className="page-title">Plan de Intervención Pedagógica de Supervisión</h1>
+        <h1 className="page-title">🗺️ Cartografía de Zona Escolar</h1>
         <p className="page-subtitle">
-          Completa el asistente paso a paso. La IA generará el PIPS completo al final.
+          Completa el asistente territorial paso a paso. La IA estructurará el diagnóstico, objetivos estratégicos y cronograma de supervisión oficial.
         </p>
       </div>
       <Suspense fallback={<div style={{ color: 'var(--c-text-muted)', padding: 40, textAlign: 'center' }}>Cargando asistente…</div>}>

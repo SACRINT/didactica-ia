@@ -5,12 +5,12 @@ import type { PipsProject, PipsPlantele, PipsProblematica, PipsObjetivo, PipsCro
 
 // ─── Step labels ──────────────────────────────────────────────────────────────
 const STEPS = [
-  { n: 1, label: 'Datos generales' },
+  { n: 1, label: 'Datos de la Zona' },
   { n: 2, label: 'Presentación' },
-  { n: 3, label: 'Reflexión PIPS anterior' },
-  { n: 4, label: 'Diagnóstico y problemáticas' },
-  { n: 5, label: 'Objetivos y metas' },
-  { n: 6, label: 'Cronograma y cierre' },
+  { n: 3, label: 'Evaluación Anterior' },
+  { n: 4, label: 'Diagnóstico Territorial' },
+  { n: 5, label: 'Objetivos y Metas' },
+  { n: 6, label: 'Cronograma y Cierre' },
 ];
 
 // ─── Default PIPS object ─────────────────────────────────────────────────────
@@ -511,9 +511,9 @@ export default function PipsWizard({ locale }: { locale: string }) {
 
       {/* Generar */}
       <div style={{ ...cardStyle, textAlign: 'center', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.05)' }}>
-        {sectionTitle('✅ Generar el PIPS con IA')}
+        {sectionTitle('✅ Generar Cartografía de Zona con IA')}
         <p style={{ fontSize: 13, color: 'var(--c-text-muted)', marginBottom: 20 }}>
-          La IA consolidará toda la información ingresada y completará el PIPS con redacción profesional, objetivos refinados y referencias APA.
+          La IA consolidará toda la información territorial ingresada y completará la Cartografía de Zona Escolar con redacción profesional, diagnósticos cuantitativos, objetivos estratégicos y cronograma oficial.
         </p>
         {msg && (
           <div style={{ padding: '10px 16px', borderRadius: 8, background: msg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: msg.startsWith('✅') ? '#22c55e' : '#ef4444', marginBottom: 16, fontSize: 13 }}>
@@ -527,7 +527,7 @@ export default function PipsWizard({ locale }: { locale: string }) {
             className="btn btn-primary"
             style={{ fontSize: 14, padding: '12px 28px' }}
           >
-            {generating ? '⏳ Generando PIPS...' : '🤖 Generar PIPS con IA'}
+            {generating ? '⏳ Generando Cartografía...' : '🤖 Generar Cartografía con IA'}
           </button>
           {projectId && pips.status === 'completed' && (
             <a
@@ -535,7 +535,7 @@ export default function PipsWizard({ locale }: { locale: string }) {
               className="btn"
               style={{ background: '#f59e0b', color: '#fff', border: 'none', fontSize: 14, padding: '12px 28px', textDecoration: 'none', borderRadius: 8, display: 'inline-block' }}
             >
-              ↓ Descargar Word
+              ↓ Descargar Word Oficial
             </a>
           )}
         </div>
