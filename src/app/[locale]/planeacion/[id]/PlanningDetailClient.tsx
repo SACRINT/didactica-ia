@@ -158,10 +158,10 @@ export default function PlanningDetailClient({
   }
 
   // Download PDF handler
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     try {
       setDownloadingPdf(true);
-      const pdf = generatePlanningPDF(planning);
+      const pdf = await generatePlanningPDF(planning);
       const filename = `Planeacion_${planning.uacName.replace(/\s+/g, '_')}_Semestre_${planning.semester}.pdf`;
       pdf.save(filename);
     } catch (e) {
@@ -172,7 +172,49 @@ export default function PlanningDetailClient({
     }
   };
 
+
+  // Classroom state
+  const [publishingClassroom, setPublishingClassroom] = useState(false);
+
+  // Classroom publish handler
+  const handlePublishClassroom = async () => {
+    try {
+      setPublishingClassroom(true);
+      const res = await fetch('/api/classroom/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planningId: planning.id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Error al conectar con Google Classroom');
+      }
+
+      if (!data.configured) {
+        alert('Configura Google Classroom en Configuración\n\n' + data.message);
+        return;
+      }
+
+      if (data.success) {
+        alert(data.message);
+        if (data.courseUrl) {
+          window.open(data.courseUrl, '_blank');
+        }
+      } else {
+        alert(data.message || 'No se pudo publicar la planeación en Classroom.');
+      }
+    } catch (err: any) {
+      console.error('Error publishing to classroom:', err);
+      alert(err.message || 'Ocurrió un error al intentar publicar en Google Classroom.');
+    } finally {
+      setPublishingClassroom(false);
+    }
+  };
+
   if (!content) {
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* Header */}
@@ -248,10 +290,27 @@ export default function PlanningDetailClient({
               >
                 <span>👁️</span> Vista Impresión A4
               </button>
+              <button
+                onClick={handlePublishClassroom}
+                disabled={publishingClassroom}
+                className="btn"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#15803d',
+                  borderColor: '#15803d',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+              >
+                <span>🚀</span> {publishingClassroom ? 'Publicando…' : 'Publicar en Classroom'}
+              </button>
             </>
           )}
           <DeletePlanningButton id={planning.id} locale={locale} redirectAfterDelete={true} />
         </div>
+
       </div>
 
       {/* Hierarchy & Compliance Banner */}

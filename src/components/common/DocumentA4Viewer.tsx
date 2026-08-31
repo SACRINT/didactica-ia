@@ -23,10 +23,10 @@ export default function DocumentA4Viewer({
   const s4 = content?.sectionIV;
   const s5 = content?.sectionV;
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     try {
       setDownloadingPdf(true);
-      const pdf = generatePlanningPDF(planning);
+      const pdf = await generatePlanningPDF(planning);
       const filename = `Planeacion_${planning.uacName.replace(/\s+/g, '_')}_Semestre_${planning.semester}.pdf`;
       pdf.save(filename);
     } catch (e) {
@@ -62,7 +62,7 @@ export default function DocumentA4Viewer({
           background: #ffffff;
           color: #1e293b;
           margin: 0 auto 24px auto;
-          padding: 40px 48px;
+          padding: 36px 44px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.08);
           border-radius: 2px;
           box-sizing: border-box;
@@ -202,23 +202,54 @@ export default function DocumentA4Viewer({
             transition: 'transform 0.15s ease',
           }}
         >
-          {/* HOJA 1: Membrete + Datos Generales + Propósito + Transversalidad */}
+          {/* HOJA 1: Membrete Oficial con 3 Logos + Datos Generales */}
           <div className="a4-page">
-            {/* Header SEP */}
-            <div style={{ textAlign: 'center', borderBottom: '2px solid #1f3864', paddingBottom: '10px', marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#1f3864', letterSpacing: '0.02em' }}>
-                SECRETARÍA DE EDUCACIÓN PÚBLICA DEL ESTADO DE PUEBLA
+            {/* Header Oficial con 3 Logos */}
+            <div style={{ borderBottom: '3px solid #E8A020', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <img
+                  src="/images/logo-gobierno-puebla.png"
+                  alt="Gobierno de Puebla"
+                  style={{ height: '46px', maxWidth: '140px', objectFit: 'contain' }}
+                />
+                <img
+                  src="/images/logo-sep-puebla.png"
+                  alt="Secretaría de Educación Pública"
+                  style={{ height: '36px', maxWidth: '140px', objectFit: 'contain' }}
+                />
+                <img
+                  src="/images/logo-supervision-004.png"
+                  alt="Supervisión Escolar 004"
+                  style={{ height: '42px', maxWidth: '120px', objectFit: 'contain' }}
+                />
               </div>
-              <div style={{ fontSize: '10px', color: '#475569', marginTop: '2px' }}>
-                SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR · DIRECCIÓN DE BACHILLERATOS ESTATALES Y PREPARATORIA ABIERTA
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#2e74b5', marginTop: '6px' }}>
-                INSTRUMENTO DE PLANEACIÓN DIDÁCTICA OFICIAL
-              </div>
-              <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
-                MARCO CURRICULAR COMÚN DE LA EDUCACIÓN MEDIA SUPERIOR (NEM) · CICLO ESCOLAR {s1?.schoolYear || '2026-2027'}
+
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#1f3864', letterSpacing: '0.02em' }}>
+                  SECRETARÍA DE EDUCACIÓN
+                </div>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: '#1e293b', marginTop: '1px' }}>
+                  SUBSECRETARÍA DE EDUCACIÓN OBLIGATORIA
+                </div>
+                <div style={{ fontSize: '9.5px', color: '#475569', marginTop: '1px' }}>
+                  DIRECCIÓN GENERAL DE EDUCACIÓN BÁSICA SEGUNDO NIVEL
+                </div>
+                <div style={{ fontSize: '9.5px', color: '#475569', marginTop: '1px' }}>
+                  DIRECCIÓN DE BACHILLERATOS ESTATALES Y PREPARATORIA ABIERTA
+                </div>
+                <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#1f3864', marginTop: '3px' }}>
+                  SUPERVISIÓN DE BACHILLERATOS 004
+                </div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#2e74b5', marginTop: '1px' }}>
+                  CCT: {s1?.cct || s1?.schoolName || '21EBH0000X'}
+                </div>
+
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#1f3864', marginTop: '4px' }}>
+                  INSTRUMENTO DE PLANEACIÓN DIDÁCTICA OFICIAL (MCCEMS NEM)
+                </div>
               </div>
             </div>
+
 
             {/* SECCIÓN I */}
             <table className="a4-table">

@@ -29,19 +29,36 @@ export async function POST(request: NextRequest) {
 
     const content = planning.contentJson as GeneratedPlanningContent;
 
+    let responseData: any = {};
     if (type === 'full') {
       const bundle = await generateFullBundle(content);
-      return NextResponse.json({ bundle });
+      responseData = { bundle };
+    } else {
+      const result = await generateBundle(content, type as 'guia' | 'instrumento' | 'diapositivas' | 'quiz');
+      responseData = { result, type };
     }
 
-    if (!type || !['guia', 'instrumento', 'diapositivas', 'quiz'].includes(type)) {
-      return NextResponse.json({ error: 'type inválido. Usa: guia, instrumento, diapositivas, quiz, full' }, { status: 400 });
+    // Send In-App Notification (Phase 8A.1)
+    try {
+      const { sendNotification } = await import('@/lib/notifications');
+      await sendNotification({
+        userId: teacher.id,
+        type: 'bundle_generated',
+        title: 'Bundle Didáctico Generado',
+        message: `Se ha generado el paquete de materiales (${type === 'full' ? 'Suite Completa' : type}) para ${planning.uacName}.`,
+        link: `/dashboard/planning/${planningId}`,
+        severity: 'success',
+        channels: ['in_app'],
+        metadata: { planningId, bundleType: type, uacName: planning.uacName },
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch bundle_generated notification:', notifErr);
     }
 
-    const result = await generateBundle(content, type as 'guia' | 'instrumento' | 'diapositivas' | 'quiz');
-    return NextResponse.json({ result, type });
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Bundle generation error:', error);
     return NextResponse.json({ error: 'Error al generar bundle' }, { status: 500 });
   }
+
 }

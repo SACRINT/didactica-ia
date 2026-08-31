@@ -119,6 +119,30 @@ export async function POST(
             const parsedContent = JSON.parse(cleanJson);
             
             await updatePlanningContent(id, teacher.id, parsedContent);
+
+            // Send Realtime / In-App Notification (Phase 8A.1)
+            try {
+              const { sendNotification } = await import('@/lib/notifications');
+              await sendNotification({
+                userId: teacher.id,
+                type: 'planeacion_ready',
+                title: 'Planeación Generada con Éxito',
+                message: `Tu planeación para ${planning.uac_name || 'tu asignatura'} (${planning.semester}° Semestre) está lista para revisión.`,
+                link: `/dashboard/planning/${id}`,
+                severity: 'success',
+                channels: ['in_app'],
+                metadata: {
+                  planningId: id,
+                  uacName: planning.uac_name,
+                  semester: planning.semester,
+                  component: planning.component,
+                  email: teacherEmail,
+                },
+              });
+            } catch (notifErr) {
+              console.warn('Could not dispatch planeacion_ready notification:', notifErr);
+            }
+
             // Log successful generation
             await logActivity({
               teacherEmail,
@@ -130,6 +154,7 @@ export async function POST(
           } catch (dbErr) {
             console.error('Failed to parse or save accumulated JSON stream to database:', dbErr);
           }
+
 
           controller.close();
         } catch (streamErr) {

@@ -21,10 +21,39 @@ export async function POST(req: NextRequest) {
       isPremium: isUserPremium
     });
 
+    // Send Realtime / In-App Notification (Phase 8A.1 & 8D)
+    if (teacherId && report) {
+      try {
+        const { sendNotification } = await import('@/lib/notifications');
+        const score = report.overall_score ?? 0;
+        const compliance = report.compliance_level ?? 'Evaluado';
+
+
+        await sendNotification({
+          userId: teacherId,
+          type: 'audit_result',
+          title: `Auditoría Pedagógica: ${score}/100`,
+          message: `Tu planeación obtuvo un nivel de cumplimiento: ${compliance}.`,
+          link: `/dashboard/planning/${planningId}`,
+          severity: score >= 80 ? 'success' : score >= 60 ? 'warning' : 'error',
+          channels: ['in_app'],
+          metadata: {
+            planningId,
+            score,
+            complianceLevel: compliance,
+            email: session?.user?.email,
+          },
+        });
+      } catch (notifErr) {
+        console.warn('Could not dispatch audit_result notification:', notifErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       report
     });
+
   } catch (error: any) {
     console.error('[API /api/audit POST Error]:', error);
     return NextResponse.json(

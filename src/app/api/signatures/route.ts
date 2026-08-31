@@ -49,11 +49,29 @@ export async function POST(request: NextRequest) {
 
     const verificationUrl = getVerificationUrl(signature.hash);
 
+    // Send In-App Notification (Phase 8A.1)
+    try {
+      const { sendNotification } = await import('@/lib/notifications');
+      await sendNotification({
+        userId: teacher.id,
+        type: 'document_signed',
+        title: 'Documento Firmado Digitalmente',
+        message: `Se ha firmado electrónicamente la planeación de ${planning.uacName}. Código de verificación generado.`,
+        link: verificationUrl,
+        severity: 'success',
+        channels: ['in_app'],
+        metadata: { planningId, hash: signature.hash, uacName: planning.uacName },
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch document_signed notification:', notifErr);
+    }
+
     return NextResponse.json({
       signature,
       verificationUrl,
       qrData: verificationUrl,
     });
+
   } catch (error) {
     console.error('Signing error:', error);
     return NextResponse.json({ error: 'Error al firmar documento' }, { status: 500 });

@@ -171,15 +171,25 @@ export async function getPlanningsByTeacher(teacherId: string) {
   `;
 }
 
-export async function getPlanningById(id: string, teacherId: string) {
+export async function getPlanningById(id: string, teacherId?: string) {
+  if (teacherId) {
+    const rows = await sql()`
+      SELECT *
+      FROM plannings
+      WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+      LIMIT 1
+    `;
+    return rows[0] || null;
+  }
   const rows = await sql()`
     SELECT *
     FROM plannings
-    WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+    WHERE id = ${id}::uuid
     LIMIT 1
   `;
   return rows[0] || null;
 }
+
 
 export async function createPlanning(data: {
   teacherId: string;
@@ -761,11 +771,13 @@ export async function deleteSchedule(id: string, teacherId: string) {
 export interface NotificationItem {
   id?: string;
   user_id: string;
-  type: string;
+  type: 'planeacion_ready' | 'audit_result' | 'deadline_reminder' | 'ffe_continuity' | 'bundle_generated' | 'document_signed' | string;
   title: string;
   message: string;
   link?: string;
   severity?: 'info' | 'warning' | 'error' | 'success';
+  channels?: string[];
+  metadata?: Record<string, any>;
   read?: boolean;
   created_at?: string;
 }
@@ -794,9 +806,12 @@ export async function getUnreadNotificationsCount(userId: string): Promise<numbe
 
 export async function createNotification(data: NotificationItem) {
   const client = sql();
+  const channelsJson = JSON.stringify(data.channels || ['in_app']);
+  const metadataJson = JSON.stringify(data.metadata || {});
+
   const rows = await client`
     INSERT INTO notifications (
-      user_id, type, title, message, link, severity, read
+      user_id, type, title, message, link, severity, channels, metadata, read
     ) VALUES (
       ${data.user_id}::uuid,
       ${data.type},
@@ -804,6 +819,8 @@ export async function createNotification(data: NotificationItem) {
       ${data.message},
       ${data.link || null},
       ${data.severity || 'info'},
+      ${channelsJson}::jsonb,
+      ${metadataJson}::jsonb,
       ${data.read || false}
     )
     RETURNING *
@@ -811,7 +828,18 @@ export async function createNotification(data: NotificationItem) {
   return rows[0];
 }
 
+export async function getAutomationRules(activeOnly: boolean = true) {
+  const client = sql();
+  return client`
+    SELECT *
+    FROM automation_rules
+    WHERE (${activeOnly}::boolean = FALSE OR active = TRUE)
+    ORDER BY created_at ASC
+  `;
+}
+
 export async function markNotificationAsRead(id: string, userId: string) {
+
   const client = sql();
   const rows = await client`
     UPDATE notifications
