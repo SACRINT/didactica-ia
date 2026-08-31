@@ -511,5 +511,57 @@ export async function deletePaecProject(id: string, teacherId: string) {
   `;
 }
 
+// ─── Program Lookup & Audit Feedback ─────────────────────────────────────────
 
+export async function getProgramByUacAndSemester(
+  uacName: string,
+  semester?: number,
+  component?: string,
+  subsystem?: string
+): Promise<ProgramCatalogItem | null> {
+  const client = sql();
+  const sem = (semester !== undefined && !isNaN(semester)) ? semester : null;
+  const comp = component && component !== 'all' ? component : null;
+  const sub = subsystem && subsystem !== 'all' ? subsystem.toLowerCase() : null;
 
+  const rows = await client`
+    SELECT *
+    FROM programs_catalog
+    WHERE (
+      uac_name ILIKE ${uacName.trim()} 
+      OR uac_name ILIKE ${'%' + uacName.trim() + '%'}
+      OR ${uacName.trim()} ILIKE ('%' || uac_name || '%')
+    )
+    AND (${sem}::int IS NULL OR semester = ${sem})
+    ORDER BY 
+      CASE WHEN LOWER(uac_name) = LOWER(${uacName.trim()}) THEN 0 ELSE 1 END,
+      CASE WHEN ${comp}::text IS NOT NULL AND component = ${comp} THEN 0 ELSE 1 END,
+      CASE WHEN ${sub}::text IS NOT NULL AND subsystem = ${sub} THEN 0 ELSE 1 END
+    LIMIT 1
+  `;
+  return (rows[0] as ProgramCatalogItem) || null;
+}
+
+export async function getFfeContinuity(uacName: string) {
+  const client = sql();
+  const rows = await client`
+    SELECT *
+    FROM ffe_continuity
+    WHERE semester_5_uac ILIKE ${'%' + uacName.trim() + '%'} 
+       OR semester_6_uac ILIKE ${'%' + uacName.trim() + '%'}
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function getAuditResultByPlanningId(planningId: string) {
+  const client = sql();
+  const rows = await client`
+    SELECT *
+    FROM audit_results
+    WHERE planning_id = ${planningId}::uuid
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getTeacherByEmail, getPlanningById, updatePlanningContent } from '@/lib/db';
+import { 
+  getTeacherByEmail, 
+  getPlanningById, 
+  updatePlanningContent,
+  getProgramByUacAndSemester,
+  getFfeContinuity,
+  getAuditResultByPlanningId,
+} from '@/lib/db';
 import { generatePlanningStream } from '@/lib/gemini';
 import { logActivity } from '@/lib/ai-provider';
 import { buildUserPrompt } from '@/lib/prompts/build-prompt';
@@ -44,19 +51,44 @@ export async function POST(
       );
     }
 
-    // Build the user prompt with teacher context
+    // 1. Consultar programa auténtico oficial de programs_catalog
+    const officialProgram = await getProgramByUacAndSemester(
+      planning.uac_name || extractedData.uacName,
+      planning.semester,
+      planning.component,
+      context.subsystem
+    );
+
+    // 2. Si es FFE optativa o semestre 5/6, consultar continuidad
+    let continuityInfo = null;
+    if (planning.component === 'ext_optativo' || planning.semester === 5 || planning.semester === 6) {
+      continuityInfo = await getFfeContinuity(planning.uac_name || extractedData.uacName);
+    }
+
+    // 3. Consultar si hay retroalimentación de auditoría pedagógica previa
+    const previousAudit = await getAuditResultByPlanningId(id);
+    const auditFeedback = previousAudit ? {
+      overall_score: previousAudit.overall_score,
+      compliance_level: previousAudit.compliance_level,
+      findings: previousAudit.findings,
+      recommendations: previousAudit.recommendations,
+    } : null;
+
+    // 4. Construir prompt con catálogo auténtico y feedback de auditoría
     const userPrompt = buildUserPrompt(
       extractedData,
       context,
       planning.semester as number,
-      planning.component as string
+      planning.component as string,
+      officialProgram,
+      auditFeedback,
+      continuityInfo
     );
 
     const libraryContext = await getUserLibraryContext(session.user.email!);
 
-    // NOTA: La normativa oficial NO se inyecta en planeaciones didácticas.
-    // Decisión del usuario (2026-08-08): solo PMC y PIPS llevan
-    // fundamentación jurídica; el formato DBEPA de planeación no la incluye.
+    // NOTA: La normativa oficial NO se inyecta en planeaciones didácticas de aula.
+    // Decisión de diseño DBEPA: solo PMC y PIPS llevan fundamentación jurídica.
 
     let fullUserPrompt = userPrompt;
     if (libraryContext) {
@@ -71,7 +103,7 @@ export async function POST(
       async start(controller) {
         let accumulatedText = '';
         try {
-          const textGenerator = await generatePlanningStream(fullUserPrompt);
+          const textGenerator = await generatePlanningStream(fullUserPrompt, teacher.id);
           
           for await (const chunk of textGenerator) {
             accumulatedText += chunk;
@@ -86,15 +118,15 @@ export async function POST(
               .trim();
             const parsedContent = JSON.parse(cleanJson);
             
-          await updatePlanningContent(id, teacher.id, parsedContent);
-          // Log successful generation
-          await logActivity({
-            teacherEmail,
-            action: 'generate_planning',
-            entityType: 'planning',
-            entityId: id,
-            success: true,
-          });
+            await updatePlanningContent(id, teacher.id, parsedContent);
+            // Log successful generation
+            await logActivity({
+              teacherEmail,
+              action: 'generate_planning',
+              entityType: 'planning',
+              entityId: id,
+              success: true,
+            });
           } catch (dbErr) {
             console.error('Failed to parse or save accumulated JSON stream to database:', dbErr);
           }

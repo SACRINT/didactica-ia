@@ -99,14 +99,17 @@ En la base de datos (`programs_catalog`), los programas se clasifican en 5 compo
   - Soporte para 7 subsistemas con badges y filtros en tiempo real.
   - CRUD completo de programas y módulo de reemplazo con IA vía PDF oficial en `AdminClient.tsx`.
   - Corrección de badges y filtros FFE / FFEO / Laboral / Ampliado / Fundamental.
-- 🟡 **Fase 2: Motor de Auditoría y Alineación Pedagógica Inteligente (EN PROGRESO)**:
-  - Paso 1: Enriquecimiento de programas con datos auténticos (reemplazo de placeholders por propósitos/progresiones reales de DOCX y PDFs).
-  - Paso 2: Esquema `audit_results` y `ffe_continuity`.
-  - Paso 3: Motor de auditoría en `src/lib/audit-engine.ts` y API `/api/audit`.
-  - Paso 4: UI de auditoría y Scorecard 4D en panel administrativo.
-- ⚪ **Fase 3: Optimización del Generador y Alineación de Prompts**:
-  - Actualización de prompts de generación de secuencias didácticas para utilizar el catálogo enriquecido.
-  - Sincronización con PAEC-PEC y PMC.
+- ✅ **Fase 2: Motor de Auditoría y Alineación Pedagógica Inteligente (COMPLETADA)**:
+  - Paso 1: Enriquecimiento de programas con datos auténticos (100% de los 449 programas con datos reales de DOCX y PDFs oficiales).
+  - Paso 2: Esquema `audit_results` y tabla de continuidad `ffe_continuity` con los 20 pares oficiales.
+  - Paso 3: Motor de auditoría en `src/lib/audit-engine.ts` y APIs REST `/api/audit` y `/api/audit/[id]`.
+  - Paso 4: UI de auditoría y Scorecard 4D interactivo en el panel de administración.
+- ✅ **Fase 3: Optimización del Generador y Alineación de Prompts (COMPLETADA)**:
+  - Paso 1: Revisión y diagnóstico de `build-prompt.ts` y del flujo de generación en streaming.
+  - Paso 2: Actualización de `build-prompt.ts` con inyección de catálogo auténtico (`officialProgram`), propósitos y contenidos temáticos oficiales, 3 Actividades Clave para Formación Laboral (18h c/u), y continuidad FFE (5° a 6° semestre).
+  - Paso 3: Integración de retroalimentación de auditoría pedagógica previa (`auditFeedback` desde `audit_results`) en regeneraciones de planeaciones para subsanar observaciones de calidad.
+  - Paso 4: Sincronización verificada con PAEC-PEC (`/api/paec`), PMC (`/api/pmc`), y contexto normativo (`src/lib/normativa-context.ts`).
+  - Paso 5: Verificación de compilación limpia con `npm run build` (0 errores) y pruebas E2E exitosas.
 
 ---
 
