@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getProgramsCatalog } from '@/lib/db';
+import { getFilteredCachedPrograms } from '@/lib/catalog-cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
     const component = searchParams.get('component') || undefined;
     const subsystem = searchParams.get('subsystem') || undefined;
 
-    const semester = semesterParam ? parseInt(semesterParam, 10) : undefined;
+    const semester = semesterParam && semesterParam !== 'all' ? parseInt(semesterParam, 10) : undefined;
 
-    const programs = await getProgramsCatalog(
+    const programs = await getFilteredCachedPrograms(
       semester !== undefined && !isNaN(semester) ? semester : undefined,
       component,
       subsystem

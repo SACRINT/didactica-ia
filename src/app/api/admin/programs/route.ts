@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, adminUnauthorized, adminForbidden } from '@/lib/admin-auth';
 import { 
-  getProgramsCatalog, 
   createProgramCatalogItem, 
   updateProgramCatalogItem, 
   deleteProgramCatalogItem,
   ProgramCatalogItem
 } from '@/lib/db';
+import { getFilteredCachedPrograms, invalidateCatalogCache } from '@/lib/catalog-cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const semester = semesterParam && semesterParam !== 'all' ? parseInt(semesterParam, 10) : undefined;
 
-    const programs = await getProgramsCatalog(
+    const programs = await getFilteredCachedPrograms(
       semester !== undefined && !isNaN(semester) ? semester : undefined,
       component,
       subsystem
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await createProgramCatalogItem(body);
+    invalidateCatalogCache();
     return NextResponse.json({ ok: true, program: created });
   } catch (error: any) {
     if (error.message === 'UNAUTHORIZED') return adminUnauthorized();
@@ -69,6 +70,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Programa no encontrado' }, { status: 404 });
     }
 
+    invalidateCatalogCache();
     return NextResponse.json({ ok: true, program: updated });
   } catch (error: any) {
     if (error.message === 'UNAUTHORIZED') return adminUnauthorized();
@@ -89,6 +91,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleted = await deleteProgramCatalogItem(id);
+    invalidateCatalogCache();
     return NextResponse.json({ ok: true, deleted });
   } catch (error: any) {
     if (error.message === 'UNAUTHORIZED') return adminUnauthorized();

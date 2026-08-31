@@ -565,3 +565,209 @@ export async function getAuditResultByPlanningId(planningId: string) {
   `;
   return rows[0] || null;
 }
+
+// ─── Schedules Queries (Phase 4) ─────────────────────────────────────────────
+
+export interface ScheduleItem {
+  id?: string;
+  teacher_id: string;
+  title: string;
+  school_name?: string;
+  cct?: string;
+  cycle_year?: string;
+  period?: string;
+  status?: string;
+  config: any;
+  grupos: any[];
+  docentes: any[];
+  aulas: any[];
+  cargas: any[];
+  celdas: any[];
+  metricas?: any;
+  ai_optimization_log?: any[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getSchedules(teacherId?: string, status?: string) {
+  const client = sql();
+  return client`
+    SELECT *
+    FROM schedules
+    WHERE (${teacherId}::uuid IS NULL OR teacher_id = ${teacherId}::uuid)
+      AND (${status}::text IS NULL OR status = ${status})
+    ORDER BY created_at DESC
+  `;
+}
+
+export async function getScheduleById(id: string, teacherId?: string) {
+  const client = sql();
+  const rows = await client`
+    SELECT *
+    FROM schedules
+    WHERE id = ${id}::uuid
+      AND (${teacherId}::uuid IS NULL OR teacher_id = ${teacherId}::uuid)
+    LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function createSchedule(data: ScheduleItem) {
+  const client = sql();
+  const rows = await client`
+    INSERT INTO schedules (
+      teacher_id, title, school_name, cct, cycle_year, period, status,
+      config, grupos, docentes, aulas, cargas, celdas, metricas, ai_optimization_log
+    ) VALUES (
+      ${data.teacher_id}::uuid,
+      ${data.title},
+      ${data.school_name || null},
+      ${data.cct || null},
+      ${data.cycle_year || '2026-2027'},
+      ${data.period || 'A'},
+      ${data.status || 'published'},
+      ${JSON.stringify(data.config || {})}::jsonb,
+      ${JSON.stringify(data.grupos || [])}::jsonb,
+      ${JSON.stringify(data.docentes || [])}::jsonb,
+      ${JSON.stringify(data.aulas || [])}::jsonb,
+      ${JSON.stringify(data.cargas || [])}::jsonb,
+      ${JSON.stringify(data.celdas || [])}::jsonb,
+      ${JSON.stringify(data.metricas || {})}::jsonb,
+      ${JSON.stringify(data.ai_optimization_log || [])}::jsonb
+    )
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function updateSchedule(id: string, teacherId: string, data: Partial<ScheduleItem>) {
+  const client = sql();
+  const existing = await getScheduleById(id, teacherId);
+  if (!existing) return null;
+
+  const title = data.title !== undefined ? data.title : existing.title;
+  const status = data.status !== undefined ? data.status : existing.status;
+  const config = data.config !== undefined ? JSON.stringify(data.config) : JSON.stringify(existing.config);
+  const grupos = data.grupos !== undefined ? JSON.stringify(data.grupos) : JSON.stringify(existing.grupos);
+  const docentes = data.docentes !== undefined ? JSON.stringify(data.docentes) : JSON.stringify(existing.docentes);
+  const aulas = data.aulas !== undefined ? JSON.stringify(data.aulas) : JSON.stringify(existing.aulas);
+  const cargas = data.cargas !== undefined ? JSON.stringify(data.cargas) : JSON.stringify(existing.cargas);
+  const celdas = data.celdas !== undefined ? JSON.stringify(data.celdas) : JSON.stringify(existing.celdas);
+  const metricas = data.metricas !== undefined ? JSON.stringify(data.metricas) : JSON.stringify(existing.metricas);
+  const aiLog = data.ai_optimization_log !== undefined ? JSON.stringify(data.ai_optimization_log) : JSON.stringify(existing.ai_optimization_log);
+
+  const rows = await client`
+    UPDATE schedules SET
+      title = ${title},
+      status = ${status},
+      config = ${config}::jsonb,
+      grupos = ${grupos}::jsonb,
+      docentes = ${docentes}::jsonb,
+      aulas = ${aulas}::jsonb,
+      cargas = ${cargas}::jsonb,
+      celdas = ${celdas}::jsonb,
+      metricas = ${metricas}::jsonb,
+      ai_optimization_log = ${aiLog}::jsonb,
+      updated_at = NOW()
+    WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function deleteSchedule(id: string, teacherId: string) {
+  const client = sql();
+  const rows = await client`
+    DELETE FROM schedules
+    WHERE id = ${id}::uuid AND teacher_id = ${teacherId}::uuid
+    RETURNING id
+  `;
+  return rows[0] || null;
+}
+
+// ─── Notifications Queries (Phase 4) ─────────────────────────────────────────
+
+export interface NotificationItem {
+  id?: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  link?: string;
+  severity?: 'info' | 'warning' | 'error' | 'success';
+  read?: boolean;
+  created_at?: string;
+}
+
+export async function getNotifications(userId: string, unreadOnly: boolean = false) {
+  const client = sql();
+  return client`
+    SELECT *
+    FROM notifications
+    WHERE user_id = ${userId}::uuid
+      AND (${unreadOnly}::boolean = FALSE OR read = FALSE)
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+}
+
+export async function getUnreadNotificationsCount(userId: string): Promise<number> {
+  const client = sql();
+  const rows = await client`
+    SELECT COUNT(*)::int as total
+    FROM notifications
+    WHERE user_id = ${userId}::uuid AND read = FALSE
+  `;
+  return rows[0]?.total || 0;
+}
+
+export async function createNotification(data: NotificationItem) {
+  const client = sql();
+  const rows = await client`
+    INSERT INTO notifications (
+      user_id, type, title, message, link, severity, read
+    ) VALUES (
+      ${data.user_id}::uuid,
+      ${data.type},
+      ${data.title},
+      ${data.message},
+      ${data.link || null},
+      ${data.severity || 'info'},
+      ${data.read || false}
+    )
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function markNotificationAsRead(id: string, userId: string) {
+  const client = sql();
+  const rows = await client`
+    UPDATE notifications
+    SET read = TRUE
+    WHERE id = ${id}::uuid AND user_id = ${userId}::uuid
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function markAllNotificationsAsRead(userId: string) {
+  const client = sql();
+  await client`
+    UPDATE notifications
+    SET read = TRUE
+    WHERE user_id = ${userId}::uuid AND read = FALSE
+  `;
+  return true;
+}
+
+export async function deleteNotification(id: string, userId: string) {
+  const client = sql();
+  const rows = await client`
+    DELETE FROM notifications
+    WHERE id = ${id}::uuid AND user_id = ${userId}::uuid
+    RETURNING id
+  `;
+  return rows[0] || null;
+}
+

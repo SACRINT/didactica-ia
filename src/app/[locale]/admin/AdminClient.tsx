@@ -94,6 +94,27 @@ export interface AuditStats {
   no_alineado_count: number;
 }
 
+export interface ScheduleItem {
+  id: string;
+  teacher_id: string;
+  title: string;
+  school_name?: string | null;
+  cct?: string | null;
+  cycle_year?: string | null;
+  period?: string | null;
+  status: string;
+  config: any;
+  grupos: any[];
+  docentes: any[];
+  aulas: any[];
+  cargas: any[];
+  celdas: any[];
+  metricas?: any;
+  ai_optimization_log?: any[];
+  created_at: string;
+  updated_at: string;
+}
+
 const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral', 'openrouter'];
 
 // Modelos disponibles por proveedor para USO ESTÁNDAR (cuota gratuita masiva 500 RPD / 15 RPM)
@@ -187,7 +208,7 @@ function relativeTime(dateStr?: string | null): string {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminClient({ locale, adminEmail }: { locale: string; adminEmail: string }) {
-  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa' | 'curricula' | 'audits'>('stats');
+  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa' | 'curricula' | 'audits' | 'schedules'>('stats');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -267,15 +288,25 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [extracting, setExtracting] = useState(false);
   const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
 
-  // ── Audits & Pedagogical Alignment states ──
+  // ── Audits & Pedagogical Alignment states (Fase 2 + UX Fase 4) ──
   const [auditPlannings, setAuditPlannings] = useState<AuditItem[]>([]);
   const [auditStats, setAuditStats] = useState<AuditStats | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditingPlanningId, setAuditingPlanningId] = useState<string | null>(null);
   const [selectedAuditScorecard, setSelectedAuditScorecard] = useState<AuditItem | null>(null);
+  const [auditViewMode, setAuditViewMode] = useState<'tabla' | 'calendario' | 'comparativa'>('tabla');
   const [auditFilterCompliance, setAuditFilterCompliance] = useState<string>('todos');
   const [auditFilterSemester, setAuditFilterSemester] = useState<string>('todos');
+  const [auditFilterTeacher, setAuditFilterTeacher] = useState<string>('todos');
+  const [auditFilterComponent, setAuditFilterComponent] = useState<string>('todos');
   const [auditSearch, setAuditSearch] = useState<string>('');
+  const [comparePlanning, setComparePlanning] = useState<AuditItem | null>(null);
+
+  // ── Schedules & School Distribution states (Fase 4) ──
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
+  const [optimizingScheduleId, setOptimizingScheduleId] = useState<string | null>(null);
+  const [selectedScheduleLog, setSelectedScheduleLog] = useState<ScheduleItem | null>(null);
 
   // Form states
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
@@ -359,6 +390,62 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     }
   }, [auditFilterCompliance, auditFilterSemester, auditSearch]);
 
+  const loadSchedules = useCallback(async () => {
+    setSchedulesLoading(true);
+    try {
+      const r = await fetch('/api/schedules');
+      const d = await r.json();
+      if (r.ok) {
+        setSchedules(d.schedules || []);
+      } else {
+        showMsg(d.error || 'Error al cargar horarios escolares', false);
+      }
+    } catch {
+      showMsg('Error de red al cargar horarios', false);
+    } finally {
+      setSchedulesLoading(false);
+    }
+  }, []);
+
+  async function handleOptimizeSchedule(id: string) {
+    setOptimizingScheduleId(id);
+    try {
+      const r = await fetch(`/api/schedules/${id}/optimize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPremium: true })
+      });
+      const d = await r.json();
+      if (r.ok && d.schedule) {
+        showMsg(`¡Horario optimizado con éxito! Conflicto residual: ${d.optimization?.conflictos_finales ?? 0}, Score: ${d.optimization?.score_calidad ?? 100}% ✓`);
+        await loadSchedules();
+      } else {
+        showMsg(d.error || 'Error al optimizar horario con IA', false);
+      }
+    } catch {
+      showMsg('Error de red al optimizar horario', false);
+    } finally {
+      setOptimizingScheduleId(null);
+    }
+  }
+
+  async function handleDeleteSchedule(id: string, title: string) {
+    if (!confirm(`¿Estás seguro de eliminar la plantilla de horario "${title}"?`)) return;
+    try {
+      const r = await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+      if (r.ok) {
+        if (selectedScheduleLog?.id === id) setSelectedScheduleLog(null);
+        loadSchedules();
+        showMsg('Horario escolar eliminado ✓');
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al eliminar horario', false);
+      }
+    } catch {
+      showMsg('Error de red al eliminar', false);
+    }
+  }
+
   async function handleRunAudit(planningId: string) {
     setAuditingPlanningId(planningId);
     try {
@@ -435,7 +522,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     if (activeTab === 'normativa') loadNormativa();
     if (activeTab === 'curricula') loadCurricula();
     if (activeTab === 'audits') loadAudits();
-  }, [activeTab, loadCurricula, loadAudits]);
+    if (activeTab === 'schedules') loadSchedules();
+  }, [activeTab, loadCurricula, loadAudits, loadSchedules]);
 
   // ── Acciones Catálogo Curricular (Malla y Programas) ───────────────────────
   function handleOpenNewProgramModal() {
@@ -983,6 +1071,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const tabs: { id: typeof activeTab; label: string; icon: string }[] = [
     { id: 'stats',    label: 'Estadísticas',  icon: '📊' },
     { id: 'audits',   label: 'Auditoría Pedagógica', icon: '🛡️' },
+    { id: 'schedules',label: 'Horarios Escolares', icon: '📅' },
     { id: 'curricula',label: 'Malla y Programas', icon: '📚' },
     { id: 'keys',     label: 'API Keys & IA', icon: '🔑' },
     { id: 'config',   label: 'Configuración', icon: '⚙️' },
@@ -1172,19 +1261,94 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
               </div>
             </div>
 
-            {/* Barra de Filtros y Búsqueda */}
-            <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 220 }}>
+            {/* Selector de Modo de Vista y Filtros (Paso 2 UX) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                {/* Switcher: Tabla | Calendario | Comparativa */}
+                <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.4)', padding: 4, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuditViewMode('tabla')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: auditViewMode === 'tabla' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                      color: auditViewMode === 'tabla' ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}
+                  >
+                    <span>📋</span> Tabla Detallada
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuditViewMode('calendario')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: auditViewMode === 'calendario' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                      color: auditViewMode === 'calendario' ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}
+                  >
+                    <span>📅</span> Calendario por Cortes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuditViewMode('comparativa')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: auditViewMode === 'comparativa' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                      color: auditViewMode === 'comparativa' ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}
+                  >
+                    <span>⚖️</span> Comparativa Antes/Después
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 13, color: 'rgba(240,244,255,0.6)' }}>
+                  Mostrando <strong style={{ color: '#818cf8' }}>
+                    {auditPlannings.filter(p => {
+                      if (auditFilterTeacher !== 'todos' && (p.teacher_email !== auditFilterTeacher && p.teacher_id !== auditFilterTeacher)) return false;
+                      if (auditFilterComponent !== 'todos' && p.component !== auditFilterComponent) return false;
+                      return true;
+                    }).length}
+                  </strong> de {auditPlannings.length} planeaciones
+                </div>
+              </div>
+
+              {/* Filtros Avanzados */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                   type="text"
                   placeholder="🔍 Buscar por Asignatura, Docente o Correo..."
                   value={auditSearch}
                   onChange={e => setAuditSearch(e.target.value)}
-                  style={{ width: '100%', background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
+                  style={{ flex: '1 1 240px', background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
                 />
-              </div>
 
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <select
                   value={auditFilterCompliance}
                   onChange={e => setAuditFilterCompliance(e.target.value)}
@@ -1211,15 +1375,57 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                   <option value="5">5.° Semestre</option>
                   <option value="6">6.° Semestre</option>
                 </select>
+
+                <select
+                  value={auditFilterComponent}
+                  onChange={e => setAuditFilterComponent(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="todos">Todos los Componentes</option>
+                  <option value="fundamental">Fundamental</option>
+                  <option value="laboral">Laboral / Capacitación</option>
+                  <option value="ampliado">Ampliado / Socioemocional</option>
+                  <option value="ext_obligatorio">Ext. Obligatoria (FFEO)</option>
+                  <option value="ext_optativo">Ext. Optativa (FFE)</option>
+                </select>
+
+                <select
+                  value={auditFilterTeacher}
+                  onChange={e => setAuditFilterTeacher(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="todos">Todos los Docentes</option>
+                  {Array.from(new Set(auditPlannings.map(p => p.teacher_email).filter(Boolean))).map((email: any) => (
+                    <option key={email} value={email}>{email}</option>
+                  ))}
+                </select>
+
+                {(auditFilterCompliance !== 'todos' || auditFilterSemester !== 'todos' || auditFilterComponent !== 'todos' || auditFilterTeacher !== 'todos' || auditSearch.trim()) && (
+                  <button
+                    type="button"
+                    className="btn-sm btn-ghost"
+                    onClick={() => {
+                      setAuditFilterCompliance('todos');
+                      setAuditFilterSemester('todos');
+                      setAuditFilterComponent('todos');
+                      setAuditFilterTeacher('todos');
+                      setAuditSearch('');
+                    }}
+                    style={{ fontSize: 12 }}
+                  >
+                    ✕ Limpiar
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Tabla de Planeaciones y Auditorías */}
+            {/* CONTENIDO PRINCIPAL: TABLA vs CALENDARIO vs COMPARATIVA */}
             {auditLoading && auditPlannings.length === 0 ? (
               <div className="empty-state">⏳ Cargando panel de auditoría pedagógica...</div>
             ) : auditPlannings.length === 0 ? (
               <div className="empty-state">No se encontraron planeaciones con los filtros seleccionados.</div>
-            ) : (
+            ) : auditViewMode === 'tabla' ? (
+              /* ── VISTA 1: TABLA DETALLADA ── */
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -1228,128 +1434,400 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     <th style={{ textAlign: 'center' }}>Semestre</th>
                     <th>Estado de Auditoría</th>
                     <th>Scorecard 4D</th>
-                    <th style={{ textAlign: 'right' }}>Acciones</th>
+                    <th style={{ textAlign: 'right' }}>Acciones & Exportación</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {auditPlannings.map(p => {
-                    const isAudited = !!p.audit_id && p.overall_score !== null;
-                    const isAuditing = auditingPlanningId === p.planning_id;
-                    const score = p.overall_score || 0;
-                    const compLevel = p.compliance_level || 'pendiente';
-                    const dims = p.dimension_scores;
+                  {auditPlannings
+                    .filter(p => {
+                      if (auditFilterTeacher !== 'todos' && p.teacher_email !== auditFilterTeacher && p.teacher_id !== auditFilterTeacher) return false;
+                      if (auditFilterComponent !== 'todos' && p.component !== auditFilterComponent) return false;
+                      return true;
+                    })
+                    .map(p => {
+                      const isAudited = !!p.audit_id && p.overall_score !== null;
+                      const isAuditing = auditingPlanningId === p.planning_id;
+                      const score = p.overall_score || 0;
+                      const compLevel = p.compliance_level || 'pendiente';
+                      const dims = p.dimension_scores;
 
-                    return (
-                      <tr key={p.planning_id}>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#f0f4ff', fontSize: 14 }}>
-                            {p.uac_name}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                            {p.curriculum_name || 'Programa Oficial'} · Creada: {new Date(p.planning_created_at).toLocaleDateString('es-MX')}
-                          </div>
-                        </td>
+                      return (
+                        <tr key={p.planning_id}>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#f0f4ff', fontSize: 14 }}>
+                              {p.uac_name}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                              {p.curriculum_name || 'Programa Oficial'} · Creada: {new Date(p.planning_created_at).toLocaleDateString('es-MX')}
+                            </div>
+                          </td>
 
-                        <td>
-                          <div style={{ color: '#e0e7ff', fontWeight: 500, fontSize: 13 }}>
-                            {p.teacher_name || p.teacher_email || 'Docente'}
-                          </div>
-                          <div style={{ fontSize: 11, color: '#818cf8' }}>
-                            {p.school_name || p.teacher_email}
-                          </div>
-                        </td>
+                          <td>
+                            <div style={{ color: '#e0e7ff', fontWeight: 500, fontSize: 13 }}>
+                              {p.teacher_name || p.teacher_email || 'Docente'}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#818cf8' }}>
+                              {p.school_name || p.teacher_email}
+                            </div>
+                          </td>
 
-                        <td style={{ textAlign: 'center' }}>
-                          <span className="badge" style={{ background: 'rgba(99,102,241,0.15)', color: '#c7d2fe', fontSize: 11 }}>
-                            {p.semester}.°
-                          </span>
-                        </td>
-
-                        <td>
-                          {isAuditing ? (
-                            <span className="badge badge-purple" style={{ animation: 'pulse 1.5s infinite' }}>
-                              ⏳ Auditando con IA...
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge" style={{ background: 'rgba(99,102,241,0.15)', color: '#c7d2fe', fontSize: 11 }}>
+                              {p.semester}.°
                             </span>
-                          ) : isAudited ? (
-                            <div>
-                              <span
-                                className="badge"
-                                style={{
-                                  background: score >= 90 ? 'rgba(16,185,129,0.15)' : score >= 75 ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)',
-                                  color: score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#fb7185',
-                                  border: `1px solid ${score >= 90 ? 'rgba(16,185,129,0.3)' : score >= 75 ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)'}`,
-                                  fontSize: 12,
-                                  fontWeight: 700
-                                }}
-                              >
-                                {score >= 90 ? '🟢' : score >= 75 ? '🟡' : '🔴'} {score} pts · {compLevel.toUpperCase()}
+                          </td>
+
+                          <td>
+                            {isAuditing ? (
+                              <span className="badge badge-purple" style={{ animation: 'pulse 1.5s infinite' }}>
+                                ⏳ Auditando con IA...
                               </span>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-                                Auditada {relativeTime(p.audited_at)}
+                            ) : isAudited ? (
+                              <div>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    background: score >= 90 ? 'rgba(16,185,129,0.15)' : score >= 75 ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)',
+                                    color: score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#fb7185',
+                                    border: `1px solid ${score >= 90 ? 'rgba(16,185,129,0.3)' : score >= 75 ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)'}`,
+                                    fontSize: 12,
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  {score >= 90 ? '🟢' : score >= 75 ? '🟡' : '🔴'} {score} pts · {compLevel.toUpperCase()}
+                                </span>
+                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
+                                  Auditada {relativeTime(p.audited_at)}
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <span className="badge badge-ghost" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
-                              ⚪ Sin Auditar
-                            </span>
-                          )}
-                        </td>
+                            ) : (
+                              <span className="badge badge-ghost" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
+                                ⚪ Sin Auditar
+                              </span>
+                            )}
+                          </td>
 
-                        <td>
-                          {isAudited && dims ? (
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              <span className="badge" style={{ fontSize: 10, background: 'rgba(99,102,241,0.1)', color: '#a5b4fc' }} title="Alineación de Propósitos">
-                                🎯 {dims.propositos_alineacion?.score || 0}%
-                              </span>
-                              <span className="badge" style={{ fontSize: 10, background: 'rgba(16,185,129,0.1)', color: '#6ee7b7' }} title="Cobertura de Contenidos">
-                                📚 {dims.cobertura_contenidos?.score || 0}%
-                              </span>
-                              <span className="badge" style={{ fontSize: 10, background: 'rgba(234,179,8,0.1)', color: '#fde047' }} title="Secuenciación Lógica">
-                                ⏳ {dims.secuenciacion_logica?.score || 0}%
-                              </span>
-                              <span className="badge" style={{ fontSize: 10, background: 'rgba(236,72,153,0.1)', color: '#f472b6' }} title="Adecuación de Evidencias">
-                                📝 {dims.adecuacion_evidencias?.score || 0}%
-                              </span>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>—</span>
-                          )}
-                        </td>
+                          <td>
+                            {isAudited && dims ? (
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <span className="badge" style={{ fontSize: 10, background: 'rgba(99,102,241,0.1)', color: '#a5b4fc' }} title="Alineación de Propósitos">
+                                  🎯 {dims.propositos_alineacion?.score || 0}%
+                                </span>
+                                <span className="badge" style={{ fontSize: 10, background: 'rgba(16,185,129,0.1)', color: '#6ee7b7' }} title="Cobertura de Contenidos">
+                                  📚 {dims.cobertura_contenidos?.score || 0}%
+                                </span>
+                                <span className="badge" style={{ fontSize: 10, background: 'rgba(234,179,8,0.1)', color: '#fde047' }} title="Secuenciación Lógica">
+                                  ⏳ {dims.secuenciacion_logica?.score || 0}%
+                                </span>
+                                <span className="badge" style={{ fontSize: 10, background: 'rgba(236,72,153,0.1)', color: '#f472b6' }} title="Adecuación de Evidencias">
+                                  📝 {dims.adecuacion_evidencias?.score || 0}%
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>—</span>
+                            )}
+                          </td>
 
-                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {isAudited && (
-                            <button
+                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            {/* Descarga 1-Click DOCX Institucional */}
+                            <a
+                              href={`/api/docx/${p.planning_id}`}
+                              target="_blank"
+                              rel="noreferrer"
                               className="btn-sm btn-ghost"
-                              onClick={() => setSelectedAuditScorecard(p)}
-                              style={{ marginRight: 6, color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
-                              title="Ver Reporte y Scorecard Detallado"
+                              style={{ marginRight: 6, color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', textDecoration: 'none' }}
+                              title="Descargar Planeación Institucional en Word (DOCX)"
                             >
-                              📊 Scorecard
-                            </button>
-                          )}
-                          <button
-                            className="btn-sm btn-primary"
-                            onClick={() => handleRunAudit(p.planning_id)}
-                            disabled={isAuditing}
-                            style={{ marginRight: 6 }}
-                          >
-                            {isAuditing ? '⏳ Auditando...' : isAudited ? '🔄 Re-auditar' : '⚡ Auditar con IA'}
-                          </button>
-                          {isAudited && p.audit_id && (
+                              📥 DOCX
+                            </a>
+                            {isAudited && (
+                              <>
+                                <button
+                                  className="btn-sm btn-ghost"
+                                  onClick={() => setSelectedAuditScorecard(p)}
+                                  style={{ marginRight: 6, color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
+                                  title="Ver Reporte y Scorecard Detallado"
+                                >
+                                  📊 Scorecard
+                                </button>
+                                <button
+                                  className="btn-sm btn-ghost"
+                                  onClick={() => {
+                                    setComparePlanning(p);
+                                    setAuditViewMode('comparativa');
+                                  }}
+                                  style={{ marginRight: 6, color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}
+                                  title="Comparar frente a Requisitos Oficiales SEP"
+                                >
+                                  ⚖️ Comparar
+                                </button>
+                              </>
+                            )}
                             <button
-                              className="btn-sm btn-danger"
-                              onClick={() => handleDeleteAudit(p.audit_id!)}
-                              title="Eliminar registro de auditoría"
+                              className="btn-sm btn-primary"
+                              onClick={() => handleRunAudit(p.planning_id)}
+                              disabled={isAuditing}
+                              style={{ marginRight: 6 }}
                             >
-                              🗑️
+                              {isAuditing ? '⏳ Auditando...' : isAudited ? '🔄 Re-auditar' : '⚡ Auditar con IA'}
                             </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                            {isAudited && p.audit_id && (
+                              <button
+                                className="btn-sm btn-danger"
+                                onClick={() => handleDeleteAudit(p.audit_id!)}
+                                title="Eliminar registro de auditoría"
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
+            ) : auditViewMode === 'calendario' ? (
+              /* ── VISTA 2: CALENDARIO POR CORTES EVALUATIVOS ── */
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+                  {[
+                    { corte: 1, titulo: '1.° Corte Evaluativo (Parcial 1)', semanas: 'Semanas 1 a 6', icono: '🌱' },
+                    { corte: 2, titulo: '2.° Corte Evaluativo (Parcial 2)', semanas: 'Semanas 7 a 12', icono: '⚡' },
+                    { corte: 3, titulo: '3.° Corte Evaluativo (Parcial 3)', semanas: 'Semanas 13 a 18', icono: '🎓' },
+                  ].map(block => {
+                    const blockPlannings = auditPlannings.filter(p => {
+                      if (auditFilterTeacher !== 'todos' && p.teacher_email !== auditFilterTeacher && p.teacher_id !== auditFilterTeacher) return false;
+                      if (auditFilterComponent !== 'todos' && p.component !== auditFilterComponent) return false;
+                      return true;
+                    });
+
+                    return (
+                      <div
+                        key={block.corte}
+                        style={{
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: 14,
+                          padding: 18,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span>{block.icono}</span> {block.titulo}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#818cf8', marginTop: 2 }}>{block.semanas}</div>
+                          </div>
+                          <span className="badge badge-blue" style={{ fontSize: 11 }}>
+                            {blockPlannings.length} planes
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '65vh', overflowY: 'auto' }}>
+                          {blockPlannings.map(p => {
+                            const isAudited = !!p.audit_id && p.overall_score !== null;
+                            const score = p.overall_score || 0;
+
+                            return (
+                              <div
+                                key={p.planning_id}
+                                style={{
+                                  background: 'rgba(0,0,0,0.3)',
+                                  border: `1px solid ${isAudited ? (score >= 90 ? 'rgba(16,185,129,0.25)' : score >= 75 ? 'rgba(245,158,11,0.25)' : 'rgba(244,63,94,0.25)') : 'rgba(255,255,255,0.08)'}`,
+                                  borderRadius: 10,
+                                  padding: 12
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                                  <div style={{ fontWeight: 700, color: '#f0f4ff', fontSize: 13 }}>
+                                    {p.uac_name}
+                                  </div>
+                                  <span className="badge" style={{ background: 'rgba(99,102,241,0.15)', color: '#c7d2fe', fontSize: 10 }}>
+                                    {p.semester}.° Sem
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+                                  👤 {p.teacher_name || p.teacher_email}
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+                                  {isAudited ? (
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#fb7185' }}>
+                                      {score >= 90 ? '🟢' : score >= 75 ? '🟡' : '🔴'} {score}/100 pts
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>⚪ Sin auditar</span>
+                                  )}
+
+                                  <div style={{ display: 'flex', gap: 4 }}>
+                                    <a
+                                      href={`/api/docx/${p.planning_id}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="btn-sm btn-ghost"
+                                      style={{ padding: '3px 8px', fontSize: 11, textDecoration: 'none' }}
+                                    >
+                                      📥 DOCX
+                                    </a>
+                                    <button
+                                      className="btn-sm btn-primary"
+                                      onClick={() => handleRunAudit(p.planning_id)}
+                                      style={{ padding: '3px 8px', fontSize: 11 }}
+                                    >
+                                      ⚡
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* ── VISTA 3: COMPARATIVA ANTES / DESPUÉS (SEP OFICIAL VS PLANEACIÓN) ── */
+              <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <h3 style={{ margin: 0, color: '#f8fafc', fontSize: 17, fontWeight: 700 }}>
+                      ⚖️ Matriz Comparativa de Alineación Curricular y Mejora Pedagógica
+                    </h3>
+                    <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+                      Contrasta los propósitos oficiales extraídos del catálogo SEP con la planeación generada y sus hallazgos de auditoría.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <label style={{ fontSize: 12, color: '#94a3b8' }}>Seleccionar Planeación:</label>
+                    <select
+                      value={comparePlanning?.planning_id || ''}
+                      onChange={e => {
+                        const target = auditPlannings.find(p => p.planning_id === e.target.value);
+                        setComparePlanning(target || null);
+                      }}
+                      style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+                    >
+                      <option value="">— Elige una planeación auditada —</option>
+                      {auditPlannings.filter(p => p.audit_id).map(p => (
+                        <option key={p.planning_id} value={p.planning_id}>
+                          {p.uac_name} ({p.semester}.° Sem) · {p.teacher_email} — Score: {p.overall_score}/100
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {comparePlanning ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 20 }}>
+                    {/* Columna Izquierda: Requisitos Oficiales del Programa */}
+                    <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <span style={{ fontSize: 20 }}>🏛️</span>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#c7d2fe', fontSize: 14 }}>Requisitos Oficiales del Programa SEP</div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Catálogo oficial de 449 programas auténticos</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gap: 10, fontSize: 12 }}>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8 }}>
+                          <strong style={{ color: '#818cf8' }}>Asignatura / UAC:</strong> {comparePlanning.uac_name}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8 }}>
+                          <strong style={{ color: '#818cf8' }}>Semestre y Componente:</strong> {comparePlanning.semester}.° Semestre · {comparePlanning.component?.toUpperCase()}
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8 }}>
+                          <strong style={{ color: '#818cf8' }}>Propósitos Oficiales Exigidos:</strong>
+                          <ul style={{ margin: '6px 0 0', paddingLeft: 18, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+                            {(comparePlanning.findings?.propositos_cubiertos || ['Propósitos formativos oficiales del catálogo SEP']).map((p, i) => (
+                              <li key={i}>{p}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Columna Derecha: Planeación Docente y Auditoría 4D */}
+                    <div style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, padding: 18 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 20 }}>📊</span>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#6ee7b7', fontSize: 14 }}>Diagnóstico y Auditoría Pedagógica</div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Alineación en 4 Dimensiones Clave</div>
+                          </div>
+                        </div>
+                        <span className="badge" style={{ background: (comparePlanning.overall_score || 0) >= 90 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)', color: (comparePlanning.overall_score || 0) >= 90 ? '#34d399' : '#fbbf24', fontSize: 13, fontWeight: 700 }}>
+                          {comparePlanning.overall_score}/100 pts
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gap: 10, fontSize: 12 }}>
+                        {comparePlanning.dimension_scores && (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 8 }}>
+                              <div style={{ color: '#a5b4fc', fontSize: 11 }}>🎯 Propósitos</div>
+                              <div style={{ fontWeight: 700, fontSize: 13 }}>{comparePlanning.dimension_scores.propositos_alineacion?.score || 0}%</div>
+                            </div>
+                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 8 }}>
+                              <div style={{ color: '#6ee7b7', fontSize: 11 }}>📚 Contenidos</div>
+                              <div style={{ fontWeight: 700, fontSize: 13 }}>{comparePlanning.dimension_scores.cobertura_contenidos?.score || 0}%</div>
+                            </div>
+                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 8 }}>
+                              <div style={{ color: '#fde047', fontSize: 11 }}>⏳ Secuenciación</div>
+                              <div style={{ fontWeight: 700, fontSize: 13 }}>{comparePlanning.dimension_scores.secuenciacion_logica?.score || 0}%</div>
+                            </div>
+                            <div style={{ background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 8 }}>
+                              <div style={{ color: '#f472b6', fontSize: 11 }}>📝 Evidencias</div>
+                              <div style={{ fontWeight: 700, fontSize: 13 }}>{comparePlanning.dimension_scores.adecuacion_evidencias?.score || 0}%</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {comparePlanning.recommendations && comparePlanning.recommendations.length > 0 && (
+                          <div style={{ background: 'rgba(245,158,11,0.08)', padding: 10, borderRadius: 8, border: '1px solid rgba(245,158,11,0.2)' }}>
+                            <strong style={{ color: '#fbbf24' }}>💡 Acciones de Alineación Sugeridas:</strong>
+                            <ul style={{ margin: '6px 0 0', paddingLeft: 18, color: '#fef3c7', lineHeight: 1.4 }}>
+                              {comparePlanning.recommendations.slice(0, 3).map((r, i) => (
+                                <li key={i}>{r.mensaje}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <a
+                            href={`/api/docx/${comparePlanning.planning_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-sm btn-ghost"
+                            style={{ flex: 1, textAlign: 'center', textDecoration: 'none', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)' }}
+                          >
+                            📥 Descargar Word DOCX
+                          </a>
+                          <button
+                            className="btn-sm btn-primary"
+                            onClick={() => handleRunAudit(comparePlanning.planning_id)}
+                            disabled={auditingPlanningId === comparePlanning.planning_id}
+                          >
+                            {auditingPlanningId === comparePlanning.planning_id ? '⏳ Auditando...' : '⚡ Re-auditar con IA'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                    👆 Selecciona una planeación auditada arriba para visualizar la matriz comparativa de requisitos SEP vs planeación docente.
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Modal: Scorecard Pedagógico 4D Detallado */}
@@ -1584,6 +2062,311 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     </button>
                   </div>
 
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── HORARIOS ESCOLARES (FASE 4) ── */}
+        {activeTab === 'schedules' && (
+          <>
+            <div className="section-header">
+              <div>
+                <h1 style={{ margin: 0, paddingBottom: 4 }}>📅 Módulo de Horarios Inteligente & Plantillas</h1>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: '6px 0 0 0' }}>
+                  Generación algorítmica Min-Conflicts y optimización pedagógica con IA (balance de jornadas, reducción de horas muertas y restricciones de docentes).
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <a
+                  href={`/${locale}/horarios`}
+                  className="btn-sm btn-primary"
+                  style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontWeight: 600 }}
+                >
+                  <span>✨</span> Nuevo Horario / Asistente
+                </a>
+                <button
+                  className="btn-sm btn-ghost"
+                  onClick={loadSchedules}
+                  disabled={schedulesLoading}
+                  style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <span>🔄</span> {schedulesLoading ? 'Cargando...' : 'Refrescar'}
+                </button>
+              </div>
+            </div>
+
+            {/* KPIs de Horarios */}
+            <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 24 }}>
+              <div className="stat-card" style={{ borderColor: 'rgba(99,102,241,0.3)' }}>
+                <div className="num" style={{ color: '#818cf8' }}>{schedules.length}</div>
+                <div className="lbl">Plantillas de Horarios</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(16,185,129,0.3)' }}>
+                <div className="num" style={{ color: '#34d399' }}>
+                  {schedules.filter(s => s.status === 'published').length}
+                </div>
+                <div className="lbl">Publicados / Oficiales</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(245,158,11,0.3)' }}>
+                <div className="num" style={{ color: '#fbbf24' }}>
+                  {schedules.filter(s => s.status === 'draft').length}
+                </div>
+                <div className="lbl">Borradores en Diseño</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(59,130,246,0.3)' }}>
+                <div className="num" style={{ color: '#60a5fa' }}>
+                  {schedules.reduce((acc, s) => acc + (s.grupos?.length || 0), 0)}
+                </div>
+                <div className="lbl">Grupos Gestionados</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(168,85,247,0.3)' }}>
+                <div className="num" style={{ color: '#c084fc' }}>
+                  {schedules.reduce((acc, s) => acc + (s.docentes?.length || 0), 0)}
+                </div>
+                <div className="lbl">Docentes Asignados</div>
+              </div>
+            </div>
+
+            {/* Listado de Horarios */}
+            {schedulesLoading && schedules.length === 0 ? (
+              <div className="empty-state">⏳ Cargando horarios escolares...</div>
+            ) : schedules.length === 0 ? (
+              <div className="empty-state" style={{ background: 'rgba(255,255,255,0.02)', padding: 48, borderRadius: 14 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📅</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#f0f4ff', marginBottom: 8 }}>Aún no hay plantillas de horarios creadas</div>
+                <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 460, margin: '0 auto 20px', fontSize: 13 }}>
+                  Crea una nueva plantilla para organizar las asignaturas, salones, docentes y grupos de tu plantel con el asistente inteligente.
+                </p>
+                <a
+                  href={`/${locale}/horarios`}
+                  className="btn-sm btn-primary"
+                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', fontSize: 14 }}
+                >
+                  🚀 Abrir Generador de Horarios
+                </a>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 16 }}>
+                {schedules.map(sch => {
+                  const isOptimizing = optimizingScheduleId === sch.id;
+                  const totalGrupos = sch.grupos?.length || 0;
+                  const totalDocentes = sch.docentes?.length || 0;
+                  const totalAulas = sch.aulas?.length || 0;
+                  const totalCeldas = sch.celdas?.length || 0;
+                  const lastLog = sch.ai_optimization_log && sch.ai_optimization_log.length > 0
+                    ? sch.ai_optimization_log[sch.ai_optimization_log.length - 1]
+                    : null;
+                  const scoreCalidad = lastLog?.score_calidad ?? sch.metricas?.score_calidad ?? 100;
+                  const conflictos = lastLog?.conflictos_finales ?? sch.metricas?.conflictos_finales ?? 0;
+
+                  return (
+                    <div
+                      key={sch.id}
+                      style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 14,
+                        padding: 20,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 14,
+                        transition: 'border-color 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                            <span className={`badge ${sch.status === 'published' ? 'badge-green' : 'badge-yellow'}`}>
+                              {sch.status === 'published' ? '✓ Publicado Oficial' : '📝 Borrador'}
+                            </span>
+                            {sch.cycle_year && (
+                              <span className="badge" style={{ background: 'rgba(99,102,241,0.15)', color: '#c7d2fe', fontSize: 11 }}>
+                                Ciclo: {sch.cycle_year} {sch.period ? `(${sch.period})` : ''}
+                              </span>
+                            )}
+                            {sch.cct && (
+                              <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', fontSize: 11 }}>
+                                CCT: {sch.cct}
+                              </span>
+                            )}
+                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                              Actualizado {relativeTime(sch.updated_at || sch.created_at)}
+                            </span>
+                          </div>
+                          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#f8fafc' }}>
+                            {sch.title}
+                          </h3>
+                          {sch.school_name && (
+                            <div style={{ fontSize: 12, color: '#818cf8', marginTop: 3 }}>
+                              🏫 {sch.school_name}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Badges de Métricas */}
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '6px 12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Grupos</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#93c5fd' }}>{totalGrupos}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '6px 12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Docentes</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>{totalDocentes}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '6px 12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Aulas</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#fcd34d' }}>{totalAulas}</div>
+                          </div>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '6px 12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Sesiones</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>{totalCeldas}</div>
+                          </div>
+                          <div style={{
+                            background: conflictos === 0 ? 'rgba(16,185,129,0.12)' : 'rgba(244,63,94,0.12)',
+                            border: `1px solid ${conflictos === 0 ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'}`,
+                            borderRadius: 10,
+                            padding: '6px 12px',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ fontSize: 10, color: conflictos === 0 ? '#34d399' : '#fb7185', textTransform: 'uppercase' }}>Conflictos</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: conflictos === 0 ? '#34d399' : '#fb7185' }}>
+                              {conflictos === 0 ? '0 ✓' : `${conflictos} ⚠️`}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Diagnóstico Pedagógico y Sugerencias Rápidas */}
+                      {lastLog?.analisis_pedagogico && (
+                        <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'rgba(240,244,255,0.9)' }}>
+                          <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>🤖</span> Diagnóstico IA de Balance Curricular y Carga Docente:
+                          </div>
+                          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
+                            {lastLog.analisis_pedagogico.balance_jornada && (
+                              <div style={{ fontSize: 11 }}>
+                                <strong>Jornada:</strong> {lastLog.analisis_pedagogico.balance_jornada}
+                              </div>
+                            )}
+                            {lastLog.analisis_pedagogico.horas_muertas_evaluacion && (
+                              <div style={{ fontSize: 11 }}>
+                                <strong>Horas Muertas:</strong> {lastLog.analisis_pedagogico.horas_muertas_evaluacion}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Barra de Acciones del Horario */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12, flexWrap: 'wrap', gap: 10 }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button
+                            className="btn-sm btn-primary"
+                            onClick={() => handleOptimizeSchedule(sch.id)}
+                            disabled={isOptimizing}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                          >
+                            {isOptimizing ? '⏳ Optimizando CSP & IA...' : '⚡ Optimizar con IA'}
+                          </button>
+                          {sch.ai_optimization_log && sch.ai_optimization_log.length > 0 && (
+                            <button
+                              className="btn-sm btn-ghost"
+                              onClick={() => setSelectedScheduleLog(sch)}
+                              style={{ border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8' }}
+                            >
+                              📊 Historial IA ({sch.ai_optimization_log.length})
+                            </button>
+                          )}
+                          <a
+                            href={`/${locale}/horarios`}
+                            className="btn-sm btn-ghost"
+                            style={{ textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0' }}
+                          >
+                            👁️ Abrir en Diseñador
+                          </a>
+                        </div>
+                        <button
+                          className="btn-sm btn-danger"
+                          onClick={() => handleDeleteSchedule(sch.id, sch.title)}
+                          title="Eliminar Horario"
+                        >
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Modal: Historial y Log de Optimización IA de Horario */}
+            {selectedScheduleLog && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 780, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 25px 70px rgba(0,0,0,0.8)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 14 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#f8fafc', fontSize: 18 }}>
+                        📊 Diagnóstico y Registro de Optimización con IA
+                      </h3>
+                      <div style={{ fontSize: 12, color: '#818cf8', marginTop: 4 }}>
+                        {selectedScheduleLog.title} · {selectedScheduleLog.school_name || 'Plantel'}
+                      </div>
+                    </div>
+                    <button className="btn-sm btn-ghost" onClick={() => setSelectedScheduleLog(null)}>✕ Cerrar</button>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    {(selectedScheduleLog.ai_optimization_log || []).slice().reverse().map((log: any, idx: number) => (
+                      <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                          <span className="badge badge-blue" style={{ fontSize: 11 }}>
+                            Ejecución #{selectedScheduleLog.ai_optimization_log!.length - idx} · {new Date(log.timestamp).toLocaleString('es-MX')}
+                          </span>
+                          <span className="badge badge-green" style={{ fontSize: 11 }}>
+                            Score: {log.score_calidad ?? 100}% · Conflictos: {log.conflictos_finales ?? 0}
+                          </span>
+                        </div>
+
+                        {log.analisis_pedagogico && (
+                          <div style={{ display: 'grid', gap: 8, marginTop: 10, fontSize: 12 }}>
+                            {log.analisis_pedagogico.diagnostico_general && (
+                              <div style={{ color: 'rgba(240,244,255,0.9)', lineHeight: 1.5 }}>
+                                <strong>Diagnóstico:</strong> {log.analisis_pedagogico.diagnostico_general}
+                              </div>
+                            )}
+                            {log.analisis_pedagogico.alertas_sobrecarga?.length > 0 && (
+                              <div style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.2)', padding: '8px 12px', borderRadius: 8, color: '#fecdd3' }}>
+                                <strong>⚠️ Alertas de sobrecarga o descanso:</strong>
+                                <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                                  {log.analisis_pedagogico.alertas_sobrecarga.map((a: string, aIdx: number) => (
+                                    <li key={aIdx}>{a}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {log.analisis_pedagogico.sugerencias_mejora?.length > 0 && (
+                              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', padding: '8px 12px', borderRadius: 8, color: '#fef3c7' }}>
+                                <strong>💡 Recomendaciones pedagógicas:</strong>
+                                <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                                  {log.analisis_pedagogico.sugerencias_mejora.map((s: string, sIdx: number) => (
+                                    <li key={sIdx}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: 20, textAlign: 'right' }}>
+                    <button className="btn-sm btn-ghost" onClick={() => setSelectedScheduleLog(null)}>
+                      Cerrar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

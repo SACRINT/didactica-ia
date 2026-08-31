@@ -6,6 +6,7 @@ import { signOutAction, signOutPlain } from '@/lib/server-actions';
 import SignOutButton from './SignOutButton';
 import HeartbeatSender from './HeartbeatSender';
 import PedagogicalChatWidget from '../PedagogicalChatWidget';
+import NotificationBell from '../notifications/NotificationBell';
 
 type Props = {
   children: React.ReactNode;
@@ -116,6 +117,7 @@ export default async function AppLayout({ children, locale, activeSection }: Pro
           </div>
         </div>
         <div className="header-right">
+          <NotificationBell />
           <div className="header-user">
             <div className="header-avatar">
               {user.image
