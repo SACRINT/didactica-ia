@@ -216,38 +216,20 @@ export interface ProgramCatalogItem {
 }
 
 export async function getProgramsCatalog(semester?: number, component?: string, subsystem?: string) {
-  // Normalize subsystem filter: if not provided, 'all', or 'todos', don't filter
-  const normalizedSubsystem = (subsystem && subsystem !== 'all' && subsystem !== 'todos') ? subsystem.toLowerCase() : undefined;
-  const normalizedComponent = (component && component !== 'all' && component !== 'todos') ? component : undefined;
+  const client = sql();
+  const normalizedSubsystem = (subsystem && subsystem !== 'all' && subsystem !== 'todos') ? subsystem.toLowerCase() : null;
+  const normalizedComponent = (component && component !== 'all' && component !== 'todos') ? component : null;
+  const sem = (semester !== undefined && !isNaN(semester)) ? semester : null;
 
-  let query = `
+  return client`
     SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, 
            learning_outcome, activities, evidences, contenidos_formativos, subsystem, model_type, created_at
     FROM programs_catalog
-    WHERE 1=1
+    WHERE (${sem}::int IS NULL OR semester = ${sem})
+      AND (${normalizedComponent}::text IS NULL OR component = ${normalizedComponent})
+      AND (${normalizedSubsystem}::text IS NULL OR subsystem = ${normalizedSubsystem} OR subsystem = 'all' OR subsystem IS NULL)
+    ORDER BY semester ASC, component ASC, uac_name ASC
   `;
-  const params: any[] = [];
-
-  if (semester !== undefined && !isNaN(semester)) {
-    params.push(semester);
-    query += ` AND semester = $${params.length}`;
-  }
-
-  if (normalizedComponent !== undefined) {
-    params.push(normalizedComponent);
-    query += ` AND component = $${params.length}`;
-  }
-
-  if (normalizedSubsystem !== undefined) {
-    params.push(normalizedSubsystem);
-    query += ` AND (subsystem = $${params.length} OR subsystem = 'all' OR subsystem IS NULL)`;
-  }
-
-  query += ` ORDER BY semester ASC, component ASC, uac_name ASC`;
-
-  // Use raw query with neon sql helper
-  const client = sql();
-  return (client as any)(query, params);
 }
 
 export async function getProgramsCatalogForPaec(semesters: number[], subsystem?: string) {

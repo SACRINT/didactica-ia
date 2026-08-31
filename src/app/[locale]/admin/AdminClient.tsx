@@ -175,10 +175,12 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   // ── Curricula & Programs states ──
   const [curriculaPrograms, setCurriculaPrograms] = useState<ProgramItem[]>([]);
   const [curriculaLoading, setCurriculaLoading] = useState(false);
+  const [curriculaViewMode, setCurriculaViewMode] = useState<'malla' | 'tabla'>('malla');
   const [curriculaSubsystem, setCurriculaSubsystem] = useState('todos');
   const [curriculaSemester, setCurriculaSemester] = useState('todos');
   const [curriculaComponent, setCurriculaComponent] = useState('todos');
   const [curriculaSearch, setCurriculaSearch] = useState('');
+  const [selectedProgramDetail, setSelectedProgramDetail] = useState<ProgramItem | null>(null);
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [editingProgram, setEditingProgram] = useState<ProgramItem | null>(null);
   const [programForm, setProgramForm] = useState<{
@@ -267,11 +269,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const loadCurricula = useCallback(async () => {
     setCurriculaLoading(true);
     try {
-      let url = `/api/admin/programs?`;
-      if (curriculaSubsystem !== 'todos') url += `&subsystem=${curriculaSubsystem}`;
-      if (curriculaSemester !== 'todos') url += `&semester=${curriculaSemester}`;
-      if (curriculaComponent !== 'todos') url += `&component=${curriculaComponent}`;
-      const r = await fetch(url);
+      const r = await fetch('/api/admin/programs');
       const d = await r.json();
       setCurriculaPrograms(d.programs || []);
     } catch {
@@ -279,7 +277,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     } finally {
       setCurriculaLoading(false);
     }
-  }, [curriculaSubsystem, curriculaSemester, curriculaComponent]);
+  }, []);
 
   useEffect(() => {
     loadStats();
@@ -1747,31 +1745,31 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
               </div>
             </div>
 
-            {/* Tarjetas de Estadísticas Curriculares */}
-            <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 20 }}>
-              <div className="stat-card">
-                <div className="num">{curriculaPrograms.length}</div>
-                <div className="lbl">Total UACs en Catálogo</div>
+            {/* Tarjetas de Estadísticas Curriculares Globales */}
+            <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', marginBottom: 20 }}>
+              <div className="stat-card" style={{ background: 'linear-gradient(145deg, rgba(30,27,75,0.6), rgba(15,23,42,0.8))', border: '1px solid rgba(129,140,248,0.2)' }}>
+                <div className="num" style={{ color: '#818cf8' }}>{curriculaPrograms.length}</div>
+                <div className="lbl">Total UACs en Catálogo Oficial</div>
               </div>
-              <div className="stat-card">
+              <div className="stat-card" style={{ background: 'linear-gradient(145deg, rgba(6,78,59,0.4), rgba(15,23,42,0.8))', border: '1px solid rgba(16,185,129,0.2)' }}>
                 <div className="num" style={{ color: '#10b981' }}>
                   {curriculaPrograms.filter(p => p.model_type === 'propositos_contenidos' || p.semester < 5).length}
                 </div>
-                <div className="lbl">Propósitos y Contenidos (1°-4°)</div>
+                <div className="lbl">Propósitos y Contenidos (1.° a 4.°)</div>
               </div>
-              <div className="stat-card">
+              <div className="stat-card" style={{ background: 'linear-gradient(145deg, rgba(88,28,135,0.4), rgba(15,23,42,0.8))', border: '1px solid rgba(168,85,247,0.2)' }}>
                 <div className="num" style={{ color: '#a855f7' }}>
                   {curriculaPrograms.filter(p => p.model_type === 'progresiones' || p.semester >= 5).length}
                 </div>
-                <div className="lbl">Progresiones (5°-6° 26-27)</div>
+                <div className="lbl">Progresiones (5.° y 6.° Vigentes 26-27)</div>
               </div>
-              <div className="stat-card">
+              <div className="stat-card" style={{ background: 'linear-gradient(145deg, rgba(12,74,110,0.4), rgba(15,23,42,0.8))', border: '1px solid rgba(56,189,248,0.2)' }}>
                 <div className="num" style={{ color: '#38bdf8' }}>
                   {curriculaPrograms.filter(p => p.subsystem === 'bge' || p.subsystem === 'all' || !p.subsystem).length}
                 </div>
-                <div className="lbl">Bachillerato General (BGE)</div>
+                <div className="lbl">Bachillerato General Estatal (BGE)</div>
               </div>
-              <div className="stat-card">
+              <div className="stat-card" style={{ background: 'linear-gradient(145deg, rgba(120,53,15,0.4), rgba(15,23,42,0.8))', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <div className="num" style={{ color: '#f59e0b' }}>
                   {curriculaPrograms.filter(p => p.subsystem !== 'bge' && p.subsystem !== 'all' && p.subsystem).length}
                 </div>
@@ -1779,122 +1777,550 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
               </div>
             </div>
 
-            {/* Barra de Filtros */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-              <input
-                placeholder="🔍 Buscar por nombre de UAC o especialidad..."
-                value={curriculaSearch}
-                onChange={e => setCurriculaSearch(e.target.value)}
-                style={{ flex: '1 1 240px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
-              />
-              <select value={curriculaSubsystem} onChange={e => setCurriculaSubsystem(e.target.value)}
-                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
-                <option value="todos">Todos los Subsistemas</option>
-                <option value="bge">Bachillerato General Estatal (BGE)</option>
-                <option value="tecnologico">Bachillerato Tecnológico</option>
-                <option value="cbtis">CBTIS</option>
-                <option value="cbta">CBTA</option>
-                <option value="cecyte">CECyTE</option>
-                <option value="digital">Bachillerato Digital</option>
-                <option value="emsad">EMSAD</option>
-              </select>
-              <select value={curriculaSemester} onChange={e => setCurriculaSemester(e.target.value)}
-                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
-                <option value="todos">Todos los Semestres</option>
-                <option value="1">1.° Semestre</option>
-                <option value="2">2.° Semestre</option>
-                <option value="3">3.° Semestre</option>
-                <option value="4">4.° Semestre</option>
-                <option value="5">5.° Semestre</option>
-                <option value="6">6.° Semestre</option>
-              </select>
-              <select value={curriculaComponent} onChange={e => setCurriculaComponent(e.target.value)}
-                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
-                <option value="todos">Todos los Componentes</option>
-                <option value="fundamental">Currículum Fundamental</option>
-                <option value="laboral">Formación Laboral / Profesional</option>
-                <option value="ampliado">Currículum Ampliado</option>
-              </select>
+            {/* Selector de Modo de Vista y Filtros */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20, background: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                {/* Switcher Malla vs Tabla */}
+                <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.4)', padding: 4, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurriculaViewMode('malla')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: curriculaViewMode === 'malla' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                      color: curriculaViewMode === 'malla' ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}
+                  >
+                    <span>🗺️</span> Mapa Curricular Semestral
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurriculaViewMode('tabla')}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: curriculaViewMode === 'tabla' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent',
+                      color: curriculaViewMode === 'tabla' ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}
+                  >
+                    <span>📋</span> Catálogo y Listado Detallado
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 13, color: 'rgba(240,244,255,0.6)' }}>
+                  Mostrando <strong style={{ color: '#818cf8' }}>
+                    {curriculaPrograms.filter(p => {
+                      if (curriculaSubsystem !== 'todos' && p.subsystem !== curriculaSubsystem && p.subsystem !== 'all' && p.subsystem) return false;
+                      if (curriculaSemester !== 'todos' && p.semester !== parseInt(curriculaSemester, 10)) return false;
+                      if (curriculaComponent !== 'todos' && p.component !== curriculaComponent) return false;
+                      if (curriculaSearch.trim()) {
+                        const q = curriculaSearch.toLowerCase();
+                        const matchName = p.uac_name.toLowerCase().includes(q);
+                        const matchCurr = (p.curriculum_name || '').toLowerCase().includes(q);
+                        if (!matchName && !matchCurr) return false;
+                      }
+                      return true;
+                    }).length}
+                  </strong> de {curriculaPrograms.length} UACs
+                </div>
+              </div>
+
+              {/* Filtros */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  placeholder="🔍 Buscar por nombre de UAC o especialidad..."
+                  value={curriculaSearch}
+                  onChange={e => setCurriculaSearch(e.target.value)}
+                  style={{ flex: '1 1 240px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+                />
+                <select
+                  value={curriculaSubsystem}
+                  onChange={e => setCurriculaSubsystem(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+                >
+                  <option value="todos">Todos los Subsistemas</option>
+                  <option value="bge">Bachillerato General Estatal (BGE)</option>
+                  <option value="tecnologico">Bachillerato Tecnológico</option>
+                  <option value="cbtis">CBTIS</option>
+                  <option value="cbta">CBTA</option>
+                  <option value="cecyte">CECyTE</option>
+                  <option value="digital">Bachillerato Digital</option>
+                  <option value="emsad">EMSAD</option>
+                </select>
+                <select
+                  value={curriculaSemester}
+                  onChange={e => setCurriculaSemester(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+                >
+                  <option value="todos">Todos los Semestres</option>
+                  <option value="1">1.° Semestre</option>
+                  <option value="2">2.° Semestre</option>
+                  <option value="3">3.° Semestre</option>
+                  <option value="4">4.° Semestre</option>
+                  <option value="5">5.° Semestre</option>
+                  <option value="6">6.° Semestre</option>
+                </select>
+                <select
+                  value={curriculaComponent}
+                  onChange={e => setCurriculaComponent(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+                >
+                  <option value="todos">Todos los Componentes</option>
+                  <option value="fundamental">Currículum Fundamental</option>
+                  <option value="laboral">Formación Laboral / Profesional</option>
+                  <option value="ampliado">Currículum Ampliado</option>
+                  <option value="ffeo">Formación Extendida Obligatoria (FFEO)</option>
+                  <option value="ext_optativo">Formación Extendida Optativa</option>
+                </select>
+                {(curriculaSubsystem !== 'todos' || curriculaSemester !== 'todos' || curriculaComponent !== 'todos' || curriculaSearch.trim()) && (
+                  <button
+                    type="button"
+                    className="btn-sm btn-ghost"
+                    onClick={() => {
+                      setCurriculaSubsystem('todos');
+                      setCurriculaSemester('todos');
+                      setCurriculaComponent('todos');
+                      setCurriculaSearch('');
+                    }}
+                    style={{ fontSize: 12 }}
+                  >
+                    ✕ Limpiar Filtros
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Tabla de Programas */}
+            {/* CONTENIDO PRINCIPAL: VISTA MALLA vs VISTA TABLA */}
             {curriculaLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.6)' }}>Cargando catálogo curricular...</div>
+              <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.6)' }}>
+                <div style={{ fontSize: 24, marginBottom: 10 }}>⏳</div>
+                <div>Cargando catálogo curricular oficial...</div>
+              </div>
             ) : curriculaPrograms.length === 0 ? (
-              <div className="empty-state">
-                <p>No se encontraron UACs con los filtros seleccionados.</p>
-                <button className="btn-sm btn-primary" onClick={handleOpenNewProgramModal} style={{ marginTop: 10 }}>➕ Agregar Primer Programa</button>
+              <div className="empty-state" style={{ padding: 40, textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: 14 }}>
+                <p style={{ fontSize: 15 }}>No se encontraron programas de estudio en la base de datos.</p>
+                <button className="btn-sm btn-primary" onClick={handleOpenNewProgramModal} style={{ marginTop: 10 }}>
+                  ➕ Agregar Primer Programa
+                </button>
+              </div>
+            ) : curriculaViewMode === 'malla' ? (
+              /* ── VISTA 1: MALLA CURRICULAR INTERACTIVA (MAPA SEMESTRAL 1.° A 6.°) ── */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
+                {[1, 2, 3, 4, 5, 6]
+                  .filter(sem => curriculaSemester === 'todos' || sem === parseInt(curriculaSemester, 10))
+                  .map(sem => {
+                    const semPrograms = curriculaPrograms.filter(p => {
+                      if (p.semester !== sem) return false;
+                      if (curriculaSubsystem !== 'todos' && p.subsystem !== curriculaSubsystem && p.subsystem !== 'all' && p.subsystem) return false;
+                      if (curriculaComponent !== 'todos' && p.component !== curriculaComponent) return false;
+                      if (curriculaSearch.trim()) {
+                        const q = curriculaSearch.toLowerCase();
+                        const matchName = p.uac_name.toLowerCase().includes(q);
+                        const matchCurr = (p.curriculum_name || '').toLowerCase().includes(q);
+                        if (!matchName && !matchCurr) return false;
+                      }
+                      return true;
+                    });
+
+                    const totalSemHours = semPrograms.reduce((acc, p) => acc + (p.total_hours || 0), 0);
+                    const weeklySemHours = semPrograms.reduce((acc, p) => acc + Math.round((p.total_hours || 54) / 18), 0);
+                    const isProgresionesModel = sem >= 5;
+
+                    return (
+                      <div
+                        key={sem}
+                        style={{
+                          background: 'rgba(15,23,42,0.7)',
+                          border: sem <= 4 ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(168,85,247,0.3)',
+                          borderRadius: 14,
+                          padding: 16,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                        }}
+                      >
+                        {/* Cabecera del Semestre */}
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <h3 style={{ margin: 0, fontSize: 16, color: '#f0f4ff', fontWeight: 700 }}>
+                              {sem}.° Semestre
+                            </h3>
+                            <span
+                              className={`badge ${isProgresionesModel ? 'badge-purple' : 'badge-green'}`}
+                              style={{ fontSize: 10, textTransform: 'uppercase' }}
+                            >
+                              {isProgresionesModel ? '🟣 Progresiones (26-27)' : '🟢 Propósitos y Contenidos'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                            <span>{semPrograms.length} asignaturas</span>
+                            <span>{weeklySemHours} h/sem · {totalSemHours} hrs total</span>
+                          </div>
+                        </div>
+
+                        {/* Tarjetas de Asignaturas del Semestre */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {semPrograms.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '24px 10px', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                              Sin UACs con los filtros actuales
+                            </div>
+                          ) : (
+                            semPrograms.map(p => {
+                              const weeklyLoad = Math.round((p.total_hours || 54) / 18);
+                              const compColor =
+                                p.component === 'laboral' ? '#f59e0b' :
+                                p.component === 'ampliado' ? '#10b981' :
+                                p.component === 'ffeo' ? '#ec4899' :
+                                p.component === 'ext_optativo' ? '#8b5cf6' : '#3b82f6';
+
+                              return (
+                                <div
+                                  key={p.id}
+                                  onClick={() => setSelectedProgramDetail(p)}
+                                  style={{
+                                    background: 'rgba(30,41,59,0.7)',
+                                    borderLeft: `4px solid ${compColor}`,
+                                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                                    borderRight: '1px solid rgba(255,255,255,0.06)',
+                                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                                    borderRadius: 8,
+                                    padding: '12px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 6
+                                  }}
+                                  onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)', e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)')}
+                                  onMouseLeave={e => (e.currentTarget.style.transform = 'none', e.currentTarget.style.boxShadow = 'none')}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                    <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: 13, lineHeight: 1.3 }}>
+                                      {p.uac_name}
+                                    </div>
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        background: 'rgba(255,255,255,0.08)',
+                                        color: '#cbd5e1',
+                                        padding: '2px 6px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      {weeklyLoad} h/sem
+                                    </span>
+                                  </div>
+
+                                  {p.curriculum_name && (
+                                    <div style={{ fontSize: 11, color: '#a5b4fc' }}>
+                                      {p.curriculum_name}
+                                    </div>
+                                  )}
+
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, fontSize: 11 }}>
+                                    <span style={{ color: compColor, fontWeight: 500 }}>
+                                      {p.component === 'laboral' ? '💼 Laboral' :
+                                       p.component === 'ampliado' ? '🌱 Ampliado' :
+                                       p.component === 'ffeo' ? '⭐ FFEO' :
+                                       p.component === 'ext_optativo' ? '🎯 Optativa' : '📘 Fundamental'}
+                                    </span>
+                                    <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
+                                      {p.contenidos_formativos?.length || p.activities?.length || 0} {isProgresionesModel ? 'progresiones' : 'propósitos'}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>UAC / Asignatura</th>
-                    <th>Subsistema</th>
-                    <th>Sem.</th>
-                    <th>Componente</th>
-                    <th>Carga Horaria</th>
-                    <th>Modelo Pedagógico</th>
-                    <th style={{ textAlign: 'right' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {curriculaPrograms
-                    .filter(p => {
-                      if (!curriculaSearch.trim()) return true;
-                      const q = curriculaSearch.toLowerCase();
-                      return p.uac_name.toLowerCase().includes(q) || (p.curriculum_name || '').toLowerCase().includes(q);
-                    })
-                    .map(p => {
-                      const isProgresiones = p.model_type === 'progresiones' || p.semester >= 5;
-                      const weeklyLoad = Math.round((p.total_hours || 54) / 18);
-                      return (
-                        <tr key={p.id}>
-                          <td>
-                            <div style={{ fontWeight: 600, color: '#f0f4ff' }}>{p.uac_name}</div>
-                            {p.curriculum_name && (
-                              <div style={{ fontSize: 11, color: '#818cf8', marginTop: 2 }}>{p.curriculum_name}</div>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`badge ${p.subsystem === 'tecnologico' || p.subsystem === 'cecyte' || p.subsystem === 'cbtis' ? 'badge-purple' : 'badge-blue'}`} style={{ textTransform: 'uppercase', fontSize: 11 }}>
-                              {p.subsystem || 'BGE'}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: 700, textAlign: 'center' }}>{p.semester}°</td>
-                          <td>
-                            <span className="badge" style={{ background: p.component === 'laboral' ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(168,85,247,0.15)' : 'rgba(59,130,246,0.15)', color: p.component === 'laboral' ? '#fbbf24' : p.component === 'ampliado' ? '#c084fc' : '#60a5fa', fontSize: 11 }}>
-                              {p.component === 'laboral' ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : 'Fundamental'}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ fontSize: 12 }}>{p.total_hours} hrs ({weeklyLoad} h/sem)</div>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{weeklyLoad * 6} hrs / corte</div>
-                          </td>
-                          <td>
-                            {isProgresiones ? (
-                              <span className="badge badge-purple" style={{ fontSize: 10 }}>
-                                🟣 Progresiones (26-27)
+              /* ── VISTA 2: TABLA Y LISTADO DETALLADO ── */
+              <div style={{ overflowX: 'auto', background: 'rgba(15,23,42,0.6)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <table className="admin-table" style={{ margin: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>UAC / Asignatura Oficial</th>
+                      <th>Subsistema</th>
+                      <th style={{ textAlign: 'center' }}>Sem.</th>
+                      <th>Componente</th>
+                      <th>Carga Horaria</th>
+                      <th>Modelo Pedagógico</th>
+                      <th>Estructura Registrada</th>
+                      <th style={{ textAlign: 'right' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {curriculaPrograms
+                      .filter(p => {
+                        if (curriculaSubsystem !== 'todos' && p.subsystem !== curriculaSubsystem && p.subsystem !== 'all' && p.subsystem) return false;
+                        if (curriculaSemester !== 'todos' && p.semester !== parseInt(curriculaSemester, 10)) return false;
+                        if (curriculaComponent !== 'todos' && p.component !== curriculaComponent) return false;
+                        if (curriculaSearch.trim()) {
+                          const q = curriculaSearch.toLowerCase();
+                          const matchName = p.uac_name.toLowerCase().includes(q);
+                          const matchCurr = (p.curriculum_name || '').toLowerCase().includes(q);
+                          if (!matchName && !matchCurr) return false;
+                        }
+                        return true;
+                      })
+                      .map(p => {
+                        const isProgresiones = p.model_type === 'progresiones' || p.semester >= 5;
+                        const weeklyLoad = Math.round((p.total_hours || 54) / 18);
+                        return (
+                          <tr key={p.id}>
+                            <td>
+                              <div
+                                style={{ fontWeight: 600, color: '#f0f4ff', cursor: 'pointer' }}
+                                onClick={() => setSelectedProgramDetail(p)}
+                              >
+                                {p.uac_name}
+                              </div>
+                              {p.curriculum_name && (
+                                <div style={{ fontSize: 11, color: '#818cf8', marginTop: 2 }}>{p.curriculum_name}</div>
+                              )}
+                            </td>
+                            <td>
+                              <span className={`badge ${p.subsystem === 'tecnologico' || p.subsystem === 'cecyte' || p.subsystem === 'cbtis' ? 'badge-purple' : 'badge-blue'}`} style={{ textTransform: 'uppercase', fontSize: 11 }}>
+                                {p.subsystem || 'BGE'}
                               </span>
-                            ) : (
-                              <span className="badge badge-green" style={{ fontSize: 10 }}>
-                                🟢 Propósitos y Contenidos
+                            </td>
+                            <td style={{ fontWeight: 700, textAlign: 'center' }}>{p.semester}°</td>
+                            <td>
+                              <span className="badge" style={{ background: p.component === 'laboral' ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(168,85,247,0.15)' : 'rgba(59,130,246,0.15)', color: p.component === 'laboral' ? '#fbbf24' : p.component === 'ampliado' ? '#c084fc' : '#60a5fa', fontSize: 11 }}>
+                                {p.component === 'laboral' ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : p.component === 'ffeo' ? 'FFEO' : p.component === 'ext_optativo' ? 'Optativo' : 'Fundamental'}
                               </span>
+                            </td>
+                            <td>
+                              <div style={{ fontSize: 12 }}>{p.total_hours} hrs ({weeklyLoad} h/sem)</div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{weeklyLoad * 6} hrs / corte</div>
+                            </td>
+                            <td>
+                              {isProgresiones ? (
+                                <span className="badge badge-purple" style={{ fontSize: 10 }}>
+                                  🟣 Progresiones (26-27)
+                                </span>
+                              ) : (
+                                <span className="badge badge-green" style={{ fontSize: 10 }}>
+                                  🟢 Propósitos y Contenidos
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                              <div>{p.activities?.length || 0} {isProgresiones ? 'progresiones' : 'propósitos'}</div>
+                              {p.contenidos_formativos && p.contenidos_formativos.length > 0 && (
+                                <div style={{ fontSize: 10, color: '#10b981' }}>✓ {p.contenidos_formativos.reduce((acc, c) => acc + (c.contenidos?.length || 0), 0)} contenidos temáticos</div>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              <button className="btn-sm btn-ghost" onClick={() => setSelectedProgramDetail(p)} title="Ver Programa Completo" style={{ marginRight: 6 }}>
+                                👁️ Ver
+                              </button>
+                              <button className="btn-sm btn-ghost" onClick={() => handleOpenEditProgramModal(p)} title="Editar / Reemplazar Programa" style={{ marginRight: 6 }}>
+                                ✏️
+                              </button>
+                              <button className="btn-sm btn-danger" onClick={() => handleDeleteProgram(p.id, p.uac_name)} title="Eliminar UAC">
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Modal: Inspector de Programa Oficial Completo */}
+            {selectedProgramDetail && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 840, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 70px rgba(0,0,0,0.8)' }}>
+                  {/* Header del Modal */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 14 }}>
+                    <div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                        <span className="badge badge-blue" style={{ textTransform: 'uppercase', fontSize: 11 }}>
+                          {selectedProgramDetail.subsystem || 'BGE'}
+                        </span>
+                        <span className="badge" style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', fontSize: 11 }}>
+                          {selectedProgramDetail.semester}.° Semestre
+                        </span>
+                        <span className="badge" style={{ background: 'rgba(255,255,255,0.1)', color: '#e2e8f0', fontSize: 11 }}>
+                          {selectedProgramDetail.component === 'laboral' ? 'Formación Laboral' :
+                           selectedProgramDetail.component === 'ampliado' ? 'Currículum Ampliado' :
+                           selectedProgramDetail.component === 'ffeo' ? 'FFEO' :
+                           selectedProgramDetail.component === 'ext_optativo' ? 'Optativa' : 'Currículum Fundamental'}
+                        </span>
+                        <span className="badge" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', fontSize: 11 }}>
+                          {selectedProgramDetail.total_hours} hrs ({Math.round((selectedProgramDetail.total_hours || 54) / 18)} h/sem)
+                        </span>
+                      </div>
+                      <h2 style={{ margin: 0, color: '#f8fafc', fontSize: 20, fontWeight: 700 }}>
+                        {selectedProgramDetail.uac_name}
+                      </h2>
+                      {selectedProgramDetail.curriculum_name && (
+                        <div style={{ fontSize: 13, color: '#818cf8', marginTop: 3 }}>
+                          {selectedProgramDetail.curriculum_name}
+                        </div>
+                      )}
+                    </div>
+                    <button className="btn-sm btn-ghost" onClick={() => setSelectedProgramDetail(null)} style={{ fontSize: 14 }}>
+                      ✕ Cerrar
+                    </button>
+                  </div>
+
+                  {/* Banner del Modelo Pedagógico */}
+                  <div style={{ background: selectedProgramDetail.semester >= 5 ? 'rgba(168,85,247,0.12)' : 'rgba(16,185,129,0.12)', border: selectedProgramDetail.semester >= 5 ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>{selectedProgramDetail.semester >= 5 ? '🟣' : '🟢'}</span>
+                    <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                      <strong>{selectedProgramDetail.semester >= 5 ? 'Modelo de Transición (Progresiones de Aprendizaje)' : 'Modelo Oficial Actualizado (Propósitos y Contenidos Formativos)'}</strong>:
+                      {selectedProgramDetail.semester >= 5
+                        ? ' Vigente durante el ciclo escolar 2026-2027 para 5.° y 6.° semestre.'
+                        : ' Vigente para el ciclo 2025-2028 estructurado con propósitos formativos y temario oficial.'}
+                    </div>
+                  </div>
+
+                  {/* Meta Educativa / Intencionalidad */}
+                  {selectedProgramDetail.learning_outcome && (
+                    <div style={{ marginBottom: 18, background: 'rgba(255,255,255,0.03)', padding: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <h4 style={{ margin: '0 0 8px', color: '#93c5fd', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        🎯 Meta Educativa / Intencionalidad Formativa
+                      </h4>
+                      <p style={{ margin: 0, fontSize: 13, color: 'rgba(240,244,255,0.85)', lineHeight: 1.6 }}>
+                        {selectedProgramDetail.learning_outcome}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Propósitos Formativos y Contenidos Temáticos */}
+                  <div style={{ marginBottom: 18 }}>
+                    <h4 style={{ margin: '0 0 10px', color: '#a5b4fc', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      📋 {selectedProgramDetail.semester >= 5 ? 'Progresiones de Aprendizaje' : 'Propósitos Formativos y Contenidos de Estudio'}
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(selectedProgramDetail.activities || []).map((act, idx) => {
+                        const matchingCf = (selectedProgramDetail.contenidos_formativos || [])[idx];
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: 10,
+                              padding: 14
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                              <span style={{ fontWeight: 700, color: '#818cf8', fontSize: 13 }}>
+                                #{idx + 1} · {act.name || `Propósito Formativo ${idx + 1}`}
+                              </span>
+                              <span className="badge badge-blue" style={{ fontSize: 10 }}>
+                                {act.hours || 18} horas
+                              </span>
+                            </div>
+
+                            {/* Contenidos Temáticos Específicos */}
+                            {matchingCf && matchingCf.contenidos && matchingCf.contenidos.length > 0 && (
+                              <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: '2px solid rgba(129,140,248,0.3)' }}>
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
+                                  Contenidos y temas oficiales:
+                                </div>
+                                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+                                  {matchingCf.contenidos.map((tema, tIdx) => (
+                                    <li key={tIdx}>{tema}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
-                          </td>
-                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <button className="btn-sm btn-ghost" onClick={() => handleOpenEditProgramModal(p)} title="Editar / Reemplazar Programa" style={{ marginRight: 6 }}>
-                              ✏️ Editar
-                            </button>
-                            <button className="btn-sm btn-danger" onClick={() => handleDeleteProgram(p.id, p.uac_name)} title="Eliminar UAC">
-                              🗑️
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Evidencias de Aprendizaje */}
+                  {selectedProgramDetail.evidences && selectedProgramDetail.evidences.length > 0 && (
+                    <div style={{ marginBottom: 20, background: 'rgba(255,255,255,0.02)', padding: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <h4 style={{ margin: '0 0 8px', color: '#fcd34d', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        📝 Evidencias y Productos Sugeridos
+                      </h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {selectedProgramDetail.evidences.map((ev, evIdx) => (
+                          <span
+                            key={evIdx}
+                            style={{
+                              background: 'rgba(245,158,11,0.1)',
+                              border: '1px solid rgba(245,158,11,0.3)',
+                              color: '#fbbf24',
+                              padding: '4px 10px',
+                              borderRadius: 6,
+                              fontSize: 12
+                            }}
+                          >
+                            ✓ {ev}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer de Acciones del Inspector */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 14, flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn-sm btn-primary"
+                        onClick={() => {
+                          const p = selectedProgramDetail;
+                          setSelectedProgramDetail(null);
+                          handleOpenEditProgramModal(p);
+                        }}
+                      >
+                        ✏️ Editar / Reemplazar Programa
+                      </button>
+                      <button
+                        className="btn-sm btn-ghost"
+                        onClick={() => {
+                          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(selectedProgramDetail, null, 2));
+                          const downloadAnchor = document.createElement('a');
+                          downloadAnchor.setAttribute("href", dataStr);
+                          downloadAnchor.setAttribute("download", `programa_${selectedProgramDetail.uac_name.replace(/\s+/g, '_').toLowerCase()}.json`);
+                          document.body.appendChild(downloadAnchor);
+                          downloadAnchor.click();
+                          downloadAnchor.remove();
+                        }}
+                      >
+                        📥 Descargar JSON
+                      </button>
+                    </div>
+                    <button className="btn-sm btn-ghost" onClick={() => setSelectedProgramDetail(null)}>
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Modal: Crear / Editar UAC Manualmente */}
