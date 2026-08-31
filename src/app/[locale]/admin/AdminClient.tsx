@@ -212,6 +212,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
 
   // Extract PDF Modal
   const [showExtractModal, setShowExtractModal] = useState(false);
+  const [extractTargetProgram, setExtractTargetProgram] = useState<ProgramItem | null>(null);
   const [extractPdfFile, setExtractPdfFile] = useState<File | null>(null);
   const [extractSubsystem, setExtractSubsystem] = useState('bge');
   const [extractSemester, setExtractSemester] = useState(1);
@@ -377,6 +378,16 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     }
   }
 
+  function handleOpenReplaceProgramModal(p: ProgramItem) {
+    setExtractTargetProgram(p);
+    setExtractSubsystem(p.subsystem || 'bge');
+    setExtractSemester(p.semester || 1);
+    setExtractComponent(p.component || 'fundamental');
+    setExtractPdfFile(null);
+    setExtractedPreview(null);
+    setShowExtractModal(true);
+  }
+
   async function handleExtractPdfSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!extractPdfFile) return showMsg('Selecciona un archivo PDF', false);
@@ -395,8 +406,13 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
       });
       const d = await r.json();
       if (r.ok && d.extracted) {
+        // If we are replacing an existing program, preserve its ID and target name
+        if (extractTargetProgram) {
+          d.extracted.id = extractTargetProgram.id;
+          d.extracted.uac_name = extractTargetProgram.uac_name;
+        }
         setExtractedPreview(d.extracted);
-        showMsg('PDF analizado y estructurado con IA ✓ Revisa la vista previa y confirma el guardado.');
+        showMsg('PDF analizado y estructurado con IA ✓ Revisa la vista previa y confirma el reemplazo.');
       } else {
         showMsg(d.error || 'No se pudo extraer la información del PDF', false);
       }
@@ -411,18 +427,25 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     if (!extractedPreview) return;
     setSaving(true);
     try {
+      const isReplacing = !!extractTargetProgram;
+      const method = isReplacing ? 'PUT' : 'POST';
+      const payload = isReplacing
+        ? { ...extractedPreview, id: extractTargetProgram.id, uac_name: extractTargetProgram.uac_name }
+        : extractedPreview;
+
       const r = await fetch('/api/admin/programs', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(extractedPreview),
+        body: JSON.stringify(payload),
       });
       const d = await r.json();
       if (r.ok) {
         setShowExtractModal(false);
         setExtractedPreview(null);
         setExtractPdfFile(null);
+        setExtractTargetProgram(null);
         loadCurricula();
-        showMsg('¡Programa oficial guardado/reemplazado exitosamente en el catálogo! ✓');
+        showMsg(isReplacing ? `¡Programa "${payload.uac_name}" actualizado y reemplazado con el nuevo PDF! ✓` : '¡Programa oficial guardado exitosamente en el catálogo! ✓');
       } else {
         showMsg(d.error || 'Error al guardar el programa extraído', false);
       }
@@ -1994,27 +2017,56 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                               return (
                                 <div
                                   key={p.id}
-                                  onClick={() => setSelectedProgramDetail(p)}
                                   style={{
                                     background: 'rgba(30,41,59,0.7)',
                                     borderLeft: `4px solid ${compColor}`,
-                                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                                    borderRight: '1px solid rgba(255,255,255,0.06)',
-                                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                                    borderRadius: 8,
+                                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                                    borderRight: '1px solid rgba(255,255,255,0.08)',
+                                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: 10,
                                     padding: '12px',
-                                    cursor: 'pointer',
                                     transition: 'all 0.2s ease',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: 6
+                                    gap: 8,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                                   }}
                                   onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)', e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)')}
-                                  onMouseLeave={e => (e.currentTarget.style.transform = 'none', e.currentTarget.style.boxShadow = 'none')}
+                                  onMouseLeave={e => (e.currentTarget.style.transform = 'none', e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)')}
                                 >
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                    <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: 13, lineHeight: 1.3 }}>
-                                      {p.uac_name}
+                                  {/* Encabezado: Badge de Subsistema, Componente y Horas */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <span
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 800,
+                                          background: p.subsystem === 'bge' ? 'rgba(59,130,246,0.2)' : 'rgba(168,85,247,0.2)',
+                                          color: p.subsystem === 'bge' ? '#93c5fd' : '#d8b4fe',
+                                          border: `1px solid ${p.subsystem === 'bge' ? 'rgba(59,130,246,0.4)' : 'rgba(168,85,247,0.4)'}`,
+                                          padding: '1px 6px',
+                                          borderRadius: 4,
+                                          textTransform: 'uppercase'
+                                        }}
+                                      >
+                                        {p.subsystem || 'BGE'}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 600,
+                                          color: compColor,
+                                          background: `${compColor}15`,
+                                          border: `1px solid ${compColor}40`,
+                                          padding: '1px 6px',
+                                          borderRadius: 4
+                                        }}
+                                      >
+                                        {p.component === 'laboral' ? '💼 Laboral' :
+                                         p.component === 'ampliado' ? '🌱 Ampliado' :
+                                         p.component === 'ffeo' ? '⭐ FFEO' :
+                                         p.component === 'ext_optativo' ? '🎯 Optativa' : '📘 Fundamental'}
+                                      </span>
                                     </div>
                                     <span
                                       style={{
@@ -2027,26 +2079,81 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                                         whiteSpace: 'nowrap'
                                       }}
                                     >
-                                      {weeklyLoad} h/sem
+                                      {weeklyLoad} h/sem · {p.total_hours || 54}h
                                     </span>
                                   </div>
 
-                                  {p.curriculum_name && (
-                                    <div style={{ fontSize: 11, color: '#a5b4fc' }}>
-                                      {p.curriculum_name}
+                                  {/* Nombre de la UAC y Especialidad */}
+                                  <div>
+                                    <div
+                                      onClick={() => setSelectedProgramDetail(p)}
+                                      style={{ fontWeight: 700, color: '#f8fafc', fontSize: 13, lineHeight: 1.35, cursor: 'pointer' }}
+                                      title="Hacer clic para ver el programa oficial completo"
+                                    >
+                                      {p.uac_name}
                                     </div>
-                                  )}
+                                    {p.curriculum_name && (
+                                      <div style={{ fontSize: 11, color: '#a5b4fc', marginTop: 2, fontWeight: 500 }}>
+                                        {p.curriculum_name}
+                                      </div>
+                                    )}
+                                  </div>
 
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, fontSize: 11 }}>
-                                    <span style={{ color: compColor, fontWeight: 500 }}>
-                                      {p.component === 'laboral' ? '💼 Laboral' :
-                                       p.component === 'ampliado' ? '🌱 Ampliado' :
-                                       p.component === 'ffeo' ? '⭐ FFEO' :
-                                       p.component === 'ext_optativo' ? '🎯 Optativa' : '📘 Fundamental'}
-                                    </span>
-                                    <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
-                                      {p.contenidos_formativos?.length || p.activities?.length || 0} {isProgresionesModel ? 'progresiones' : 'propósitos'}
-                                    </span>
+                                  {/* Estructura Pedagógica Registrada */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>
+                                    {p.component === 'laboral' ? (
+                                      <span style={{ color: '#fbbf24', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        💼 3 Actividades Clave (18h c/u)
+                                      </span>
+                                    ) : isProgresionesModel ? (
+                                      <span style={{ color: '#c084fc', fontSize: 10, fontWeight: 600 }}>
+                                        🟣 {p.activities?.length || 0} Progresiones
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: '#34d399', fontSize: 10, fontWeight: 600 }}>
+                                        🟢 {p.activities?.length || 0} Propósitos {p.contenidos_formativos && p.contenidos_formativos.length > 0 ? `· ${p.contenidos_formativos.reduce((acc, c) => acc + (c.contenidos?.length || 0), 0)} temas` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Botones de Acción Directa en la Tarjeta (CRUD y Reemplazo) */}
+                                  <div style={{ display: 'flex', gap: 4, justifyContent: 'space-between', alignItems: 'center', marginTop: 2, background: 'rgba(0,0,0,0.3)', padding: '4px 6px', borderRadius: 6 }}>
+                                    <button
+                                      type="button"
+                                      className="btn-sm btn-ghost"
+                                      onClick={(e) => { e.stopPropagation(); setSelectedProgramDetail(p); }}
+                                      title="Ver / Inspeccionar Programa Oficial"
+                                      style={{ padding: '3px 8px', fontSize: 11, color: '#93c5fd' }}
+                                    >
+                                      👁️ Ver
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-sm btn-ghost"
+                                      onClick={(e) => { e.stopPropagation(); handleOpenEditProgramModal(p); }}
+                                      title="Editar Datos de la UAC"
+                                      style={{ padding: '3px 8px', fontSize: 11, color: '#fcd34d' }}
+                                    >
+                                      ✏️ Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-sm btn-ghost"
+                                      onClick={(e) => { e.stopPropagation(); handleOpenReplaceProgramModal(p); }}
+                                      title="Reemplazar Programa con nuevo PDF (IA)"
+                                      style={{ padding: '3px 8px', fontSize: 11, color: '#a7f3d0' }}
+                                    >
+                                      📄 Reemplazar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-sm btn-danger"
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteProgram(p.id, p.uac_name); }}
+                                      title="Eliminar UAC del Catálogo"
+                                      style={{ padding: '3px 8px', fontSize: 11 }}
+                                    >
+                                      🗑️
+                                    </button>
                                   </div>
                                 </div>
                               );
@@ -2088,7 +2195,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         return true;
                       })
                       .map(p => {
-                        const isProgresiones = p.model_type === 'progresiones' || p.semester >= 5;
+                        const isProgresiones = p.model_type === 'progresiones' || (p.semester >= 5 && p.component !== 'laboral');
+                        const isLaboral = p.component === 'laboral';
                         const weeklyLoad = Math.round((p.total_hours || 54) / 18);
                         return (
                           <tr key={p.id}>
@@ -2110,8 +2218,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                             </td>
                             <td style={{ fontWeight: 700, textAlign: 'center' }}>{p.semester}°</td>
                             <td>
-                              <span className="badge" style={{ background: p.component === 'laboral' ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(168,85,247,0.15)' : 'rgba(59,130,246,0.15)', color: p.component === 'laboral' ? '#fbbf24' : p.component === 'ampliado' ? '#c084fc' : '#60a5fa', fontSize: 11 }}>
-                                {p.component === 'laboral' ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : p.component === 'ffeo' ? 'FFEO' : p.component === 'ext_optativo' ? 'Optativo' : 'Fundamental'}
+                              <span className="badge" style={{ background: isLaboral ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(16,185,129,0.15)' : p.component === 'ffeo' ? 'rgba(236,72,153,0.15)' : p.component === 'ext_optativo' ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)', color: isLaboral ? '#fbbf24' : p.component === 'ampliado' ? '#34d399' : p.component === 'ffeo' ? '#f472b6' : p.component === 'ext_optativo' ? '#a78bfa' : '#60a5fa', fontSize: 11 }}>
+                                {isLaboral ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : p.component === 'ffeo' ? 'FFEO' : p.component === 'ext_optativo' ? 'Optativo' : 'Fundamental'}
                               </span>
                             </td>
                             <td>
@@ -2119,7 +2227,11 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{weeklyLoad * 6} hrs / corte</div>
                             </td>
                             <td>
-                              {isProgresiones ? (
+                              {isLaboral ? (
+                                <span className="badge" style={{ background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)', fontSize: 10 }}>
+                                  💼 3 Actividades Clave
+                                </span>
+                              ) : isProgresiones ? (
                                 <span className="badge badge-purple" style={{ fontSize: 10 }}>
                                   🟣 Progresiones (26-27)
                                 </span>
@@ -2130,17 +2242,31 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                               )}
                             </td>
                             <td style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                              <div>{p.activities?.length || 0} {isProgresiones ? 'progresiones' : 'propósitos'}</div>
-                              {p.contenidos_formativos && p.contenidos_formativos.length > 0 && (
-                                <div style={{ fontSize: 10, color: '#10b981' }}>✓ {p.contenidos_formativos.reduce((acc, c) => acc + (c.contenidos?.length || 0), 0)} contenidos temáticos</div>
+                              {isLaboral ? (
+                                <div>
+                                  <div style={{ color: '#fbbf24', fontWeight: 600 }}>3 Actividades Clave (18h c/u)</div>
+                                  {p.contenidos_formativos && p.contenidos_formativos.length > 0 && (
+                                    <div style={{ fontSize: 10, color: '#10b981' }}>✓ {p.contenidos_formativos.reduce((acc, c) => acc + (c.contenidos?.length || 0), 0)} contenidos de desempeño</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  <div>{p.activities?.length || 0} {isProgresiones ? 'progresiones' : 'propósitos'}</div>
+                                  {p.contenidos_formativos && p.contenidos_formativos.length > 0 && (
+                                    <div style={{ fontSize: 10, color: '#10b981' }}>✓ {p.contenidos_formativos.reduce((acc, c) => acc + (c.contenidos?.length || 0), 0)} contenidos temáticos</div>
+                                  )}
+                                </div>
                               )}
                             </td>
                             <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                              <button className="btn-sm btn-ghost" onClick={() => setSelectedProgramDetail(p)} title="Ver Programa Completo" style={{ marginRight: 6 }}>
+                              <button className="btn-sm btn-ghost" onClick={() => setSelectedProgramDetail(p)} title="Ver Programa Completo" style={{ marginRight: 4, fontSize: 11 }}>
                                 👁️ Ver
                               </button>
-                              <button className="btn-sm btn-ghost" onClick={() => handleOpenEditProgramModal(p)} title="Editar / Reemplazar Programa" style={{ marginRight: 6 }}>
+                              <button className="btn-sm btn-ghost" onClick={() => handleOpenEditProgramModal(p)} title="Editar UAC" style={{ marginRight: 4, fontSize: 11 }}>
                                 ✏️
+                              </button>
+                              <button className="btn-sm btn-ghost" onClick={() => handleOpenReplaceProgramModal(p)} title="Reemplazar Programa con PDF (IA)" style={{ marginRight: 4, fontSize: 11, color: '#a7f3d0' }}>
+                                📄 Reemplazar
                               </button>
                               <button className="btn-sm btn-danger" onClick={() => handleDeleteProgram(p.id, p.uac_name)} title="Eliminar UAC">
                                 🗑️
@@ -2169,10 +2295,10 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                           {selectedProgramDetail.semester}.° Semestre
                         </span>
                         <span className="badge" style={{ background: 'rgba(255,255,255,0.1)', color: '#e2e8f0', fontSize: 11 }}>
-                          {selectedProgramDetail.component === 'laboral' ? 'Formación Laboral' :
-                           selectedProgramDetail.component === 'ampliado' ? 'Currículum Ampliado' :
-                           selectedProgramDetail.component === 'ffeo' ? 'FFEO' :
-                           selectedProgramDetail.component === 'ext_optativo' ? 'Optativa' : 'Currículum Fundamental'}
+                          {selectedProgramDetail.component === 'laboral' ? '💼 Formación Laboral (Capacitación)' :
+                           selectedProgramDetail.component === 'ampliado' ? '🌱 Currículum Ampliado (Socioemocional)' :
+                           selectedProgramDetail.component === 'ffeo' ? '⭐ FFEO' :
+                           selectedProgramDetail.component === 'ext_optativo' ? '🎯 Optativa / FFE' : '📘 Currículum Fundamental'}
                         </span>
                         <span className="badge" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', fontSize: 11 }}>
                           {selectedProgramDetail.total_hours} hrs ({Math.round((selectedProgramDetail.total_hours || 54) / 18)} h/sem)
@@ -2182,8 +2308,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         {selectedProgramDetail.uac_name}
                       </h2>
                       {selectedProgramDetail.curriculum_name && (
-                        <div style={{ fontSize: 13, color: '#818cf8', marginTop: 3 }}>
-                          {selectedProgramDetail.curriculum_name}
+                        <div style={{ fontSize: 13, color: '#818cf8', marginTop: 3, fontWeight: 500 }}>
+                          Capacitación / Especialidad: {selectedProgramDetail.curriculum_name}
                         </div>
                       )}
                     </div>
@@ -2193,15 +2319,35 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                   </div>
 
                   {/* Banner del Modelo Pedagógico */}
-                  <div style={{ background: selectedProgramDetail.semester >= 5 ? 'rgba(168,85,247,0.12)' : 'rgba(16,185,129,0.12)', border: selectedProgramDetail.semester >= 5 ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>{selectedProgramDetail.semester >= 5 ? '🟣' : '🟢'}</span>
-                    <div style={{ fontSize: 12, lineHeight: 1.4 }}>
-                      <strong>{selectedProgramDetail.semester >= 5 ? 'Modelo de Transición (Progresiones de Aprendizaje)' : 'Modelo Oficial Actualizado (Propósitos y Contenidos Formativos)'}</strong>:
-                      {selectedProgramDetail.semester >= 5
-                        ? ' Vigente durante el ciclo escolar 2026-2027 para 5.° y 6.° semestre.'
-                        : ' Vigente para el ciclo 2025-2028 estructurado con propósitos formativos y temario oficial.'}
+                  {selectedProgramDetail.component === 'laboral' ? (
+                    <div style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>💼</span>
+                      <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                        <strong>Formación Laboral (Capacitación para el Trabajo)</strong>: Desarrollada mediante <strong>estrictamente 3 Actividades Clave</strong> (1 por cada corte de evaluación / parcial, 18 horas cada una).
+                      </div>
                     </div>
-                  </div>
+                  ) : selectedProgramDetail.component === 'ampliado' ? (
+                    <div style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>🌱</span>
+                      <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                        <strong>Currículum Ampliado (Formación Socioemocional / PAEC)</strong>: Recursos socioemocionales, ámbitos de bienestar y proyectos de práctica ciudadana.
+                      </div>
+                    </div>
+                  ) : selectedProgramDetail.semester >= 5 ? (
+                    <div style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>🟣</span>
+                      <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                        <strong>Modelo de Transición (Progresiones de Aprendizaje)</strong>: Vigente durante el ciclo escolar 2026-2027 para 5.° y 6.° semestre.
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>🟢</span>
+                      <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                        <strong>Modelo Oficial Actualizado (Propósitos y Contenidos Formativos)</strong>: Vigente para el ciclo 2025-2028 estructurado con propósitos formativos y temario oficial.
+                      </div>
+                    </div>
+                  )}
 
                   {/* Meta Educativa / Intencionalidad */}
                   {selectedProgramDetail.learning_outcome && (
@@ -2215,38 +2361,43 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     </div>
                   )}
 
-                  {/* Propósitos Formativos y Contenidos Temáticos */}
+                  {/* Propósitos Formativos / Actividades Clave y Contenidos Temáticos */}
                   <div style={{ marginBottom: 18 }}>
                     <h4 style={{ margin: '0 0 10px', color: '#a5b4fc', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      📋 {selectedProgramDetail.semester >= 5 ? 'Progresiones de Aprendizaje' : 'Propósitos Formativos y Contenidos de Estudio'}
+                      {selectedProgramDetail.component === 'laboral' ? '💼 3 Actividades Clave y Contenidos de Desempeño Laboral' :
+                       selectedProgramDetail.semester >= 5 ? '🟣 Progresiones de Aprendizaje Oficiales' :
+                       '📋 Propósitos Formativos y Contenidos de Estudio'}
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {(selectedProgramDetail.activities || []).map((act, idx) => {
                         const matchingCf = (selectedProgramDetail.contenidos_formativos || [])[idx];
+                        const isLab = selectedProgramDetail.component === 'laboral';
                         return (
                           <div
                             key={idx}
                             style={{
                               background: 'rgba(0,0,0,0.3)',
-                              border: '1px solid rgba(255,255,255,0.08)',
+                              border: `1px solid ${isLab ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}`,
                               borderRadius: 10,
                               padding: 14
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <span style={{ fontWeight: 700, color: '#818cf8', fontSize: 13 }}>
-                                #{idx + 1} · {act.name || `Propósito Formativo ${idx + 1}`}
+                              <span style={{ fontWeight: 700, color: isLab ? '#fbbf24' : '#818cf8', fontSize: 13 }}>
+                                {isLab
+                                  ? `Actividad Clave #${idx + 1} (Parcial ${idx + 1}) · ${act.name}`
+                                  : `#${idx + 1} · ${act.name || `Propósito Formativo ${idx + 1}`}`}
                               </span>
-                              <span className="badge badge-blue" style={{ fontSize: 10 }}>
-                                {act.hours || 18} horas
+                              <span className="badge" style={{ background: isLab ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', color: isLab ? '#fbbf24' : '#93c5fd', fontSize: 10 }}>
+                                {act.hours || 18} horas {isLab ? `(Corte ${idx + 1})` : ''}
                               </span>
                             </div>
 
                             {/* Contenidos Temáticos Específicos */}
                             {matchingCf && matchingCf.contenidos && matchingCf.contenidos.length > 0 && (
-                              <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: '2px solid rgba(129,140,248,0.3)' }}>
+                              <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: `2px solid ${isLab ? 'rgba(245,158,11,0.4)' : 'rgba(129,140,248,0.3)'}` }}>
                                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
-                                  Contenidos y temas oficiales:
+                                  {isLab ? 'Contenidos técnicos y criterios de desempeño:' : 'Contenidos y temas oficiales:'}
                                 </div>
                                 <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
                                   {matchingCf.contenidos.map((tema, tIdx) => (
@@ -2289,7 +2440,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
 
                   {/* Footer de Acciones del Inspector */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 14, flexWrap: 'wrap', gap: 10 }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button
                         className="btn-sm btn-primary"
                         onClick={() => {
@@ -2298,7 +2449,18 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                           handleOpenEditProgramModal(p);
                         }}
                       >
-                        ✏️ Editar / Reemplazar Programa
+                        ✏️ Editar Manualmente
+                      </button>
+                      <button
+                        className="btn-sm"
+                        style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}
+                        onClick={() => {
+                          const p = selectedProgramDetail;
+                          setSelectedProgramDetail(null);
+                          handleOpenReplaceProgramModal(p);
+                        }}
+                      >
+                        📄 Reemplazar con PDF Oficial (IA)
                       </button>
                       <button
                         className="btn-sm btn-ghost"
@@ -2316,7 +2478,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       </button>
                     </div>
                     <button className="btn-sm btn-ghost" onClick={() => setSelectedProgramDetail(null)}>
-                      Cerrar
+                      ✕ Cerrar
                     </button>
                   </div>
                 </div>
@@ -2395,8 +2557,10 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                           style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}
                         >
                           <option value="fundamental">Currículum Fundamental</option>
-                          <option value="laboral">Formación Laboral / Profesional</option>
-                          <option value="ampliado">Currículum Ampliado</option>
+                          <option value="ampliado">Currículum Ampliado (Socioemocional / PAEC)</option>
+                          <option value="laboral">Formación Laboral / Profesional (Capacitación)</option>
+                          <option value="ffeo">Formación Fundamental Extendida Obligatoria (FFEO)</option>
+                          <option value="ext_optativo">Formación Fundamental Extendida (Optativas / FFE)</option>
                         </select>
                       </div>
 
@@ -2420,6 +2584,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         >
                           <option value="propositos_contenidos">Propósitos y Contenidos (1°-4° y 2027+)</option>
                           <option value="progresiones">Progresiones MCCEMS (5°-6° 2026-2027)</option>
+                          <option value="actividades_clave">Actividades Clave (Formación Laboral)</option>
                         </select>
                       </div>
                     </div>
@@ -2449,28 +2614,36 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: 16, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <label style={{ fontWeight: 600, color: '#818cf8', margin: 0 }}>
-                          {programForm.model_type === 'progresiones' ? 'Progresiones de Aprendizaje' : 'Propósitos y Contenidos Formativos (Temas Oficiales)'}
+                          {programForm.component === 'laboral'
+                            ? '💼 3 Actividades Clave (18 horas por corte / parcial)'
+                            : programForm.model_type === 'progresiones'
+                            ? 'Progresiones de Aprendizaje'
+                            : 'Propósitos y Contenidos Formativos (Temas Oficiales)'}
                         </label>
-                        <button
-                          type="button"
-                          className="btn-sm btn-ghost"
-                          onClick={() => {
-                            const newIdx = programForm.activities.length + 1;
-                            setProgramForm(f => ({
-                              ...f,
-                              activities: [...f.activities, { name: `Propósito Formativo ${newIdx}`, hours: 18, order: newIdx }],
-                              contenidos_formativos: [...f.contenidos_formativos, { proposito: `Propósito Formativo ${newIdx}`, contenidos: [''] }]
-                            }));
-                          }}
-                        >
-                          ➕ Agregar Propósito / Progresión
-                        </button>
+                        {programForm.component !== 'laboral' && (
+                          <button
+                            type="button"
+                            className="btn-sm btn-ghost"
+                            onClick={() => {
+                              const newIdx = programForm.activities.length + 1;
+                              setProgramForm(f => ({
+                                ...f,
+                                activities: [...f.activities, { name: `Propósito Formativo ${newIdx}`, hours: 18, order: newIdx }],
+                                contenidos_formativos: [...f.contenidos_formativos, { proposito: `Propósito Formativo ${newIdx}`, contenidos: [''] }]
+                              }));
+                            }}
+                          >
+                            ➕ Agregar Propósito / Progresión
+                          </button>
+                        )}
                       </div>
 
                       {programForm.activities.map((act, actIdx) => (
                         <div key={actIdx} style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, marginBottom: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>#{actIdx + 1}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>
+                              {programForm.component === 'laboral' ? `Actividad Clave #${actIdx + 1}` : `#${actIdx + 1}`}
+                            </span>
                             <input
                               style={{ flex: 1 }}
                               value={act.name}
@@ -2484,7 +2657,13 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                                   return { ...f, activities: acts, contenidos_formativos: cfs };
                                 });
                               }}
-                              placeholder={programForm.model_type === 'progresiones' ? 'Texto de la Progresión X...' : 'Nombre del Propósito Formativo X...'}
+                              placeholder={
+                                programForm.component === 'laboral'
+                                  ? `Descripción técnica de la Actividad Clave #${actIdx + 1}...`
+                                  : programForm.model_type === 'progresiones'
+                                  ? 'Texto de la Progresión X...'
+                                  : 'Nombre del Propósito Formativo X...'
+                              }
                             />
                             <input
                               type="number"
@@ -2501,7 +2680,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                               title="Horas asignadas"
                             />
                             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>hrs</span>
-                            {programForm.activities.length > 1 && (
+                            {programForm.component !== 'laboral' && programForm.activities.length > 1 && (
                               <button
                                 type="button"
                                 className="btn-sm btn-danger"
@@ -2518,11 +2697,13 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                             )}
                           </div>
 
-                          {/* Temas / Contenidos formativos si es modelo nuevo */}
+                          {/* Temas / Contenidos formativos si es modelo nuevo o laboral */}
                           {programForm.model_type !== 'progresiones' && (
                             <div style={{ paddingLeft: 24, marginTop: 6 }}>
                               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
-                                📋 Contenidos Formativos / Temas de estudio para este propósito:
+                                {programForm.component === 'laboral'
+                                  ? '📋 Criterios de Desempeño y Contenidos Técnicos:'
+                                  : '📋 Contenidos Formativos / Temas de estudio para este propósito:'}
                               </div>
                               {(programForm.contenidos_formativos[actIdx]?.contenidos || ['']).map((tema, tIdx) => (
                                 <div key={tIdx} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
@@ -2538,7 +2719,7 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                                         return { ...f, contenidos_formativos: cfs };
                                       });
                                     }}
-                                    placeholder={`Tema o contenido ${tIdx + 1}...`}
+                                    placeholder={programForm.component === 'laboral' ? `Criterio o contenido técnico ${tIdx + 1}...` : `Tema o contenido ${tIdx + 1}...`}
                                   />
                                   <button
                                     type="button"
@@ -2597,10 +2778,19 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                 <div style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 30, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
                     <h3 style={{ color: '#818cf8', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>📄</span> Cargar / Reemplazar Programa con IA (PDF Oficial)
+                      <span>📄</span> {extractTargetProgram ? `Reemplazar Programa: ${extractTargetProgram.uac_name}` : 'Cargar / Reemplazar Programa con IA (PDF Oficial)'}
                     </h3>
                     <button className="btn-sm btn-ghost" onClick={() => setShowExtractModal(false)}>✕ Cerrar</button>
                   </div>
+
+                  {extractTargetProgram && (
+                    <div style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 20 }}>🔄</span>
+                      <div style={{ fontSize: 13, color: '#e0e7ff', lineHeight: 1.4 }}>
+                        <strong>Reemplazo Directo Activado:</strong> Al procesar y guardar este nuevo PDF, se actualizarán los datos oficiales de <strong>"{extractTargetProgram.uac_name}"</strong> ({extractTargetProgram.subsystem?.toUpperCase()}, {extractTargetProgram.semester}° Semestre).
+                      </div>
+                    </div>
+                  )}
 
                   <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: 18 }}>
                     Sube el documento PDF del programa de estudios emitido por la SEP/SEMS. La IA extraerá automáticamente la UAC, carga horaria, propósitos, contenidos formativos y evidencias para guardarlos o reemplazar la versión anterior en la base de datos.
@@ -2651,8 +2841,10 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                         <select value={extractComponent} onChange={e => setExtractComponent(e.target.value)}
                           style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}>
                           <option value="fundamental">Currículum Fundamental</option>
-                          <option value="laboral">Formación Laboral / Profesional</option>
                           <option value="ampliado">Currículum Ampliado</option>
+                          <option value="laboral">Formación Laboral / Profesional</option>
+                          <option value="ffeo">Formación Extendida Obligatoria (FFEO)</option>
+                          <option value="ext_optativo">Formación Extendida Optativa (FFE)</option>
                         </select>
                       </div>
                     </div>
