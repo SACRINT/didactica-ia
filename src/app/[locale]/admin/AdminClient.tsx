@@ -47,6 +47,53 @@ export interface ProgramItem {
   created_at?: string;
 }
 
+export interface AuditItem {
+  planning_id: string;
+  teacher_id: string;
+  uac_name: string;
+  semester: number;
+  component: string;
+  curriculum_name?: string | null;
+  planning_status: string;
+  planning_created_at: string;
+  teacher_name?: string | null;
+  teacher_email?: string | null;
+  school_name?: string | null;
+  audit_id: string | null;
+  overall_score: number | null;
+  compliance_level: string | null;
+  dimension_scores: {
+    propositos_alineacion?: { score: number; weight: number; status: string; feedback: string };
+    cobertura_contenidos?: { score: number; weight: number; status: string; feedback: string };
+    secuenciacion_logica?: { score: number; weight: number; status: string; feedback: string };
+    adecuacion_evidencias?: { score: number; weight: number; status: string; feedback: string };
+  } | null;
+  findings: {
+    fortalezas?: string[];
+    desalineaciones?: string[];
+    omisiones_detectadas?: string[];
+    propositos_cubiertos?: string[];
+    propositos_omitidos?: string[];
+  } | null;
+  recommendations: {
+    dimension?: string;
+    severidad?: string;
+    mensaje: string;
+  }[] | null;
+  audited_by?: string | null;
+  audited_at?: string | null;
+}
+
+export interface AuditStats {
+  total_plannings: number;
+  total_audited: number;
+  average_score: number;
+  excelente_count: number;
+  satisfactorio_count: number;
+  requiere_mejora_count: number;
+  no_alineado_count: number;
+}
+
 const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral', 'openrouter'];
 
 // Modelos disponibles por proveedor para USO ESTÁNDAR (cuota gratuita masiva 500 RPD / 15 RPM)
@@ -128,7 +175,7 @@ function isUserOnline(lastSeenAt?: string | null): boolean {
   return (Date.now() - new Date(lastSeenAt).getTime()) < 5 * 60 * 1000;
 }
 
-function relativeTime(dateStr: string | null): string {
+function relativeTime(dateStr?: string | null): string {
   if (!dateStr) return 'Nunca';
   const diff = Date.now() - new Date(dateStr).getTime();
   if (diff < 60000) return 'Hace un momento';
@@ -140,7 +187,7 @@ function relativeTime(dateStr: string | null): string {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminClient({ locale, adminEmail }: { locale: string; adminEmail: string }) {
-  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa' | 'curricula'>('stats');
+  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa' | 'curricula' | 'audits'>('stats');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -220,6 +267,16 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [extracting, setExtracting] = useState(false);
   const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
 
+  // ── Audits & Pedagogical Alignment states ──
+  const [auditPlannings, setAuditPlannings] = useState<AuditItem[]>([]);
+  const [auditStats, setAuditStats] = useState<AuditStats | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditingPlanningId, setAuditingPlanningId] = useState<string | null>(null);
+  const [selectedAuditScorecard, setSelectedAuditScorecard] = useState<AuditItem | null>(null);
+  const [auditFilterCompliance, setAuditFilterCompliance] = useState<string>('todos');
+  const [auditFilterSemester, setAuditFilterSemester] = useState<string>('todos');
+  const [auditSearch, setAuditSearch] = useState<string>('');
+
   // Form states
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
   const [editPromptId, setEditPromptId] = useState<string | null>(null);
@@ -251,7 +308,6 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     const d = await r.json();
     setNormativaDocs(d.documentos || []);
     setNormativaStats(d.stats || null);
-    // Cargar también la info del snapshot predeterminado
     try {
       const rc = await fetch('/api/admin/normativa?action=get_default');
       const dc = await rc.json();
@@ -280,6 +336,91 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     }
   }, []);
 
+  const loadAudits = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (auditFilterCompliance !== 'todos') params.append('compliance', auditFilterCompliance);
+      if (auditFilterSemester !== 'todos') params.append('semester', auditFilterSemester);
+      if (auditSearch.trim()) params.append('search', auditSearch.trim());
+
+      const r = await fetch(`/api/audit?${params.toString()}`);
+      const d = await r.json();
+      if (r.ok) {
+        setAuditPlannings(d.plannings || []);
+        setAuditStats(d.stats || null);
+      } else {
+        showMsg(d.error || 'Error al cargar auditorías', false);
+      }
+    } catch {
+      showMsg('Error de red al cargar auditorías', false);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [auditFilterCompliance, auditFilterSemester, auditSearch]);
+
+  async function handleRunAudit(planningId: string) {
+    setAuditingPlanningId(planningId);
+    try {
+      const r = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planningId, isPremium: true })
+      });
+      const d = await r.json();
+      if (r.ok && d.report) {
+        showMsg(`¡Auditoría completada! Puntuación: ${d.report.overall_score}/100 (${d.report.compliance_level?.toUpperCase()}) ✓`);
+        await loadAudits();
+        // Mostrar scorecard de inmediato
+        const target = auditPlannings.find(p => p.planning_id === planningId);
+        setSelectedAuditScorecard({
+          planning_id: planningId,
+          teacher_id: target?.teacher_id || '',
+          uac_name: d.report.uac_name || target?.uac_name || '',
+          semester: d.report.semester || target?.semester || 1,
+          component: d.report.component || target?.component || 'fundamental',
+          curriculum_name: target?.curriculum_name,
+          planning_status: target?.planning_status || 'completed',
+          planning_created_at: target?.planning_created_at || new Date().toISOString(),
+          teacher_name: target?.teacher_name,
+          teacher_email: target?.teacher_email,
+          school_name: target?.school_name,
+          audit_id: d.report.id,
+          overall_score: d.report.overall_score,
+          compliance_level: d.report.compliance_level,
+          dimension_scores: d.report.dimension_scores,
+          findings: d.report.findings,
+          recommendations: d.report.recommendations,
+          audited_by: d.report.audited_by,
+          audited_at: d.report.created_at || new Date().toISOString()
+        });
+      } else {
+        showMsg(d.error || 'Error al ejecutar la auditoría con IA', false);
+      }
+    } catch {
+      showMsg('Error de conexión al ejecutar auditoría', false);
+    } finally {
+      setAuditingPlanningId(null);
+    }
+  }
+
+  async function handleDeleteAudit(auditId: string) {
+    if (!confirm('¿Eliminar esta auditoría? Podrás volver a auditar la planeación cuando lo desees.')) return;
+    try {
+      const r = await fetch(`/api/audit/${auditId}`, { method: 'DELETE' });
+      if (r.ok) {
+        if (selectedAuditScorecard?.audit_id === auditId) setSelectedAuditScorecard(null);
+        loadAudits();
+        showMsg('Auditoría eliminada ✓');
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al eliminar auditoría', false);
+      }
+    } catch {
+      showMsg('Error de red al eliminar', false);
+    }
+  }
+
   useEffect(() => {
     loadStats();
     loadConfig();
@@ -293,7 +434,8 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     if (activeTab === 'activity') loadActivity();
     if (activeTab === 'normativa') loadNormativa();
     if (activeTab === 'curricula') loadCurricula();
-  }, [activeTab, loadCurricula]);
+    if (activeTab === 'audits') loadAudits();
+  }, [activeTab, loadCurricula, loadAudits]);
 
   // ── Acciones Catálogo Curricular (Malla y Programas) ───────────────────────
   function handleOpenNewProgramModal() {
@@ -840,9 +982,10 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
 
   const tabs: { id: typeof activeTab; label: string; icon: string }[] = [
     { id: 'stats',    label: 'Estadísticas',  icon: '📊' },
+    { id: 'audits',   label: 'Auditoría Pedagógica', icon: '🛡️' },
+    { id: 'curricula',label: 'Malla y Programas', icon: '📚' },
     { id: 'keys',     label: 'API Keys & IA', icon: '🔑' },
     { id: 'config',   label: 'Configuración', icon: '⚙️' },
-    { id: 'curricula',label: 'Malla y Programas', icon: '📚' },
     { id: 'normativa',label: 'Normativa',     icon: '🏛️' },
     { id: 'users',    label: 'Usuarios',      icon: '👥' },
     { id: 'prompts',  label: 'Prompts',       icon: '✏️' },
@@ -871,12 +1014,13 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
         .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .admin-table th { text-align: left; padding: 10px 12px; color: rgba(240,244,255,0.35); font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .admin-table td { padding: 10px 12px; color: rgba(240,244,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
-        .admin-table tr:hover td { background: rgba(255,255,255,0.025); }
+        .admin-table tr:hover td { background: rgba(255,255,200,0.025); }
         .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .badge-green  { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
         .badge-red    { background: rgba(244,63,94,0.12);  color: #fb7185; border: 1px solid rgba(244,63,94,0.2); }
         .badge-yellow { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.2); }
         .badge-blue   { background: rgba(99,102,241,0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.2); padding: 2px 8px; }
+        .badge-purple { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.2); }
         .btn-sm { padding: 5px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.18s ease; }
         .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,0.35); }
         .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
@@ -977,6 +1121,472 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                 )}
               </>
             ) : <div className="empty-state">Cargando estadísticas...</div>}
+          </>
+        )}
+
+        {/* ── AUDITORÍA PEDAGÓGICA (FASE 2) ── */}
+        {activeTab === 'audits' && (
+          <>
+            <div className="section-header">
+              <div>
+                <h1 style={{ margin: 0, paddingBottom: 4 }}>🛡️ Motor de Auditoría y Alineación Pedagógica Inteligente</h1>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: '6px 0 0 0' }}>
+                  Audita y califica automáticamente la congruencia entre las planeaciones docentes y los 449 programas oficiales de estudio en 4 dimensiones formativas.
+                </p>
+              </div>
+              <button
+                className="btn-sm btn-ghost"
+                onClick={loadAudits}
+                disabled={auditLoading}
+                style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>🔄</span> {auditLoading ? 'Actualizando...' : 'Refrescar'}
+              </button>
+            </div>
+
+            {/* KPIs de Auditoría */}
+            <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', marginBottom: 24 }}>
+              <div className="stat-card" style={{ borderColor: 'rgba(99,102,241,0.3)' }}>
+                <div className="num" style={{ color: '#818cf8' }}>{auditStats?.total_plannings || 0}</div>
+                <div className="lbl">Total Planeaciones</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(59,130,246,0.3)' }}>
+                <div className="num" style={{ color: '#60a5fa' }}>{auditStats?.total_audited || 0}</div>
+                <div className="lbl">Auditadas ({auditStats && auditStats.total_plannings > 0 ? Math.round((auditStats.total_audited / auditStats.total_plannings) * 100) : 0}%)</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(16,185,129,0.3)' }}>
+                <div className="num" style={{ color: '#34d399' }}>{auditStats?.average_score || 0}<span style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)' }}>/100</span></div>
+                <div className="lbl">Alineación Media</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(16,185,129,0.2)' }}>
+                <div className="num" style={{ color: '#10b981' }}>{auditStats?.excelente_count || 0}</div>
+                <div className="lbl">🟢 Excelente (90-100)</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
+                <div className="num" style={{ color: '#fbbf24' }}>{auditStats?.satisfactorio_count || 0}</div>
+                <div className="lbl">🟡 Satisfactorio (75-89)</div>
+              </div>
+              <div className="stat-card" style={{ borderColor: 'rgba(244,63,94,0.2)' }}>
+                <div className="num" style={{ color: '#fb7185' }}>{(auditStats?.requiere_mejora_count || 0) + (auditStats?.no_alineado_count || 0)}</div>
+                <div className="lbl">🟠 Requiere Ajuste (&lt;75)</div>
+              </div>
+            </div>
+
+            {/* Barra de Filtros y Búsqueda */}
+            <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar por Asignatura, Docente o Correo..."
+                  value={auditSearch}
+                  onChange={e => setAuditSearch(e.target.value)}
+                  style={{ width: '100%', background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <select
+                  value={auditFilterCompliance}
+                  onChange={e => setAuditFilterCompliance(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="todos">Todos los Estados</option>
+                  <option value="pendiente">⚪ Pendiente de Auditoría</option>
+                  <option value="excelente">🟢 Excelente (90-100 pts)</option>
+                  <option value="satisfactorio">🟡 Satisfactorio (75-89 pts)</option>
+                  <option value="requiere_mejora">🟠 Requiere Mejora (60-74 pts)</option>
+                  <option value="no_alineado">🔴 No Alineado (&lt;60 pts)</option>
+                </select>
+
+                <select
+                  value={auditFilterSemester}
+                  onChange={e => setAuditFilterSemester(e.target.value)}
+                  style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13, outline: 'none' }}
+                >
+                  <option value="todos">Todos los Semestres</option>
+                  <option value="1">1.° Semestre</option>
+                  <option value="2">2.° Semestre</option>
+                  <option value="3">3.° Semestre</option>
+                  <option value="4">4.° Semestre</option>
+                  <option value="5">5.° Semestre</option>
+                  <option value="6">6.° Semestre</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tabla de Planeaciones y Auditorías */}
+            {auditLoading && auditPlannings.length === 0 ? (
+              <div className="empty-state">⏳ Cargando panel de auditoría pedagógica...</div>
+            ) : auditPlannings.length === 0 ? (
+              <div className="empty-state">No se encontraron planeaciones con los filtros seleccionados.</div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Asignatura / UAC</th>
+                    <th>Docente & Escuela</th>
+                    <th style={{ textAlign: 'center' }}>Semestre</th>
+                    <th>Estado de Auditoría</th>
+                    <th>Scorecard 4D</th>
+                    <th style={{ textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditPlannings.map(p => {
+                    const isAudited = !!p.audit_id && p.overall_score !== null;
+                    const isAuditing = auditingPlanningId === p.planning_id;
+                    const score = p.overall_score || 0;
+                    const compLevel = p.compliance_level || 'pendiente';
+                    const dims = p.dimension_scores;
+
+                    return (
+                      <tr key={p.planning_id}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#f0f4ff', fontSize: 14 }}>
+                            {p.uac_name}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                            {p.curriculum_name || 'Programa Oficial'} · Creada: {new Date(p.planning_created_at).toLocaleDateString('es-MX')}
+                          </div>
+                        </td>
+
+                        <td>
+                          <div style={{ color: '#e0e7ff', fontWeight: 500, fontSize: 13 }}>
+                            {p.teacher_name || p.teacher_email || 'Docente'}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#818cf8' }}>
+                            {p.school_name || p.teacher_email}
+                          </div>
+                        </td>
+
+                        <td style={{ textAlign: 'center' }}>
+                          <span className="badge" style={{ background: 'rgba(99,102,241,0.15)', color: '#c7d2fe', fontSize: 11 }}>
+                            {p.semester}.°
+                          </span>
+                        </td>
+
+                        <td>
+                          {isAuditing ? (
+                            <span className="badge badge-purple" style={{ animation: 'pulse 1.5s infinite' }}>
+                              ⏳ Auditando con IA...
+                            </span>
+                          ) : isAudited ? (
+                            <div>
+                              <span
+                                className="badge"
+                                style={{
+                                  background: score >= 90 ? 'rgba(16,185,129,0.15)' : score >= 75 ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)',
+                                  color: score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#fb7185',
+                                  border: `1px solid ${score >= 90 ? 'rgba(16,185,129,0.3)' : score >= 75 ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)'}`,
+                                  fontSize: 12,
+                                  fontWeight: 700
+                                }}
+                              >
+                                {score >= 90 ? '🟢' : score >= 75 ? '🟡' : '🔴'} {score} pts · {compLevel.toUpperCase()}
+                              </span>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
+                                Auditada {relativeTime(p.audited_at)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="badge badge-ghost" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
+                              ⚪ Sin Auditar
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          {isAudited && dims ? (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <span className="badge" style={{ fontSize: 10, background: 'rgba(99,102,241,0.1)', color: '#a5b4fc' }} title="Alineación de Propósitos">
+                                🎯 {dims.propositos_alineacion?.score || 0}%
+                              </span>
+                              <span className="badge" style={{ fontSize: 10, background: 'rgba(16,185,129,0.1)', color: '#6ee7b7' }} title="Cobertura de Contenidos">
+                                📚 {dims.cobertura_contenidos?.score || 0}%
+                              </span>
+                              <span className="badge" style={{ fontSize: 10, background: 'rgba(234,179,8,0.1)', color: '#fde047' }} title="Secuenciación Lógica">
+                                ⏳ {dims.secuenciacion_logica?.score || 0}%
+                              </span>
+                              <span className="badge" style={{ fontSize: 10, background: 'rgba(236,72,153,0.1)', color: '#f472b6' }} title="Adecuación de Evidencias">
+                                📝 {dims.adecuacion_evidencias?.score || 0}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>—</span>
+                          )}
+                        </td>
+
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {isAudited && (
+                            <button
+                              className="btn-sm btn-ghost"
+                              onClick={() => setSelectedAuditScorecard(p)}
+                              style={{ marginRight: 6, color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
+                              title="Ver Reporte y Scorecard Detallado"
+                            >
+                              📊 Scorecard
+                            </button>
+                          )}
+                          <button
+                            className="btn-sm btn-primary"
+                            onClick={() => handleRunAudit(p.planning_id)}
+                            disabled={isAuditing}
+                            style={{ marginRight: 6 }}
+                          >
+                            {isAuditing ? '⏳ Auditando...' : isAudited ? '🔄 Re-auditar' : '⚡ Auditar con IA'}
+                          </button>
+                          {isAudited && p.audit_id && (
+                            <button
+                              className="btn-sm btn-danger"
+                              onClick={() => handleDeleteAudit(p.audit_id!)}
+                              title="Eliminar registro de auditoría"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {/* Modal: Scorecard Pedagógico 4D Detallado */}
+            {selectedAuditScorecard && selectedAuditScorecard.dimension_scores && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                <div style={{ background: '#0d1322', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 16, padding: 30, width: '100%', maxWidth: 880, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 80px rgba(0,0,0,0.9)' }}>
+                  
+                  {/* Header Scorecard */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 18, marginBottom: 20 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <span className="badge badge-purple" style={{ fontSize: 11, textTransform: 'uppercase' }}>
+                          Auditoría Oficial MCCEMS
+                        </span>
+                        <span className="badge badge-blue" style={{ fontSize: 11 }}>
+                          {selectedAuditScorecard.semester}.° Semestre
+                        </span>
+                        <span className="badge" style={{ background: 'rgba(255,255,255,0.1)', color: '#f0f4ff', fontSize: 11 }}>
+                          {selectedAuditScorecard.component?.toUpperCase()}
+                        </span>
+                      </div>
+                      <h2 style={{ margin: 0, color: '#f8fafc', fontSize: 22, fontWeight: 800 }}>
+                        {selectedAuditScorecard.uac_name}
+                      </h2>
+                      <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>
+                        Docente: <strong>{selectedAuditScorecard.teacher_name || selectedAuditScorecard.teacher_email}</strong> · Escuela: {selectedAuditScorecard.school_name || 'Plantel Oficial'}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <button className="btn-sm btn-ghost" onClick={() => setSelectedAuditScorecard(null)} style={{ fontSize: 14 }}>
+                        ✕ Cerrar
+                      </button>
+                      <div style={{ background: (selectedAuditScorecard.overall_score || 0) >= 90 ? 'rgba(16,185,129,0.15)' : (selectedAuditScorecard.overall_score || 0) >= 75 ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)', border: `1px solid ${(selectedAuditScorecard.overall_score || 0) >= 90 ? 'rgba(16,185,129,0.4)' : (selectedAuditScorecard.overall_score || 0) >= 75 ? 'rgba(245,158,11,0.4)' : 'rgba(244,63,94,0.4)'}`, borderRadius: 12, padding: '6px 14px', textAlign: 'center' }}>
+                        <div style={{ fontSize: 24, fontWeight: 900, color: (selectedAuditScorecard.overall_score || 0) >= 90 ? '#34d399' : (selectedAuditScorecard.overall_score || 0) >= 75 ? '#fbbf24' : '#fb7185', lineHeight: 1 }}>
+                          {selectedAuditScorecard.overall_score}<span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>/100</span>
+                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
+                          {selectedAuditScorecard.compliance_level?.replace('_', ' ')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4 Dimensiones Formativas */}
+                  <h3 style={{ fontSize: 15, color: '#c7d2fe', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>📊</span> Evaluación en las 4 Dimensiones Pedagógicas Clave
+                  </h3>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 14, marginBottom: 24 }}>
+                    
+                    {/* Dimensión 1: Propósitos */}
+                    {selectedAuditScorecard.dimension_scores.propositos_alineacion && (
+                      <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#e0e7ff', fontSize: 13 }}>
+                            🎯 1. Alineación de Propósitos (30%)
+                          </div>
+                          <span className="badge badge-blue" style={{ fontSize: 12, fontWeight: 700 }}>
+                            {selectedAuditScorecard.dimension_scores.propositos_alineacion.score} / 100
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                          <div style={{ width: `${selectedAuditScorecard.dimension_scores.propositos_alineacion.score}%`, height: '100%', background: '#6366f1', borderRadius: 4 }} />
+                        </div>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0, lineHeight: 1.45 }}>
+                          {selectedAuditScorecard.dimension_scores.propositos_alineacion.feedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Dimensión 2: Contenidos */}
+                    {selectedAuditScorecard.dimension_scores.cobertura_contenidos && (
+                      <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#d1fae5', fontSize: 13 }}>
+                            📚 2. Cobertura de Contenidos (25%)
+                          </div>
+                          <span className="badge badge-green" style={{ fontSize: 12, fontWeight: 700 }}>
+                            {selectedAuditScorecard.dimension_scores.cobertura_contenidos.score} / 100
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                          <div style={{ width: `${selectedAuditScorecard.dimension_scores.cobertura_contenidos.score}%`, height: '100%', background: '#10b981', borderRadius: 4 }} />
+                        </div>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0, lineHeight: 1.45 }}>
+                          {selectedAuditScorecard.dimension_scores.cobertura_contenidos.feedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Dimensión 3: Secuenciación */}
+                    {selectedAuditScorecard.dimension_scores.secuenciacion_logica && (
+                      <div style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#fef3c7', fontSize: 13 }}>
+                            ⏳ 3. Secuenciación Lógica (25%)
+                          </div>
+                          <span className="badge badge-yellow" style={{ fontSize: 12, fontWeight: 700 }}>
+                            {selectedAuditScorecard.dimension_scores.secuenciacion_logica.score} / 100
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                          <div style={{ width: `${selectedAuditScorecard.dimension_scores.secuenciacion_logica.score}%`, height: '100%', background: '#eab308', borderRadius: 4 }} />
+                        </div>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0, lineHeight: 1.45 }}>
+                          {selectedAuditScorecard.dimension_scores.secuenciacion_logica.feedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Dimensión 4: Evidencias */}
+                    {selectedAuditScorecard.dimension_scores.adecuacion_evidencias && (
+                      <div style={{ background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.2)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ fontWeight: 700, color: '#fce7f3', fontSize: 13 }}>
+                            📝 4. Evidencias e Instrumentos (20%)
+                          </div>
+                          <span className="badge badge-purple" style={{ fontSize: 12, fontWeight: 700 }}>
+                            {selectedAuditScorecard.dimension_scores.adecuacion_evidencias.score} / 100
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                          <div style={{ width: `${selectedAuditScorecard.dimension_scores.adecuacion_evidencias.score}%`, height: '100%', background: '#ec4899', borderRadius: 4 }} />
+                        </div>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0, lineHeight: 1.45 }}>
+                          {selectedAuditScorecard.dimension_scores.adecuacion_evidencias.feedback}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hallazgos y Fortalezas */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 16, marginBottom: 20 }}>
+                    
+                    {/* Fortalezas */}
+                    <div style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, padding: 18 }}>
+                      <h4 style={{ color: '#34d399', fontSize: 14, margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>🌟</span> Fortalezas Pedagógicas
+                      </h4>
+                      {selectedAuditScorecard.findings?.fortalezas && selectedAuditScorecard.findings.fortalezas.length > 0 ? (
+                        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#f0f4ff', lineHeight: 1.6 }}>
+                          {selectedAuditScorecard.findings.fortalezas.map((f, i) => (
+                            <li key={i} style={{ marginBottom: 6 }}>{f}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0 }}>No se registraron fortalezas destacadas.</p>
+                      )}
+                    </div>
+
+                    {/* Desalineaciones / Omisiones */}
+                    <div style={{ background: 'rgba(244,63,94,0.04)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: 12, padding: 18 }}>
+                      <h4 style={{ color: '#fb7185', fontSize: 14, margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>⚠️</span> Desalineaciones u Omisiones Detectadas
+                      </h4>
+                      {((selectedAuditScorecard.findings?.desalineaciones?.length || 0) > 0 || (selectedAuditScorecard.findings?.omisiones_detectadas?.length || 0) > 0) ? (
+                        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#fecdd3', lineHeight: 1.6 }}>
+                          {(selectedAuditScorecard.findings?.desalineaciones || []).map((d, i) => (
+                            <li key={`d-${i}`} style={{ marginBottom: 6 }}>{d}</li>
+                          ))}
+                          {(selectedAuditScorecard.findings?.omisiones_detectadas || []).map((o, i) => (
+                            <li key={`o-${i}`} style={{ marginBottom: 6 }}>{o}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34d399', fontSize: 12 }}>
+                          <span>✓</span> Sin desalineaciones críticas detectadas frente al programa oficial.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Propósitos Oficiales Cubiertos */}
+                  {selectedAuditScorecard.findings?.propositos_cubiertos && selectedAuditScorecard.findings.propositos_cubiertos.length > 0 && (
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 18, marginBottom: 20 }}>
+                      <h4 style={{ color: '#a5b4fc', fontSize: 14, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>📌</span> Propósitos / Progresiones Oficiales Validados ({selectedAuditScorecard.findings.propositos_cubiertos.length})
+                      </h4>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {selectedAuditScorecard.findings.propositos_cubiertos.map((p, i) => (
+                          <div key={i} style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f0f4ff', display: 'flex', gap: 8 }}>
+                            <span style={{ color: '#10b981' }}>✓</span>
+                            <span>{p}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recomendaciones de Mejora */}
+                  {selectedAuditScorecard.recommendations && selectedAuditScorecard.recommendations.length > 0 && (
+                    <div style={{ background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: 18, marginBottom: 20 }}>
+                      <h4 style={{ color: '#fcd34d', fontSize: 14, margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>💡</span> Recomendaciones Pedagógicas para el Docente
+                      </h4>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {selectedAuditScorecard.recommendations.map((rec, i) => (
+                          <div key={i} style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#fef3c7', lineHeight: 1.45 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 10, color: '#fbbf24' }}>
+                                Dimensión: {rec.dimension?.replace('_', ' ')}
+                              </span>
+                              <span className="badge" style={{ background: 'rgba(245,158,11,0.2)', color: '#fde047', fontSize: 10 }}>
+                                Severidad {rec.severidad}
+                              </span>
+                            </div>
+                            {rec.mensaje}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer del Modal */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16 }}>
+                    <button
+                      className="btn-sm btn-primary"
+                      onClick={() => handleRunAudit(selectedAuditScorecard.planning_id)}
+                      disabled={auditingPlanningId === selectedAuditScorecard.planning_id}
+                      style={{ padding: '8px 16px' }}
+                    >
+                      {auditingPlanningId === selectedAuditScorecard.planning_id ? '⏳ Re-auditando con IA...' : '⚡ Re-auditar Planeación'}
+                    </button>
+
+                    <button
+                      className="btn-sm btn-ghost"
+                      onClick={() => setSelectedAuditScorecard(null)}
+                      style={{ padding: '8px 18px' }}
+                    >
+                      Cerrar Reporte
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            )}
           </>
         )}
 
