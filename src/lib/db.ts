@@ -196,53 +196,157 @@ export async function savePdfUpload(data: {
 
 // ─── Programs Catalog queries ────────────────────────────────────────────────
 
-export async function getProgramsCatalog(semester?: number, component?: string) {
-  if (semester !== undefined && component !== undefined) {
-    if (component === 'ampliado') {
-      return sql()`
-        SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences, contenidos_formativos
-        FROM programs_catalog
-        WHERE component = ${component}
-        ORDER BY uac_name ASC
-      `;
-    }
-    return sql()`
-      SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences, contenidos_formativos
-      FROM programs_catalog
-      WHERE semester = ${semester} AND component = ${component}
-      ORDER BY uac_name ASC
-    `;
-  } else if (semester !== undefined) {
-    return sql()`
-      SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences, contenidos_formativos
-      FROM programs_catalog
-      WHERE semester = ${semester}
-      ORDER BY uac_name ASC
-    `;
-  } else if (component !== undefined) {
-    return sql()`
-      SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences, contenidos_formativos
-      FROM programs_catalog
-      WHERE component = ${component}
-      ORDER BY uac_name ASC
-    `;
-  } else {
-    return sql()`
-      SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, learning_outcome, activities, evidences, contenidos_formativos
-      FROM programs_catalog
-      ORDER BY uac_name ASC
-    `;
-  }
+// ─── Programs Catalog queries ────────────────────────────────────────────────
+
+export interface ProgramCatalogItem {
+  id?: string;
+  uac_name: string;
+  semester: number;
+  component: string;
+  curriculum_name?: string | null;
+  year?: number;
+  total_hours: number;
+  learning_outcome: string;
+  activities: any;
+  evidences: any;
+  contenidos_formativos?: any;
+  subsystem?: string;
+  model_type?: string;
+  created_at?: string;
 }
 
-export async function getProgramsCatalogForPaec(semesters: number[]) {
-  return sql()`
-    SELECT uac_name, semester, component
+export async function getProgramsCatalog(semester?: number, component?: string, subsystem?: string) {
+  // Normalize subsystem filter: if not provided or 'all', don't filter strictly unless needed
+  const normalizedSubsystem = (subsystem && subsystem !== 'all') ? subsystem.toLowerCase() : undefined;
+
+  let query = `
+    SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, 
+           learning_outcome, activities, evidences, contenidos_formativos, subsystem, model_type, created_at
+    FROM programs_catalog
+    WHERE 1=1
+  `;
+  const params: any[] = [];
+
+  if (semester !== undefined) {
+    // If component is ampliado, in some views it's semester-agnostic, but if explicitly requested with semester:
+    params.push(semester);
+    query += ` AND semester = $${params.length}`;
+  }
+
+  if (component !== undefined && component !== 'all') {
+    params.push(component);
+    query += ` AND component = $${params.length}`;
+  }
+
+  if (normalizedSubsystem !== undefined) {
+    params.push(normalizedSubsystem);
+    query += ` AND (subsystem = $${params.length} OR subsystem = 'all' OR subsystem IS NULL)`;
+  }
+
+  query += ` ORDER BY semester ASC, component ASC, uac_name ASC`;
+
+  // Use raw query with neon sql helper
+  const client = sql();
+  return (client as any)(query, params);
+}
+
+export async function getProgramsCatalogForPaec(semesters: number[], subsystem?: string) {
+  const client = sql();
+  if (subsystem && subsystem !== 'all') {
+    return client`
+      SELECT uac_name, semester, component, subsystem, model_type
+      FROM programs_catalog
+      WHERE semester = ANY(${semesters}) AND (subsystem = ${subsystem.toLowerCase()} OR subsystem = 'all' OR subsystem IS NULL)
+      ORDER BY semester, uac_name ASC
+    `;
+  }
+  return client`
+    SELECT uac_name, semester, component, subsystem, model_type
     FROM programs_catalog
     WHERE semester = ANY(${semesters})
     ORDER BY semester, uac_name ASC
   `;
 }
+
+export async function createProgramCatalogItem(data: ProgramCatalogItem) {
+  const rows = await sql()`
+    INSERT INTO programs_catalog (
+      uac_name, semester, component, curriculum_name, year, total_hours,
+      learning_outcome, activities, evidences, contenidos_formativos, subsystem, model_type
+    ) VALUES (
+      ${data.uac_name.trim()},
+      ${data.semester},
+      ${data.component},
+      ${data.curriculum_name || null},
+      ${data.year || 2026},
+      ${data.total_hours},
+      ${data.learning_outcome},
+      ${JSON.stringify(data.activities || [])}::jsonb,
+      ${JSON.stringify(data.evidences || [])}::jsonb,
+      ${data.contenidos_formativos ? JSON.stringify(data.contenidos_formativos) : null}::jsonb,
+      ${(data.subsystem || 'bge').toLowerCase()},
+      ${data.model_type || (data.semester >= 5 ? 'progresiones' : 'propositos_contenidos')}
+    )
+    ON CONFLICT (uac_name, semester, component, subsystem)
+    DO UPDATE SET
+      curriculum_name = EXCLUDED.curriculum_name,
+      year = EXCLUDED.year,
+      total_hours = EXCLUDED.total_hours,
+      learning_outcome = EXCLUDED.learning_outcome,
+      activities = EXCLUDED.activities,
+      evidences = EXCLUDED.evidences,
+      contenidos_formativos = EXCLUDED.contenidos_formativos,
+      model_type = EXCLUDED.model_type
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function updateProgramCatalogItem(id: string, data: Partial<ProgramCatalogItem>) {
+  const existing = await sql()`SELECT * FROM programs_catalog WHERE id = ${id}::uuid LIMIT 1`;
+  if (existing.length === 0) return null;
+
+  const current = existing[0];
+  const uac_name = data.uac_name !== undefined ? data.uac_name.trim() : current.uac_name;
+  const semester = data.semester !== undefined ? data.semester : current.semester;
+  const component = data.component !== undefined ? data.component : current.component;
+  const curriculum_name = data.curriculum_name !== undefined ? data.curriculum_name : current.curriculum_name;
+  const year = data.year !== undefined ? data.year : current.year;
+  const total_hours = data.total_hours !== undefined ? data.total_hours : current.total_hours;
+  const learning_outcome = data.learning_outcome !== undefined ? data.learning_outcome : current.learning_outcome;
+  const activities = data.activities !== undefined ? JSON.stringify(data.activities) : JSON.stringify(current.activities);
+  const evidences = data.evidences !== undefined ? JSON.stringify(data.evidences) : JSON.stringify(current.evidences);
+  const contenidos_formativos = data.contenidos_formativos !== undefined ? JSON.stringify(data.contenidos_formativos) : (current.contenidos_formativos ? JSON.stringify(current.contenidos_formativos) : null);
+  const subsystem = data.subsystem !== undefined ? data.subsystem.toLowerCase() : current.subsystem;
+  const model_type = data.model_type !== undefined ? data.model_type : current.model_type;
+
+  const rows = await sql()`
+    UPDATE programs_catalog SET
+      uac_name = ${uac_name},
+      semester = ${semester},
+      component = ${component},
+      curriculum_name = ${curriculum_name},
+      year = ${year},
+      total_hours = ${total_hours},
+      learning_outcome = ${learning_outcome},
+      activities = ${activities}::jsonb,
+      evidences = ${evidences}::jsonb,
+      contenidos_formativos = ${contenidos_formativos ? contenidos_formativos : null}::jsonb,
+      subsystem = ${subsystem},
+      model_type = ${model_type}
+    WHERE id = ${id}::uuid
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function deleteProgramCatalogItem(id: string) {
+  const rows = await sql()`
+    DELETE FROM programs_catalog WHERE id = ${id}::uuid RETURNING id, uac_name
+  `;
+  return rows[0];
+}
+
 
 // ─── Planning Extras queries ──────────────────────────────────────────────────
 

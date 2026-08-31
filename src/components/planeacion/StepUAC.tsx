@@ -7,6 +7,7 @@ interface UACSelection {
   uacName: string;
   semester: number;
   component: string;
+  subsystem?: string;
   curriculumName?: string;
 }
 
@@ -28,10 +29,12 @@ function cleanSocioemotionalName(name: string, semester: number): string {
 }
 
 export default function StepUAC({ onNext }: Props) {
+  const [selectedSubsystem, setSelectedSubsystem] = useState<string>('bge');
   const [form, setForm] = useState<UACSelection>({
     uacName: '',
     semester: 3,
     component: 'laboral',
+    subsystem: 'bge',
     curriculumName: '',
   });
 
@@ -44,6 +47,7 @@ export default function StepUAC({ onNext }: Props) {
 
   const isLaboralDisabled = SEMESTERS_WITHOUT_LABORAL.includes(form.semester);
   const isFfeDisabled = form.semester < 5;
+  const isProgresionesModel = form.semester >= 5;
 
   // Extract unique specialties from catalog programs when in Formación Laboral mode
   const specialties = form.component === 'laboral'
@@ -55,12 +59,13 @@ export default function StepUAC({ onNext }: Props) {
     ? catalogPrograms.filter(p => p.curriculum_name === selectedSpecialty)
     : catalogPrograms;
 
-  // Fetch programs from catalog when semester or component changes
+  // Fetch programs from catalog when semester, component or subsystem changes
   useEffect(() => {
     const fetchPrograms = async () => {
       setLoadingPrograms(true);
       try {
-        const res = await fetch(`/api/programs?semester=${form.semester}&component=${form.component}`);
+        const subParam = selectedSubsystem ? `&subsystem=${selectedSubsystem}` : '';
+        const res = await fetch(`/api/programs?semester=${form.semester}&component=${form.component}${subParam}`);
         const data = await res.json();
         
         if (data.programs) {
@@ -103,13 +108,14 @@ export default function StepUAC({ onNext }: Props) {
                     ...prev,
                     uacName: first.uac_name,
                     curriculumName: first.curriculum_name || '',
+                    subsystem: selectedSubsystem,
                   }));
                   setIsManualInput(false);
                 }
               } else {
                 setSelectedSpecialty('');
                 setSelectedCatalogUac(null);
-                setForm(prev => ({ ...prev, uacName: '', curriculumName: '' }));
+                setForm(prev => ({ ...prev, uacName: '', curriculumName: '', subsystem: selectedSubsystem }));
                 setIsManualInput(true);
               }
             } else {
@@ -120,6 +126,7 @@ export default function StepUAC({ onNext }: Props) {
                 ...prev,
                 uacName: form.component === 'ampliado' ? cleanSocioemotionalName(first.uac_name, form.semester) : first.uac_name,
                 curriculumName: first.curriculum_name || '',
+                subsystem: selectedSubsystem,
               }));
               setIsManualInput(false);
               setSelectedSpecialty('');
@@ -130,6 +137,7 @@ export default function StepUAC({ onNext }: Props) {
               ...prev,
               uacName: '',
               curriculumName: '',
+              subsystem: selectedSubsystem,
             }));
             setIsManualInput(true);
             setSelectedSpecialty('');
@@ -143,7 +151,7 @@ export default function StepUAC({ onNext }: Props) {
     };
 
     fetchPrograms();
-  }, [form.semester, form.component]);
+  }, [form.semester, form.component, selectedSubsystem]);
 
   // When semester changes, auto-switch to 'fundamental' if laboral is not available
   const handleSemesterChange = (newSemester: number) => {
@@ -247,15 +255,73 @@ export default function StepUAC({ onNext }: Props) {
 
   return (
     <div className="card">
-      <h2 className="card-title">Paso 1: Datos de la UAC</h2>
-      <p className="card-subtitle">
-        Ingresa los datos básicos de la Unidad de Aprendizaje Curricular que vas a planear.
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h2 className="card-title">Paso 1: Datos de la UAC y Modelo Curricular</h2>
+          <p className="card-subtitle">
+            Selecciona tu subsistema educativo y la Unidad de Aprendizaje Curricular oficial que vas a planear.
+          </p>
+        </div>
+        <div>
+          {isProgresionesModel ? (
+            <span className="badge badge-purple" style={{ padding: '6px 12px', fontSize: 12 }}>
+              🟣 Transición: Progresiones MCCEMS (5°-6° sem.)
+            </span>
+          ) : (
+            <span className="badge badge-green" style={{ padding: '6px 12px', fontSize: 12 }}>
+              🟢 Modelo Oficial 2026-2027: Propósitos y Contenidos
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Alerta contextual sobre el modelo curricular oficial */}
+      <div style={{
+        marginTop: 12,
+        marginBottom: 16,
+        padding: '10px 14px',
+        borderRadius: 8,
+        fontSize: 12,
+        lineHeight: 1.4,
+        background: isProgresionesModel ? 'rgba(168,85,247,0.08)' : 'rgba(16,185,129,0.08)',
+        border: `1px solid ${isProgresionesModel ? 'rgba(168,85,247,0.25)' : 'rgba(16,185,129,0.25)'}`,
+        color: isProgresionesModel ? '#c084fc' : '#34d399'
+      }}>
+        {isProgresionesModel ? (
+          <>
+            <strong>📌 Modelo de Transición Curricular Ciclo 2026-2027:</strong> Para 5.° y 6.° semestre, la planeación se estructura con <em>Progresiones de Aprendizaje MCCEMS</em>. (Este es el último ciclo de vigencia de progresiones).
+          </>
+        ) : (
+          <>
+            <strong>✨ Modelo Curricular Oficial 2026-2027:</strong> Para 1.°, 2.°, 3.° y 4.° semestre, la planeación didáctica se estructura con <em>Propósitos Formativos y Contenidos de Estudio</em> oficiales de la SEP.
+          </>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
           <div className="form-row">
+            <div className="form-group">
+              <label className="form-label form-label-required">Subsistema Educativo</label>
+              <select
+                className="form-select"
+                value={selectedSubsystem}
+                onChange={e => {
+                  setSelectedSubsystem(e.target.value);
+                  setForm(f => ({ ...f, subsystem: e.target.value }));
+                }}
+              >
+                <option value="bge">Bachillerato General Estatal (BGE)</option>
+                <option value="tecnologico">Bachillerato Tecnológico (General)</option>
+                <option value="cbtis">CBTIS</option>
+                <option value="cbta">CBTA</option>
+                <option value="cecyte">CECyTE</option>
+                <option value="digital">Bachillerato Digital</option>
+                <option value="emsad">EMSAD</option>
+              </select>
+            </div>
+
             <div className="form-group">
               <label className="form-label form-label-required">Semestre</label>
               <select
@@ -264,7 +330,7 @@ export default function StepUAC({ onNext }: Props) {
                 onChange={e => handleSemesterChange(Number(e.target.value))}
               >
                 {[1, 2, 3, 4, 5, 6].map(s => (
-                  <option key={s} value={s}>{s}° Semestre</option>
+                  <option key={s} value={s}>{s}° Semestre {s >= 5 ? '(Progresiones)' : '(Propósitos)'}</option>
                 ))}
               </select>
             </div>
@@ -329,7 +395,7 @@ export default function StepUAC({ onNext }: Props) {
             {loadingPrograms ? (
               <div className="form-input" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#666' }}>
                 <div className="spinner spinner-dark" style={{ width: '16px', height: '16px' }} />
-                <span>Cargando UACs del catálogo...</span>
+                <span>Cargando UACs del catálogo oficial...</span>
               </div>
             ) : catalogPrograms.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -345,11 +411,11 @@ export default function StepUAC({ onNext }: Props) {
                     const suffix = form.component === 'laboral'
                       ? ''
                       : form.component === 'ampliado'
-                        ? '' // Hide (MCC FORMACION SOCIOEMOCIONAL)
+                        ? ''
                         : p.curriculum_name ? ` (${p.curriculum_name})` : '';
                     return (
                       <option key={p.id} value={p.id}>
-                        {displayName}{suffix} ({p.year})
+                        {displayName}{suffix} ({p.total_hours || 54} hrs)
                       </option>
                     );
                   })}
@@ -381,6 +447,42 @@ export default function StepUAC({ onNext }: Props) {
               Selecciona una UAC del catálogo oficial o escribe el nombre exacto como aparece en tu programa de estudios.
             </span>
           </div>
+
+          {/* Tarjeta de Resumen Curricular Precargado */}
+          {!isManualInput && selectedCatalogUac && (
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 10,
+              padding: 14,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 12
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Carga Horaria</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f4ff' }}>
+                  {selectedCatalogUac.total_hours || 54} hrs totales ({Math.round((selectedCatalogUac.total_hours || 54) / 18)} h/semana)
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                  {isProgresionesModel ? 'Progresiones Registradas' : 'Propósitos Formativos'}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#818cf8' }}>
+                  {selectedCatalogUac.activities?.length || 3} {isProgresionesModel ? 'progresiones' : 'propósitos clave'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Contenidos / Temas</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#10b981' }}>
+                  {selectedCatalogUac.contenidos_formativos?.length > 0
+                    ? `${selectedCatalogUac.contenidos_formativos.reduce((acc: number, c: any) => acc + (c.contenidos?.length || 0), 0)} temas precargados`
+                    : 'Listos para sincronizar'}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Nombre del currículo / especialidad</label>

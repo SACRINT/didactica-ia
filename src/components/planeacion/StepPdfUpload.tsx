@@ -12,11 +12,24 @@ interface Props {
 
 export default function StepPdfUpload({ uacSelection, initialData, onNext, onBack }: Props) {
   const isLaboral = uacSelection.component === 'laboral';
-  const activityLabel = isLaboral ? 'Actividades Clave' : 'Propósitos y Contenidos formativos';
+  const isProgresiones = uacSelection.semester >= 5;
+  const activityLabel = isLaboral
+    ? 'Actividades Clave y Resultados Laborales'
+    : isProgresiones
+      ? 'Progresiones de Aprendizaje MCCEMS (Ciclo de Transición 26-27)'
+      : 'Propósitos Formativos y Contenidos de Estudio (SEP 26-27)';
+
   const activityPlaceholder = isLaboral
     ? 'Nombre de la Actividad Clave'
-    : 'Nombre del Propósito o Contenido formativo (ej: Propósito 1, Bloque 1)';
-  const addBtnLabel = isLaboral ? '+ Agregar actividad' : '+ Agregar propósito/contenido';
+    : isProgresiones
+      ? 'Texto de la Progresión X...'
+      : 'Nombre del Propósito Formativo (ej: Propósito 1, Bloque 1)';
+
+  const addBtnLabel = isLaboral
+    ? '+ Agregar actividad clave'
+    : isProgresiones
+      ? '+ Agregar progresión'
+      : '+ Agregar propósito formativo';
 
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -301,34 +314,94 @@ export default function StepPdfUpload({ uacSelection, initialData, onNext, onBac
           <div className="form-group">
             <label className="form-label form-label-required">{activityLabel}</label>
             {formData.activities.map((a, idx) => (
-              <div key={idx} className="activity-row" style={{ marginBottom: '8px' }}>
-                <input
-                  className="form-input"
-                  placeholder={`${activityPlaceholder} ${idx + 1}`}
-                  value={a.name}
-                  onChange={e => updateActivity(idx, 'name', e.target.value)}
-                  required
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div key={idx} style={{ marginBottom: '12px', background: 'var(--c-bg-subtle, #f8fafc)', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div className="activity-row" style={{ marginBottom: '6px' }}>
                   <input
-                    type="number"
                     className="form-input"
-                    placeholder="Horas"
-                    value={a.hours}
-                    min={1}
-                    onChange={e => updateActivity(idx, 'hours', Number(e.target.value))}
-                    style={{ flex: 1, minWidth: '0' }}
+                    placeholder={`${activityPlaceholder} ${idx + 1}`}
+                    value={a.name}
+                    onChange={e => updateActivity(idx, 'name', e.target.value)}
+                    required
                   />
-                  <span style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>hrs</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder="Horas"
+                      value={a.hours}
+                      min={1}
+                      onChange={e => updateActivity(idx, 'hours', Number(e.target.value))}
+                      style={{ flex: 1, minWidth: '0' }}
+                    />
+                    <span style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>hrs</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => removeActivity(idx)}
+                    disabled={formData.activities.length <= 1}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-danger btn-sm"
-                  onClick={() => removeActivity(idx)}
-                  disabled={formData.activities.length <= 1}
-                >
-                  ✕
-                </button>
+
+                {/* Sub-lista de Contenidos Formativos si el modelo no es de progresiones */}
+                {!isProgresiones && (
+                  <div style={{ paddingLeft: '12px', marginTop: '6px' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', fontWeight: 500, marginBottom: '4px' }}>
+                      📋 Contenidos / Temas de estudio asociados:
+                    </div>
+                    {((formData.contenidosFormativos && formData.contenidosFormativos[idx]?.contenidos) || []).map((tema: string, tIdx: number) => (
+                      <div key={tIdx} style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                        <input
+                          className="form-input"
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                          value={tema}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setFormData(prev => {
+                              const cfs = [...(prev.contenidosFormativos || [])];
+                              if (!cfs[idx]) cfs[idx] = { proposito: a.name, contenidos: [] };
+                              cfs[idx].contenidos[tIdx] = val;
+                              return { ...prev, contenidosFormativos: cfs };
+                            });
+                          }}
+                          placeholder={`Tema ${tIdx + 1}...`}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: '2px 8px' }}
+                          onClick={() => {
+                            setFormData(prev => {
+                              const cfs = [...(prev.contenidosFormativos || [])];
+                              if (!cfs[idx]) return prev;
+                              cfs[idx].contenidos = cfs[idx].contenidos.filter((_: string, i: number) => i !== tIdx);
+                              return { ...prev, contenidosFormativos: cfs };
+                            });
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: '11px', padding: '2px 8px' }}
+                      onClick={() => {
+                        setFormData(prev => {
+                          const cfs = [...(prev.contenidosFormativos || [])];
+                          if (!cfs[idx]) cfs[idx] = { proposito: a.name, contenidos: [''] };
+                          else cfs[idx].contenidos.push('');
+                          return { ...prev, contenidosFormativos: cfs };
+                        });
+                      }}
+                    >
+                      ➕ Agregar tema de estudio
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <button

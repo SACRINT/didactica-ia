@@ -12,12 +12,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const semesterParam = searchParams.get('semester');
     const component = searchParams.get('component') || undefined;
+    const subsystem = searchParams.get('subsystem') || undefined;
 
     const semester = semesterParam ? parseInt(semesterParam, 10) : undefined;
 
     const programs = await getProgramsCatalog(
       semester !== undefined && !isNaN(semester) ? semester : undefined,
-      component
+      component,
+      subsystem
     );
 
     return NextResponse.json({ programs });

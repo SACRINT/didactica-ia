@@ -30,6 +30,23 @@ interface NormativaArticulo { id: string; numero: string; texto: string; aplicab
 interface NormativaDoc { id: string; titulo: string; tipo: string; fuente: string | null; vigente: boolean; orden_display: number; created_at: string; articulos: NormativaArticulo[]; }
 interface NormativaStats { total_documentos: number; total_articulos: number; arts_pmc: number; arts_paec: number; arts_pips: number; arts_planeacion: number; }
 
+export interface ProgramItem {
+  id: string;
+  uac_name: string;
+  semester: number;
+  component: string;
+  curriculum_name?: string | null;
+  year?: number;
+  total_hours: number;
+  learning_outcome: string;
+  activities: { name: string; hours: number; order?: number }[];
+  evidences: string[];
+  contenidos_formativos?: { proposito: string; contenidos: string[] }[];
+  subsystem: string;
+  model_type: string;
+  created_at?: string;
+}
+
 const PROVIDERS = ['gemini', 'claude', 'openai', 'nvidia', 'qwen', 'mistral', 'openrouter'];
 
 // Modelos disponibles por proveedor para USO ESTÁNDAR (cuota gratuita masiva 500 RPD / 15 RPM)
@@ -123,7 +140,7 @@ function relativeTime(dateStr: string | null): string {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminClient({ locale, adminEmail }: { locale: string; adminEmail: string }) {
-  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa'>('stats');
+  const [activeTab, setActiveTab] = useState<'keys' | 'config' | 'users' | 'stats' | 'prompts' | 'docs' | 'activity' | 'normativa' | 'curricula'>('stats');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -154,6 +171,51 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
   const [normativaDefaultInfo, setNormativaDefaultInfo] = useState<{ saved_at: string; vigentes: number; total: number } | null>(null);
   const [savingDefault, setSavingDefault] = useState(false);
   const [resettingDefault, setResettingDefault] = useState(false);
+
+  // ── Curricula & Programs states ──
+  const [curriculaPrograms, setCurriculaPrograms] = useState<ProgramItem[]>([]);
+  const [curriculaLoading, setCurriculaLoading] = useState(false);
+  const [curriculaSubsystem, setCurriculaSubsystem] = useState('todos');
+  const [curriculaSemester, setCurriculaSemester] = useState('todos');
+  const [curriculaComponent, setCurriculaComponent] = useState('todos');
+  const [curriculaSearch, setCurriculaSearch] = useState('');
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<ProgramItem | null>(null);
+  const [programForm, setProgramForm] = useState<{
+    id?: string;
+    uac_name: string;
+    semester: number;
+    component: string;
+    curriculum_name: string;
+    total_hours: number;
+    learning_outcome: string;
+    subsystem: string;
+    model_type: string;
+    activities: { name: string; hours: number; order?: number }[];
+    evidences: string[];
+    contenidos_formativos: { proposito: string; contenidos: string[] }[];
+  }>({
+    uac_name: '',
+    semester: 1,
+    component: 'fundamental',
+    curriculum_name: '',
+    total_hours: 54,
+    learning_outcome: '',
+    subsystem: 'bge',
+    model_type: 'propositos_contenidos',
+    activities: [{ name: '', hours: 18, order: 1 }],
+    evidences: [''],
+    contenidos_formativos: [{ proposito: '', contenidos: [''] }]
+  });
+
+  // Extract PDF Modal
+  const [showExtractModal, setShowExtractModal] = useState(false);
+  const [extractPdfFile, setExtractPdfFile] = useState<File | null>(null);
+  const [extractSubsystem, setExtractSubsystem] = useState('bge');
+  const [extractSemester, setExtractSemester] = useState(1);
+  const [extractComponent, setExtractComponent] = useState('fundamental');
+  const [extracting, setExtracting] = useState(false);
+  const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
 
   // Form states
   const [newKey, setNewKey] = useState({ label: '', provider: 'gemini', apiKey: '', modelDefault: '' });
@@ -202,6 +264,23 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     } catch { /* sin snapshot */ }
   }, []);
 
+  const loadCurricula = useCallback(async () => {
+    setCurriculaLoading(true);
+    try {
+      let url = `/api/admin/programs?`;
+      if (curriculaSubsystem !== 'todos') url += `&subsystem=${curriculaSubsystem}`;
+      if (curriculaSemester !== 'todos') url += `&semester=${curriculaSemester}`;
+      if (curriculaComponent !== 'todos') url += `&component=${curriculaComponent}`;
+      const r = await fetch(url);
+      const d = await r.json();
+      setCurriculaPrograms(d.programs || []);
+    } catch {
+      showMsg('Error al cargar catálogo curricular', false);
+    } finally {
+      setCurriculaLoading(false);
+    }
+  }, [curriculaSubsystem, curriculaSemester, curriculaComponent]);
+
   useEffect(() => {
     loadStats();
     loadConfig();
@@ -214,7 +293,147 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     if (activeTab === 'docs') loadDocs();
     if (activeTab === 'activity') loadActivity();
     if (activeTab === 'normativa') loadNormativa();
-  }, [activeTab]);
+    if (activeTab === 'curricula') loadCurricula();
+  }, [activeTab, loadCurricula]);
+
+  // ── Acciones Catálogo Curricular (Malla y Programas) ───────────────────────
+  function handleOpenNewProgramModal() {
+    setEditingProgram(null);
+    setProgramForm({
+      uac_name: '',
+      semester: 1,
+      component: 'fundamental',
+      curriculum_name: '',
+      total_hours: 54,
+      learning_outcome: '',
+      subsystem: 'bge',
+      model_type: 'propositos_contenidos',
+      activities: [{ name: 'Propósito Formativo 1', hours: 18, order: 1 }],
+      evidences: ['Evidencia de aprendizaje / Producto'],
+      contenidos_formativos: [{ proposito: 'Propósito Formativo 1', contenidos: ['Tema o contenido formativo 1'] }]
+    });
+    setShowProgramModal(true);
+  }
+
+  function handleOpenEditProgramModal(p: ProgramItem) {
+    setEditingProgram(p);
+    setProgramForm({
+      id: p.id,
+      uac_name: p.uac_name,
+      semester: p.semester,
+      component: p.component,
+      curriculum_name: p.curriculum_name || '',
+      total_hours: p.total_hours,
+      learning_outcome: p.learning_outcome || '',
+      subsystem: p.subsystem || 'bge',
+      model_type: p.model_type || (p.semester >= 5 ? 'progresiones' : 'propositos_contenidos'),
+      activities: Array.isArray(p.activities) && p.activities.length > 0 ? p.activities : [{ name: '', hours: 18, order: 1 }],
+      evidences: Array.isArray(p.evidences) && p.evidences.length > 0 ? p.evidences : [''],
+      contenidos_formativos: Array.isArray(p.contenidos_formativos) && p.contenidos_formativos.length > 0
+        ? p.contenidos_formativos
+        : [{ proposito: '', contenidos: [''] }]
+    });
+    setShowProgramModal(true);
+  }
+
+  async function handleSaveProgram(e: React.FormEvent) {
+    e.preventDefault();
+    if (!programForm.uac_name.trim()) return showMsg('El nombre de la UAC es obligatorio', false);
+    setSaving(true);
+    try {
+      const method = editingProgram ? 'PUT' : 'POST';
+      const body = editingProgram ? { ...programForm, id: editingProgram.id } : programForm;
+      const r = await fetch('/api/admin/programs', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setShowProgramModal(false);
+        loadCurricula();
+        showMsg(editingProgram ? 'Programa actualizado correctamente ✓' : 'Nuevo programa registrado en el catálogo ✓');
+      } else {
+        showMsg(d.error || 'Error al guardar programa', false);
+      }
+    } catch {
+      showMsg('Error de conexión al servidor', false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteProgram(id: string, name: string) {
+    if (!confirm(`¿Estás seguro de eliminar el programa "${name}" del catálogo?`)) return;
+    try {
+      const r = await fetch(`/api/admin/programs?id=${id}`, { method: 'DELETE' });
+      if (r.ok) {
+        loadCurricula();
+        showMsg('Programa eliminado del catálogo ✓');
+      } else {
+        const d = await r.json();
+        showMsg(d.error || 'Error al eliminar', false);
+      }
+    } catch {
+      showMsg('Error de red', false);
+    }
+  }
+
+  async function handleExtractPdfSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!extractPdfFile) return showMsg('Selecciona un archivo PDF', false);
+    setExtracting(true);
+    setExtractedPreview(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', extractPdfFile);
+      fd.append('subsystem', extractSubsystem);
+      fd.append('semester', String(extractSemester));
+      fd.append('component', extractComponent);
+
+      const r = await fetch('/api/admin/programs/extract', {
+        method: 'POST',
+        body: fd,
+      });
+      const d = await r.json();
+      if (r.ok && d.extracted) {
+        setExtractedPreview(d.extracted);
+        showMsg('PDF analizado y estructurado con IA ✓ Revisa la vista previa y confirma el guardado.');
+      } else {
+        showMsg(d.error || 'No se pudo extraer la información del PDF', false);
+      }
+    } catch {
+      showMsg('Error al comunicarse con el extractor de PDF', false);
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function handleSaveExtractedToCatalog() {
+    if (!extractedPreview) return;
+    setSaving(true);
+    try {
+      const r = await fetch('/api/admin/programs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(extractedPreview),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setShowExtractModal(false);
+        setExtractedPreview(null);
+        setExtractPdfFile(null);
+        loadCurricula();
+        showMsg('¡Programa oficial guardado/reemplazado exitosamente en el catálogo! ✓');
+      } else {
+        showMsg(d.error || 'Error al guardar el programa extraído', false);
+      }
+    } catch {
+      showMsg('Error de red al guardar', false);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -602,9 +821,10 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
     { id: 'stats',    label: 'Estadísticas',  icon: '📊' },
     { id: 'keys',     label: 'API Keys & IA', icon: '🔑' },
     { id: 'config',   label: 'Configuración', icon: '⚙️' },
+    { id: 'curricula',label: 'Malla y Programas', icon: '📚' },
+    { id: 'normativa',label: 'Normativa',     icon: '🏛️' },
     { id: 'users',    label: 'Usuarios',      icon: '👥' },
     { id: 'prompts',  label: 'Prompts',       icon: '✏️' },
-    { id: 'normativa',label: 'Normativa',     icon: '🏛️' },
     { id: 'docs',     label: 'Documentos',    icon: '📁' },
     { id: 'activity', label: 'Actividad',     icon: '📜' },
   ];
@@ -1497,6 +1717,567 @@ export default function AdminClient({ locale, adminEmail }: { locale: string; ad
                       <button type="button" className="btn-sm btn-ghost" onClick={() => setShowNewArtModal(false)}>Cancelar</button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── MALLA Y PROGRAMAS (CURRÍCULA) ── */}
+        {activeTab === 'curricula' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h1 style={{ margin: 0 }}>📚 Malla Curricular y Programas de Estudio</h1>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'rgba(240,244,255,0.5)' }}>
+                  Gestión oficial de UACs, Propósitos, Contenidos Formativos y Progresiones para Bachillerato General y Tecnológico
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-sm btn-ghost" onClick={loadCurricula} title="Recargar catálogo">
+                  🔄 Actualizar
+                </button>
+                <button className="btn-sm" onClick={() => setShowExtractModal(true)}
+                  style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', border: 'none', fontWeight: 600 }}>
+                  📄 Subir Programa Oficial (PDF con IA)
+                </button>
+                <button className="btn-sm btn-primary" onClick={handleOpenNewProgramModal}>
+                  ➕ Nueva UAC Manual
+                </button>
+              </div>
+            </div>
+
+            {/* Tarjetas de Estadísticas Curriculares */}
+            <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 20 }}>
+              <div className="stat-card">
+                <div className="num">{curriculaPrograms.length}</div>
+                <div className="lbl">Total UACs en Catálogo</div>
+              </div>
+              <div className="stat-card">
+                <div className="num" style={{ color: '#10b981' }}>
+                  {curriculaPrograms.filter(p => p.model_type === 'propositos_contenidos' || p.semester < 5).length}
+                </div>
+                <div className="lbl">Propósitos y Contenidos (1°-4°)</div>
+              </div>
+              <div className="stat-card">
+                <div className="num" style={{ color: '#a855f7' }}>
+                  {curriculaPrograms.filter(p => p.model_type === 'progresiones' || p.semester >= 5).length}
+                </div>
+                <div className="lbl">Progresiones (5°-6° 26-27)</div>
+              </div>
+              <div className="stat-card">
+                <div className="num" style={{ color: '#38bdf8' }}>
+                  {curriculaPrograms.filter(p => p.subsystem === 'bge' || p.subsystem === 'all' || !p.subsystem).length}
+                </div>
+                <div className="lbl">Bachillerato General (BGE)</div>
+              </div>
+              <div className="stat-card">
+                <div className="num" style={{ color: '#f59e0b' }}>
+                  {curriculaPrograms.filter(p => p.subsystem !== 'bge' && p.subsystem !== 'all' && p.subsystem).length}
+                </div>
+                <div className="lbl">Bachilleratos Tecnológicos / Otros</div>
+              </div>
+            </div>
+
+            {/* Barra de Filtros */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <input
+                placeholder="🔍 Buscar por nombre de UAC o especialidad..."
+                value={curriculaSearch}
+                onChange={e => setCurriculaSearch(e.target.value)}
+                style={{ flex: '1 1 240px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}
+              />
+              <select value={curriculaSubsystem} onChange={e => setCurriculaSubsystem(e.target.value)}
+                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
+                <option value="todos">Todos los Subsistemas</option>
+                <option value="bge">Bachillerato General Estatal (BGE)</option>
+                <option value="tecnologico">Bachillerato Tecnológico</option>
+                <option value="cbtis">CBTIS</option>
+                <option value="cbta">CBTA</option>
+                <option value="cecyte">CECyTE</option>
+                <option value="digital">Bachillerato Digital</option>
+                <option value="emsad">EMSAD</option>
+              </select>
+              <select value={curriculaSemester} onChange={e => setCurriculaSemester(e.target.value)}
+                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
+                <option value="todos">Todos los Semestres</option>
+                <option value="1">1.° Semestre</option>
+                <option value="2">2.° Semestre</option>
+                <option value="3">3.° Semestre</option>
+                <option value="4">4.° Semestre</option>
+                <option value="5">5.° Semestre</option>
+                <option value="6">6.° Semestre</option>
+              </select>
+              <select value={curriculaComponent} onChange={e => setCurriculaComponent(e.target.value)}
+                style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', fontSize: 13 }}>
+                <option value="todos">Todos los Componentes</option>
+                <option value="fundamental">Currículum Fundamental</option>
+                <option value="laboral">Formación Laboral / Profesional</option>
+                <option value="ampliado">Currículum Ampliado</option>
+              </select>
+            </div>
+
+            {/* Tabla de Programas */}
+            {curriculaLoading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.6)' }}>Cargando catálogo curricular...</div>
+            ) : curriculaPrograms.length === 0 ? (
+              <div className="empty-state">
+                <p>No se encontraron UACs con los filtros seleccionados.</p>
+                <button className="btn-sm btn-primary" onClick={handleOpenNewProgramModal} style={{ marginTop: 10 }}>➕ Agregar Primer Programa</button>
+              </div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>UAC / Asignatura</th>
+                    <th>Subsistema</th>
+                    <th>Sem.</th>
+                    <th>Componente</th>
+                    <th>Carga Horaria</th>
+                    <th>Modelo Pedagógico</th>
+                    <th style={{ textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {curriculaPrograms
+                    .filter(p => {
+                      if (!curriculaSearch.trim()) return true;
+                      const q = curriculaSearch.toLowerCase();
+                      return p.uac_name.toLowerCase().includes(q) || (p.curriculum_name || '').toLowerCase().includes(q);
+                    })
+                    .map(p => {
+                      const isProgresiones = p.model_type === 'progresiones' || p.semester >= 5;
+                      const weeklyLoad = Math.round((p.total_hours || 54) / 18);
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#f0f4ff' }}>{p.uac_name}</div>
+                            {p.curriculum_name && (
+                              <div style={{ fontSize: 11, color: '#818cf8', marginTop: 2 }}>{p.curriculum_name}</div>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge ${p.subsystem === 'tecnologico' || p.subsystem === 'cecyte' || p.subsystem === 'cbtis' ? 'badge-purple' : 'badge-blue'}`} style={{ textTransform: 'uppercase', fontSize: 11 }}>
+                              {p.subsystem || 'BGE'}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700, textAlign: 'center' }}>{p.semester}°</td>
+                          <td>
+                            <span className="badge" style={{ background: p.component === 'laboral' ? 'rgba(245,158,11,0.15)' : p.component === 'ampliado' ? 'rgba(168,85,247,0.15)' : 'rgba(59,130,246,0.15)', color: p.component === 'laboral' ? '#fbbf24' : p.component === 'ampliado' ? '#c084fc' : '#60a5fa', fontSize: 11 }}>
+                              {p.component === 'laboral' ? 'Laboral' : p.component === 'ampliado' ? 'Ampliado' : 'Fundamental'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: 12 }}>{p.total_hours} hrs ({weeklyLoad} h/sem)</div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{weeklyLoad * 6} hrs / corte</div>
+                          </td>
+                          <td>
+                            {isProgresiones ? (
+                              <span className="badge badge-purple" style={{ fontSize: 10 }}>
+                                🟣 Progresiones (26-27)
+                              </span>
+                            ) : (
+                              <span className="badge badge-green" style={{ fontSize: 10 }}>
+                                🟢 Propósitos y Contenidos
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button className="btn-sm btn-ghost" onClick={() => handleOpenEditProgramModal(p)} title="Editar / Reemplazar Programa" style={{ marginRight: 6 }}>
+                              ✏️ Editar
+                            </button>
+                            <button className="btn-sm btn-danger" onClick={() => handleDeleteProgram(p.id, p.uac_name)} title="Eliminar UAC">
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            )}
+
+            {/* Modal: Crear / Editar UAC Manualmente */}
+            {showProgramModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                <div style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 780, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12 }}>
+                    <h3 style={{ color: '#818cf8', margin: 0, fontSize: 18 }}>
+                      {editingProgram ? `✏️ Editar / Reemplazar: ${editingProgram.uac_name}` : '➕ Nueva UAC / Programa de Estudio'}
+                    </h3>
+                    <button className="btn-sm btn-ghost" onClick={() => setShowProgramModal(false)}>✕ Cerrar</button>
+                  </div>
+
+                  <form onSubmit={handleSaveProgram} style={{ display: 'grid', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+                      <div className="form-group">
+                        <label>Nombre oficial de la UAC *</label>
+                        <input
+                          value={programForm.uac_name}
+                          onChange={e => setProgramForm(f => ({ ...f, uac_name: e.target.value }))}
+                          placeholder="Ej: Pensamiento Matemático I"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Subsistema *</label>
+                        <select
+                          value={programForm.subsystem}
+                          onChange={e => setProgramForm(f => ({ ...f, subsystem: e.target.value }))}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}
+                        >
+                          <option value="bge">Bachillerato General Estatal (BGE)</option>
+                          <option value="tecnologico">Bachillerato Tecnológico</option>
+                          <option value="cbtis">CBTIS</option>
+                          <option value="cbta">CBTA</option>
+                          <option value="cecyte">CECyTE</option>
+                          <option value="digital">Bachillerato Digital</option>
+                          <option value="emsad">EMSAD</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+                      <div className="form-group">
+                        <label>Semestre *</label>
+                        <select
+                          value={programForm.semester}
+                          onChange={e => {
+                            const sem = parseInt(e.target.value, 10);
+                            setProgramForm(f => ({
+                              ...f,
+                              semester: sem,
+                              model_type: sem >= 5 ? 'progresiones' : 'propositos_contenidos'
+                            }));
+                          }}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}
+                        >
+                          <option value={1}>1.° Semestre</option>
+                          <option value={2}>2.° Semestre</option>
+                          <option value={3}>3.° Semestre</option>
+                          <option value={4}>4.° Semestre</option>
+                          <option value={5}>5.° Semestre</option>
+                          <option value={6}>6.° Semestre</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Componente *</label>
+                        <select
+                          value={programForm.component}
+                          onChange={e => setProgramForm(f => ({ ...f, component: e.target.value }))}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}
+                        >
+                          <option value="fundamental">Currículum Fundamental</option>
+                          <option value="laboral">Formación Laboral / Profesional</option>
+                          <option value="ampliado">Currículum Ampliado</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Horas Totales Semestre *</label>
+                        <input
+                          type="number"
+                          value={programForm.total_hours}
+                          onChange={e => setProgramForm(f => ({ ...f, total_hours: parseInt(e.target.value, 10) || 54 }))}
+                          placeholder="54 o 72"
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Modelo Curricular</label>
+                        <select
+                          value={programForm.model_type}
+                          onChange={e => setProgramForm(f => ({ ...f, model_type: e.target.value }))}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}
+                        >
+                          <option value="propositos_contenidos">Propósitos y Contenidos (1°-4° y 2027+)</option>
+                          <option value="progresiones">Progresiones MCCEMS (5°-6° 2026-2027)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {programForm.component === 'laboral' && (
+                      <div className="form-group">
+                        <label>Especialidad / Capacitación de Formación Laboral</label>
+                        <input
+                          value={programForm.curriculum_name}
+                          onChange={e => setProgramForm(f => ({ ...f, curriculum_name: e.target.value }))}
+                          placeholder="Ej: Administración, Tecnologías de la Información, Turismo"
+                        />
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label>Resultado de Aprendizaje / Intencionalidad</label>
+                      <textarea
+                        value={programForm.learning_outcome}
+                        onChange={e => setProgramForm(f => ({ ...f, learning_outcome: e.target.value }))}
+                        rows={2}
+                        placeholder="Descripción del resultado de aprendizaje esperado..."
+                      />
+                    </div>
+
+                    {/* Editor de Propósitos / Actividades Clave con Contenidos Formativos */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: 16, borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <label style={{ fontWeight: 600, color: '#818cf8', margin: 0 }}>
+                          {programForm.model_type === 'progresiones' ? 'Progresiones de Aprendizaje' : 'Propósitos y Contenidos Formativos (Temas Oficiales)'}
+                        </label>
+                        <button
+                          type="button"
+                          className="btn-sm btn-ghost"
+                          onClick={() => {
+                            const newIdx = programForm.activities.length + 1;
+                            setProgramForm(f => ({
+                              ...f,
+                              activities: [...f.activities, { name: `Propósito Formativo ${newIdx}`, hours: 18, order: newIdx }],
+                              contenidos_formativos: [...f.contenidos_formativos, { proposito: `Propósito Formativo ${newIdx}`, contenidos: [''] }]
+                            }));
+                          }}
+                        >
+                          ➕ Agregar Propósito / Progresión
+                        </button>
+                      </div>
+
+                      {programForm.activities.map((act, actIdx) => (
+                        <div key={actIdx} style={{ background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 8, marginBottom: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>#{actIdx + 1}</span>
+                            <input
+                              style={{ flex: 1 }}
+                              value={act.name}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setProgramForm(f => {
+                                  const acts = [...f.activities];
+                                  acts[actIdx] = { ...acts[actIdx], name: val };
+                                  const cfs = [...f.contenidos_formativos];
+                                  if (cfs[actIdx]) cfs[actIdx].proposito = val;
+                                  return { ...f, activities: acts, contenidos_formativos: cfs };
+                                });
+                              }}
+                              placeholder={programForm.model_type === 'progresiones' ? 'Texto de la Progresión X...' : 'Nombre del Propósito Formativo X...'}
+                            />
+                            <input
+                              type="number"
+                              style={{ width: 80 }}
+                              value={act.hours}
+                              onChange={e => {
+                                const hrs = parseInt(e.target.value, 10) || 18;
+                                setProgramForm(f => {
+                                  const acts = [...f.activities];
+                                  acts[actIdx] = { ...acts[actIdx], hours: hrs };
+                                  return { ...f, activities: acts };
+                                });
+                              }}
+                              title="Horas asignadas"
+                            />
+                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>hrs</span>
+                            {programForm.activities.length > 1 && (
+                              <button
+                                type="button"
+                                className="btn-sm btn-danger"
+                                onClick={() => {
+                                  setProgramForm(f => ({
+                                    ...f,
+                                    activities: f.activities.filter((_, i) => i !== actIdx),
+                                    contenidos_formativos: f.contenidos_formativos.filter((_, i) => i !== actIdx)
+                                  }));
+                                }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Temas / Contenidos formativos si es modelo nuevo */}
+                          {programForm.model_type !== 'progresiones' && (
+                            <div style={{ paddingLeft: 24, marginTop: 6 }}>
+                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
+                                📋 Contenidos Formativos / Temas de estudio para este propósito:
+                              </div>
+                              {(programForm.contenidos_formativos[actIdx]?.contenidos || ['']).map((tema, tIdx) => (
+                                <div key={tIdx} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                                  <input
+                                    style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+                                    value={tema}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setProgramForm(f => {
+                                        const cfs = [...f.contenidos_formativos];
+                                        if (!cfs[actIdx]) cfs[actIdx] = { proposito: act.name, contenidos: [] };
+                                        cfs[actIdx].contenidos[tIdx] = val;
+                                        return { ...f, contenidos_formativos: cfs };
+                                      });
+                                    }}
+                                    placeholder={`Tema o contenido ${tIdx + 1}...`}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn-sm btn-ghost"
+                                    style={{ padding: '2px 8px' }}
+                                    onClick={() => {
+                                      setProgramForm(f => {
+                                        const cfs = [...f.contenidos_formativos];
+                                        if (!cfs[actIdx]) return f;
+                                        cfs[actIdx].contenidos = cfs[actIdx].contenidos.filter((_, i) => i !== tIdx);
+                                        return { ...f, contenidos_formativos: cfs };
+                                      });
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                className="btn-sm btn-ghost"
+                                style={{ fontSize: 11, padding: '2px 8px', marginTop: 2 }}
+                                onClick={() => {
+                                  setProgramForm(f => {
+                                    const cfs = [...f.contenidos_formativos];
+                                    if (!cfs[actIdx]) cfs[actIdx] = { proposito: act.name, contenidos: [''] };
+                                    else cfs[actIdx].contenidos.push('');
+                                    return { ...f, contenidos_formativos: cfs };
+                                  });
+                                }}
+                              >
+                                ➕ Añadir tema
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14 }}>
+                      <button type="submit" className="btn-sm btn-primary" disabled={saving} style={{ flex: 1, padding: '10px 16px', fontWeight: 600 }}>
+                        {saving ? 'Guardando...' : editingProgram ? '💾 Guardar Cambios y Actualizar BD' : '➕ Registrar en Catálogo'}
+                      </button>
+                      <button type="button" className="btn-sm btn-ghost" onClick={() => setShowProgramModal(false)}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Subir y Extraer PDF Oficial con IA */}
+            {showExtractModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                <div style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 16, padding: 30, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                    <h3 style={{ color: '#818cf8', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>📄</span> Cargar / Reemplazar Programa con IA (PDF Oficial)
+                    </h3>
+                    <button className="btn-sm btn-ghost" onClick={() => setShowExtractModal(false)}>✕ Cerrar</button>
+                  </div>
+
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: 18 }}>
+                    Sube el documento PDF del programa de estudios emitido por la SEP/SEMS. La IA extraerá automáticamente la UAC, carga horaria, propósitos, contenidos formativos y evidencias para guardarlos o reemplazar la versión anterior en la base de datos.
+                  </p>
+
+                  <form onSubmit={handleExtractPdfSubmit} style={{ display: 'grid', gap: 14 }}>
+                    <div className="form-group">
+                      <label>Archivo PDF oficial del programa *</label>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={e => setExtractPdfFile(e.target.files?.[0] || null)}
+                        required
+                        style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '10px 12px', color: '#f0f4ff', width: '100%' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                      <div className="form-group">
+                        <label>Subsistema de Destino</label>
+                        <select value={extractSubsystem} onChange={e => setExtractSubsystem(e.target.value)}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}>
+                          <option value="bge">Bachillerato General Estatal (BGE)</option>
+                          <option value="tecnologico">Bachillerato Tecnológico</option>
+                          <option value="cbtis">CBTIS</option>
+                          <option value="cbta">CBTA</option>
+                          <option value="cecyte">CECyTE</option>
+                          <option value="digital">Bachillerato Digital</option>
+                          <option value="emsad">EMSAD</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Semestre</label>
+                        <select value={extractSemester} onChange={e => setExtractSemester(parseInt(e.target.value, 10))}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}>
+                          <option value={1}>1.° Semestre</option>
+                          <option value={2}>2.° Semestre</option>
+                          <option value={3}>3.° Semestre</option>
+                          <option value={4}>4.° Semestre</option>
+                          <option value={5}>5.° Semestre</option>
+                          <option value={6}>6.° Semestre</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Componente</label>
+                        <select value={extractComponent} onChange={e => setExtractComponent(e.target.value)}
+                          style={{ background: '#131324', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', color: '#f0f4ff', width: '100%' }}>
+                          <option value="fundamental">Currículum Fundamental</option>
+                          <option value="laboral">Formación Laboral / Profesional</option>
+                          <option value="ampliado">Currículum Ampliado</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn-sm btn-primary"
+                      disabled={extracting || !extractPdfFile}
+                      style={{ padding: '12px 16px', fontWeight: 600, marginTop: 8 }}
+                    >
+                      {extracting ? '⏳ Analizando y estructurando PDF con Gemini IA...' : '⚡ Extraer Estructura con IA'}
+                    </button>
+                  </form>
+
+                  {/* Vista Previa de Extracción */}
+                  {extractedPreview && (
+                    <div style={{ marginTop: 20, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, padding: 18 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <h4 style={{ color: '#10b981', margin: 0, fontSize: 15 }}>✓ Datos extraídos del programa:</h4>
+                        <span className="badge badge-green">Listo para guardar</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#f0f4ff', marginBottom: 6 }}>
+                        <strong>UAC:</strong> {extractedPreview.uac_name}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>
+                        <strong>Carga horaria:</strong> {extractedPreview.total_hours} horas totales ({Math.round(extractedPreview.total_hours / 18)} h/sem)
+                      </div>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 12 }}>
+                        <strong>Propósitos / Progresiones detectadas:</strong> {extractedPreview.activities?.length || 0}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button
+                          type="button"
+                          className="btn-sm"
+                          onClick={handleSaveExtractedToCatalog}
+                          disabled={saving}
+                          style={{ flex: 1, background: '#10b981', color: '#fff', border: 'none', fontWeight: 700, padding: '10px 16px' }}
+                        >
+                          {saving ? 'Guardando en BD...' : '💾 Confirmar y Guardar en Catálogo'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-sm btn-ghost"
+                          onClick={() => setExtractedPreview(null)}
+                        >
+                          Descartar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

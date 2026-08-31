@@ -344,3 +344,23 @@ sin abrirlos. La estrategia es catálogo curado manualmente en BD (NO carga masi
 - Streaming Claude: routes de Planeaciones retornan ReadableStream SSE
 - Windows scripts: usar cmd /c "node --env-file=.env.local", nunca npx dotenv-cli
 
+---
+
+## 14. PLAN MAESTRO DE ACTUALIZACIÓN (CALIDAD MUNDIAL)
+
+> Ver documento maestro completo: [PLAN_MAESTRO_ACTUALIZACION.md](file:///c:/Proyectos_SACRINT/Proyecto_SIGPDA_EMS/SIGPDA_EMS/PLAN_MAESTRO_ACTUALIZACION.md)
+
+### 📌 Régimen de Transición Curricular Oficial:
+- **1.° a 4.° Semestre (Ciclo 2026-2027 en adelante):** Modelo de **Propósitos Formativos y Contenidos Formativos** (Conceptos Centrales, Transversales y Temas). Lineamientos DBEPA 2026-2027, Anexo 12 CC 1-4.
+- **5.° y 6.° Semestre (ÚNICAMENTE Ciclo 2026-2027):** Modelo de **Progresiones de Aprendizaje** (Metas, Categorías y Subcategorías MCCEMS 2022, Anexo 12 CC 5-6).
+- **Ciclo 2027-2028 en adelante:** Progresiones quedan extintas en todo el bachillerato; unificación total bajo Propósitos y Contenidos Formativos.
+
+### 🏛️ Las 6 Fases de Evolución:
+1. **Fase 1:** Motor Curricular Dual & Catálogo Oficial en BD (Zero-Friction Prompting).
+2. **Fase 2:** Auditor Pedagógico IA (Quality Gate con Listas de Cotejo y Rúbricas Oficiales de DBEPA).
+3. **Fase 3:** Ecosistema de Recursos de Aula 1-Click (Rúbricas Analíticas, Guías Alumno, Tickets de Salida, Slides).
+4. **Fase 4:** Módulo DUA e Inclusión (Ajustes razonables BAP y talento sobresaliente).
+5. **Fase 5:** Articulación Integral de la Suite (PAEC ↔ Planeación ↔ PMC ↔ PIPS).
+6. **Fase 6:** Memoria de Estilo Docente y Refinamiento Granular.
+
+
