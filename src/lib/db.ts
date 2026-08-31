@@ -216,8 +216,9 @@ export interface ProgramCatalogItem {
 }
 
 export async function getProgramsCatalog(semester?: number, component?: string, subsystem?: string) {
-  // Normalize subsystem filter: if not provided or 'all', don't filter strictly unless needed
-  const normalizedSubsystem = (subsystem && subsystem !== 'all') ? subsystem.toLowerCase() : undefined;
+  // Normalize subsystem filter: if not provided, 'all', or 'todos', don't filter
+  const normalizedSubsystem = (subsystem && subsystem !== 'all' && subsystem !== 'todos') ? subsystem.toLowerCase() : undefined;
+  const normalizedComponent = (component && component !== 'all' && component !== 'todos') ? component : undefined;
 
   let query = `
     SELECT id, uac_name, semester, component, curriculum_name, year, total_hours, 
@@ -227,14 +228,13 @@ export async function getProgramsCatalog(semester?: number, component?: string, 
   `;
   const params: any[] = [];
 
-  if (semester !== undefined) {
-    // If component is ampliado, in some views it's semester-agnostic, but if explicitly requested with semester:
+  if (semester !== undefined && !isNaN(semester)) {
     params.push(semester);
     query += ` AND semester = $${params.length}`;
   }
 
-  if (component !== undefined && component !== 'all') {
-    params.push(component);
+  if (normalizedComponent !== undefined) {
+    params.push(normalizedComponent);
     query += ` AND component = $${params.length}`;
   }
 
