@@ -296,7 +296,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
 
   const docIds = Array.from(new Set(allUnits.map(u => u.docenteId)));
 
-  function runPermutationSolver(): { success: boolean; assignment: Int32Array; conflicts: number; triples: number } {
+  function runPermutationSolver(): { success: boolean; assignment: Int32Array; conflicts: number; triples: number; concentrations: number } {
     const t0 = Date.now();
     const assignment = new Int32Array(allUnits.length).fill(-1);
     const groupGrid: { [groupId: string]: Int32Array } = {};
@@ -365,20 +365,23 @@ export function resolverHorario(params: SolverParams): SolverResult {
             const periodo = (s % horasPorDia) + 1;
             const matKey = `${dia}_${u.asignaturaId}`;
             const currentCountInDay = groupMatDayCount.get(matKey) || 0;
+            const totalMatInGroup = gUnits.filter(x => x.asignaturaId === u.asignaturaId).length;
+            const maxPermitidoDia = totalMatInGroup <= diasLectivos ? 1 : 2;
 
-            // Restricción pedagógica estricta: máximo 2 horas de la misma materia por día
-            // Penalización masiva si ya tiene 2 o más horas este día
             let score = load * 1000;
             if (currentCountInDay >= 2) {
-              score += 1000000; // Evita generar 3 horas el mismo día
-            } else if (currentCountInDay === 1) {
-              // Si ya tiene 1 hora, verificar si este slot es consecutivo (para formar hora dual/bloque continuo)
+              score += 1000000; // Estricto: jamás 3 horas el mismo día
+            } else if (currentCountInDay >= maxPermitidoDia) {
+              // Asignatura de <= 5h que ya tiene 1h hoy: penalizar para forzar distribución equitativa de 1h por día
+              score += 2500;
+            } else if (currentCountInDay === 1 && totalMatInGroup > diasLectivos) {
+              // Asignatura de módulo (>5h) que requiere 2h: permitir y si es posible hacerlas consecutivas/duales
               const prevSlot = s - 1;
               const nextSlot = s + 1;
               const isPrevSame = periodo > 1 && grid[prevSlot] >= 0 && allUnits[grid[prevSlot]]?.asignaturaId === u.asignaturaId;
               const isNextSame = periodo < maxP && grid[nextSlot] >= 0 && allUnits[grid[nextSlot]]?.asignaturaId === u.asignaturaId;
               if (isPrevSame || isNextSame) {
-                score -= 300; // Fuerte bonificación para formar bloque dual continuo de 2 horas
+                score -= 10; // Leve preferencia de bloque continuo solo cuando ya se requieren 2h el mismo día
               }
             }
 
@@ -548,10 +551,22 @@ export function resolverHorario(params: SolverParams): SolverResult {
           }
 
           // Penalización dura si el swap genera 3 o más horas de la misma materia en un día
-          if (countMatAInDayB >= 2) delta += 20;
-          if (countMatAInDayA > 2) delta -= 20;
-          if (countMatBInDayA >= 2) delta += 20;
-          if (countMatBInDayB > 2) delta -= 20;
+          if (countMatAInDayB >= 2) delta += 50;
+          if (countMatAInDayA > 2) delta -= 50;
+          if (countMatBInDayA >= 2) delta += 50;
+          if (countMatBInDayB > 2) delta -= 50;
+
+          // Distribución equitativa: penalizar si una materia de <= 5h pasa a tener 2 horas en un día
+          const totA = gUnits.filter(x => x.asignaturaId === uA.asignaturaId).length;
+          const totB = gUnits.filter(x => x.asignaturaId === uB.asignaturaId).length;
+          if (totA <= diasLectivos) {
+            if (countMatAInDayB >= 1) delta += 15;
+            if (countMatAInDayA >= 2) delta -= 15;
+          }
+          if (totB <= diasLectivos) {
+            if (countMatBInDayA >= 1) delta += 15;
+            if (countMatBInDayB >= 2) delta -= 15;
+          }
         }
 
         if (delta < bestDelta || (isRandomWalk && Math.random() < 0.35)) {
@@ -583,56 +598,64 @@ export function resolverHorario(params: SolverParams): SolverResult {
       }
     }
 
-    function countTripleViolations(assign: Int32Array) {
-      let count = 0;
+    function countPedagogicalViolations(assign: Int32Array) {
+      let triples = 0;
+      let concentrations = 0;
       for (const g of grupos) {
         const grpId = normalizarId(g.id);
         const gUnits = allUnits.filter(u => normalizarId(u.grupoId) === grpId);
         const dayMat: { [k: string]: number } = {};
+        const totalMat: { [mat: string]: number } = {};
         for (const u of gUnits) {
+          totalMat[u.asignaturaId] = (totalMat[u.asignaturaId] || 0) + 1;
           const s = assign[u.id];
           if (s < 0) continue;
           const d = Math.floor(s / horasPorDia);
           const key = `${d}_${u.asignaturaId}`;
           dayMat[key] = (dayMat[key] || 0) + 1;
         }
-        for (const cnt of Object.values(dayMat)) {
-          if (cnt > 2) count += (cnt - 2);
+        for (const [key, cnt] of Object.entries(dayMat)) {
+          const mat = key.split('_')[1];
+          if (cnt > 2) {
+            triples += (cnt - 2);
+          } else if (cnt > 1 && (totalMat[mat] || 0) <= diasLectivos) {
+            concentrations += (cnt - 1);
+          }
         }
       }
-      return count;
+      return { triples, concentrations };
     }
 
-    const triples = countTripleViolations(assignment);
+    const ped = countPedagogicalViolations(assignment);
 
     return {
       success: totalConflicts === 0,
       assignment,
       conflicts: totalConflicts,
-      triples
+      triples: ped.triples,
+      concentrations: ped.concentrations
     };
   }
 
-  // 6. Ejecutar con Multi-Start hasta lograr 0 conflictos y 0 materias con >2 horas el mismo día
+  // 6. Ejecutar con Multi-Start hasta lograr 0 conflictos y óptima distribución semanal (1h/día)
   let solverRun = runPermutationSolver();
   let attempts = 1;
   let bestRun = solverRun;
 
-  while ((!solverRun.success || solverRun.triples > 0) && (Date.now() - globalStartTime < GLOBAL_TIME_LIMIT) && attempts < 15) {
+  while ((!solverRun.success || solverRun.triples > 0 || solverRun.concentrations > 0) && (Date.now() - globalStartTime < GLOBAL_TIME_LIMIT) && attempts < 15) {
     attempts++;
     solverRun = runPermutationSolver();
-    if (
-      solverRun.conflicts < bestRun.conflicts ||
-      (solverRun.conflicts === bestRun.conflicts && solverRun.triples < bestRun.triples)
-    ) {
+    const scoreCurr = solverRun.conflicts * 1000 + solverRun.triples * 100 + solverRun.concentrations;
+    const scoreBest = bestRun.conflicts * 1000 + bestRun.triples * 100 + bestRun.concentrations;
+    if (scoreCurr < scoreBest) {
       bestRun = solverRun;
     }
   }
 
-  if (!solverRun.success || (solverRun.triples > 0 && bestRun.triples < solverRun.triples)) {
-    if (bestRun.conflicts <= solverRun.conflicts) {
-      solverRun = bestRun;
-    }
+  const scoreCurr = solverRun.conflicts * 1000 + solverRun.triples * 100 + solverRun.concentrations;
+  const scoreBest = bestRun.conflicts * 1000 + bestRun.triples * 100 + bestRun.concentrations;
+  if (scoreBest < scoreCurr) {
+    solverRun = bestRun;
   }
 
   // 7. Construir celdas de resultado
@@ -663,12 +686,15 @@ export function resolverHorario(params: SolverParams): SolverResult {
   }
 
   // 7.1 Optimización Pedagógica Post-Procesamiento:
-  // - Desconcentración: máximo 2 horas diarias por asignatura (evita 3 horas antipedagógicas)
-  // - Compactación: clases continuas desde la Hora 1 para grupos, huecos libres al final del día
+  // 1. Distribución equitativa: de preferencia 1 hora por día para asignaturas de <= 5 horas semanales.
+  // 2. Máximo 2 horas diarias (jamás 3 horas del mismo curso el mismo día).
+  // 3. Horas duales/consecutivas: solo cuando se asignen 2 horas en un mismo día (módulos o necesidad).
+  // 4. Compactación: jornada continua desde la Hora 1, dejando horas libres estrictamente al final del día.
   if (solverRun.success) {
-    desconcentrarMateriasTriples(resultCeldas, grupos, diasLectivos, horasPorDia);
+    redistribuirEquitativamenteMaterias(resultCeldas, grupos, diasLectivos, horasPorDia);
     optimizarHuecosEstudiantes(resultCeldas, grupos, diasLectivos, horasPorDia);
-    desconcentrarMateriasTriples(resultCeldas, grupos, diasLectivos, horasPorDia);
+    redistribuirEquitativamenteMaterias(resultCeldas, grupos, diasLectivos, horasPorDia);
+    agruparHorasDualesExistentes(resultCeldas, grupos, diasLectivos);
   }
 
   // 8. Cálculo de Métricas de Calidad Pedagógica (Soft Constraints)
@@ -931,12 +957,12 @@ function optimizarHuecosEstudiantes(
 }
 
 /**
- * Optimización Post-Procesamiento: Desconcentración Pedagógica
- * Garantiza que ninguna asignatura tenga más de 2 horas en un mismo día para un grupo.
- * Busca intercambios válidos entre días diferentes donde la materia tenga menos de 2 horas,
- * respetando la disponibilidad de los docentes y sin alterar la estructura horaria.
+ * Optimización Post-Procesamiento: Distribución Equitativa Semanal y Límite Pedagógico
+ * 1. Prioridad: Distribuir las asignaturas equitativamente a lo largo de la semana (1 hora por día para materias de <= 5h).
+ * 2. Máximo estricto de 2 horas por día (jamás 3 horas para ninguna materia).
+ * 3. En caso de materias de más de 5 horas (módulos) o restricciones de docentes, se permiten hasta 2 horas por día.
  */
-function desconcentrarMateriasTriples(
+function redistribuirEquitativamenteMaterias(
   celdas: CeldaResultado[],
   grupos: GrupoInput[],
   diasLectivos: number,
@@ -944,12 +970,19 @@ function desconcentrarMateriasTriples(
 ) {
   for (const g of grupos) {
     const grpId = normalizarId(g.id);
+    const celdasGrupo = celdas.filter(c => normalizarId(c.grupoId) === grpId);
 
-    for (let iter = 0; iter < 10; iter++) {
+    // Conteo de horas totales de cada materia para este grupo
+    const totalMatHours: { [mat: string]: number } = {};
+    for (const c of celdasGrupo) {
+      totalMatHours[c.asignaturaId] = (totalMatHours[c.asignaturaId] || 0) + 1;
+    }
+
+    for (let iter = 0; iter < 15; iter++) {
       let huboCambio = false;
 
       for (let d = 1; d <= diasLectivos; d++) {
-        const celdasDia = celdas.filter(c => normalizarId(c.grupoId) === grpId && c.diaSemana === d);
+        const celdasDia = celdasGrupo.filter(c => c.diaSemana === d);
         const matCounts: { [mat: string]: CeldaResultado[] } = {};
         for (const c of celdasDia) {
           if (!matCounts[c.asignaturaId]) matCounts[c.asignaturaId] = [];
@@ -957,7 +990,12 @@ function desconcentrarMateriasTriples(
         }
 
         for (const [mat, celdasMat] of Object.entries(matCounts)) {
-          if (celdasMat.length > 2) {
+          const tot = totalMatHours[mat] || 0;
+          // Si tiene <= 5 horas a la semana, la meta prioritaria es 1 hora por día
+          // Si tiene > 5 horas a la semana (módulos), la meta es máximo 2 horas por día
+          const maxPermitido = tot <= diasLectivos ? 1 : 2;
+
+          if (celdasMat.length > maxPermitido) {
             const celdasMovibles = celdasMat.filter(c => !c.esBloqueado);
             if (celdasMovibles.length === 0) continue;
 
@@ -965,13 +1003,20 @@ function desconcentrarMateriasTriples(
             for (const cOrigen of celdasMovibles) {
               for (let d2 = 1; d2 <= diasLectivos; d2++) {
                 if (d2 === d) continue;
-                const celdasD2 = celdas.filter(c => normalizarId(c.grupoId) === grpId && c.diaSemana === d2);
+                const celdasD2 = celdasGrupo.filter(c => c.diaSemana === d2);
                 const countMatInD2 = celdasD2.filter(c => c.asignaturaId === mat).length;
-                if (countMatInD2 >= 2) continue;
+
+                // Si la materia tiene <= 5h, d2 debe tener 0 horas
+                // Si tiene > 5h, d2 puede tener como máximo 1 hora
+                if (tot <= diasLectivos && countMatInD2 >= 1) continue;
+                if (tot > diasLectivos && countMatInD2 >= 2) continue;
 
                 for (const cDestino of celdasD2.filter(c => !c.esBloqueado && c.asignaturaId !== mat)) {
+                  const destTot = totalMatHours[cDestino.asignaturaId] || 0;
+                  const destMaxPermitido = destTot <= diasLectivos ? 1 : 2;
+
                   const countDestMatInD = celdasDia.filter(c => c !== cOrigen && c.asignaturaId === cDestino.asignaturaId).length;
-                  if (countDestMatInD >= 2) continue;
+                  if (countDestMatInD >= destMaxPermitido) continue;
 
                   const docOrigenLibre = !celdas.some(c =>
                     c !== cOrigen &&
@@ -1006,6 +1051,60 @@ function desconcentrarMateriasTriples(
         }
       }
       if (!huboCambio) break;
+    }
+  }
+}
+
+/**
+ * Optimización Post-Procesamiento: Agrupación de Horas Duales
+ * Cuando una asignatura tenga asignadas 2 horas en el mismo día (módulos o por necesidad),
+ * intenta agruparlas de forma consecutiva (horas duales) si la disponibilidad del docente lo permite.
+ */
+function agruparHorasDualesExistentes(
+  celdas: CeldaResultado[],
+  grupos: GrupoInput[],
+  diasLectivos: number
+) {
+  for (const g of grupos) {
+    const grpId = normalizarId(g.id);
+    for (let d = 1; d <= diasLectivos; d++) {
+      const celdasDia = celdas.filter(c => normalizarId(c.grupoId) === grpId && c.diaSemana === d);
+      const matCounts: { [mat: string]: CeldaResultado[] } = {};
+      for (const c of celdasDia) {
+        if (!matCounts[c.asignaturaId]) matCounts[c.asignaturaId] = [];
+        matCounts[c.asignaturaId].push(c);
+      }
+
+      for (const [mat, list] of Object.entries(matCounts)) {
+        if (list.length === 2 && !list[0].esBloqueado && !list[1].esBloqueado) {
+          list.sort((a, b) => a.periodo - b.periodo);
+          const p1 = list[0].periodo;
+          const p2 = list[1].periodo;
+          if (p2 > p1 + 1) {
+            const targetP = p1 + 1;
+            const interCell = celdasDia.find(c => c.periodo === targetP && !c.esBloqueado && c.asignaturaId !== mat);
+            if (interCell) {
+              const docInterLibre = !celdas.some(c =>
+                c !== interCell &&
+                normalizarId(c.docenteId) === normalizarId(interCell.docenteId) &&
+                c.diaSemana === d &&
+                c.periodo === p2
+              );
+              const doc2Libre = !celdas.some(c =>
+                c !== list[1] &&
+                normalizarId(c.docenteId) === normalizarId(list[1].docenteId) &&
+                c.diaSemana === d &&
+                c.periodo === targetP
+              );
+
+              if (docInterLibre && doc2Libre) {
+                interCell.periodo = p2;
+                list[1].periodo = targetP;
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
