@@ -21,10 +21,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "horarioId y celdas son requeridos." }, { status: 400 });
     }
 
+    let prevMetricas = {};
+    try {
+      const existing = await sql()`SELECT horario_generado FROM horario_config WHERE teacher_id = ${teacher.id}::uuid LIMIT 1`;
+      prevMetricas = existing[0]?.horario_generado?.scoreMetricas || {};
+    } catch {}
+
     const horarioActualizado = {
       id: horarioId,
       celdas,
       scoreMetricas: {
+        ...prevMetricas,
         slotsLibresBloqueados: Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : []
       }
     };

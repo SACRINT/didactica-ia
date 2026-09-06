@@ -158,15 +158,42 @@ export default function EditorHorarios({
   const [regenerandoHorario, setRegenerandoHorario] = useState<boolean>(false);
   const [limpiandoHorario, setLimpiandoHorario] = useState<boolean>(false);
 
+  const getFiltroAliases = (filtroId: string): string[] => {
+    if (!filtroId) return [];
+    const aliases = new Set<string>([filtroId]);
+    if (vistaTab === "GRUPO") {
+      const g = grupos.find((grp: any) => grp.id === filtroId || grp.nombre === filtroId);
+      if (g) {
+        if (g.id) aliases.add(g.id);
+        if (g.nombre) {
+          aliases.add(g.nombre);
+          aliases.add(g.nombre.replace(/º/g, '°'));
+          aliases.add(g.nombre.replace(/°/g, 'º'));
+        }
+      }
+    } else if (vistaTab === "DOCENTE") {
+      const d = docentes.find((doc: any) => doc.id === filtroId);
+      if (d && d.id) {
+        aliases.add(d.id);
+      }
+    }
+    return Array.from(aliases);
+  };
+
   const toggleBloquearSlotLibre = (dia: number, periodo: number, filtroId: string) => {
-    const key = `${dia}_${periodo}_${filtroId}`;
+    const aliases = getFiltroAliases(filtroId);
+    const estaBloqueado = aliases.some(a => slotsLibresBloqueados.has(`${dia}_${periodo}_${a}`));
     setSlotsLibresBloqueados(prev => {
       const nuevo = new Set(prev);
-      if (nuevo.has(key)) {
-        nuevo.delete(key);
+      if (estaBloqueado) {
+        for (const a of aliases) {
+          nuevo.delete(`${dia}_${periodo}_${a}`);
+        }
         toast.success("Hora libre desbloqueada");
       } else {
-        nuevo.add(key);
+        for (const a of aliases) {
+          nuevo.add(`${dia}_${periodo}_${a}`);
+        }
         toast.success("🔒 Hora libre fijada — el sistema no colocará clases aquí");
       }
       if (typeof window !== "undefined" && escuela?.id && horario?.id) {
@@ -179,8 +206,11 @@ export default function EditorHorarios({
     });
   };
 
-  const esSlotLibreBloqueado = (dia: number, periodo: number, filtroId: string) =>
-    slotsLibresBloqueados.has(`${dia}_${periodo}_${filtroId}`);
+  const esSlotLibreBloqueado = (dia: number, periodo: number, filtroId: string) => {
+    if (!filtroId) return false;
+    const aliases = getFiltroAliases(filtroId);
+    return aliases.some(a => slotsLibresBloqueados.has(`${dia}_${periodo}_${a}`));
+  };
 
   const toggleBloquearDiaCompleto = async (diaSemana: number) => {
     const filtroId =
@@ -191,16 +221,23 @@ export default function EditorHorarios({
 
     if (!filtroId) return;
 
+    const aliases = getFiltroAliases(filtroId);
     const horasDelDia = periodosVisibles;
-    const todasBloqueadas = horasDelDia.every(p => slotsLibresBloqueados.has(`${diaSemana}_${p}_${filtroId}`));
+    const todasBloqueadas = horasDelDia.every(p =>
+      aliases.some(a => slotsLibresBloqueados.has(`${diaSemana}_${p}_${a}`))
+    );
 
     const nuevosSlots = new Set(slotsLibresBloqueados);
     if (todasBloqueadas) {
-      horasDelDia.forEach(p => nuevosSlots.delete(`${diaSemana}_${p}_${filtroId}`));
+      horasDelDia.forEach(p => {
+        aliases.forEach(a => nuevosSlots.delete(`${diaSemana}_${p}_${a}`));
+      });
       setSlotsLibresBloqueados(nuevosSlots);
       toast.success(`Día ${diasLectivos[diaSemana - 1]} desbloqueado`);
     } else {
-      horasDelDia.forEach(p => nuevosSlots.add(`${diaSemana}_${p}_${filtroId}`));
+      horasDelDia.forEach(p => {
+        aliases.forEach(a => nuevosSlots.add(`${diaSemana}_${p}_${a}`));
+      });
       setSlotsLibresBloqueados(nuevosSlots);
       toast.success(`🔒 Día ${diasLectivos[diaSemana - 1]} completo bloqueado (${horasDelDia.length} horas protegidas)`);
     }

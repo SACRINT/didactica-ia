@@ -123,6 +123,30 @@ export function normalizarId(val: any): string {
   return String(val).trim();
 }
 
+export function isSlotBloqueadoOIndisponible(
+  dia: number,
+  periodo: number,
+  grupoId: string,
+  docenteId: string,
+  aulaId: string | undefined,
+  slotLibreBloqueadoSet: Set<string>,
+  docenteIndisponibleSet: Set<string>
+): boolean {
+  const gId = normalizarId(grupoId);
+  const dId = normalizarId(docenteId);
+  const aId = aulaId ? normalizarId(aulaId) : "";
+
+  const kGrp = `${dia}_${periodo}_${gId}`;
+  const kDoc = `${dia}_${periodo}_${dId}`;
+
+  if (slotLibreBloqueadoSet.has(kGrp)) return true;
+  if (slotLibreBloqueadoSet.has(kDoc)) return true;
+  if (aId && slotLibreBloqueadoSet.has(`${dia}_${periodo}_${aId}`)) return true;
+  if (docenteIndisponibleSet.has(kDoc)) return true;
+
+  return false;
+}
+
 export function resolverHorario(params: SolverParams): SolverResult {
   const {
     diasLectivos = 5,
@@ -170,7 +194,34 @@ export function resolverHorario(params: SolverParams): SolverResult {
   const globalStartTime = Date.now();
   const GLOBAL_TIME_LIMIT = 8000; // 8s max limit for serverless environment
 
-  // 1. Mapeo de Bloqueos y Restricciones
+  // Mapa de alias para normalización bidireccional de IDs y nombres de grupos, docentes y aulas
+  const aliasMap = new Map<string, string[]>();
+  for (const g of grupos) {
+    const id = normalizarId(g.id);
+    const nom = normalizarId(g.nombre);
+    const aliases = new Set<string>([id]);
+    if (nom) {
+      aliases.add(nom);
+      aliases.add(nom.replace(/º/g, "°"));
+      aliases.add(nom.replace(/°/g, "º"));
+    }
+    const arr = Array.from(aliases);
+    for (const a of arr) {
+      aliasMap.set(a, arr);
+    }
+  }
+  for (const d of docentes) {
+    const id = normalizarId(d.id);
+    const nom = normalizarId(d.nombreCompleto || d.nombre);
+    const aliases = new Set<string>([id]);
+    if (nom) aliases.add(nom);
+    const arr = Array.from(aliases);
+    for (const a of arr) {
+      aliasMap.set(a, arr);
+    }
+  }
+
+  // 1. Mapeo de Bloqueos y Restricciones (con expansión completa de alias)
   const slotLibreBloqueadoSet = new Set<string>();
   if (slotsLibresBloqueados) {
     const arr = Array.isArray(slotsLibresBloqueados)
@@ -178,22 +229,37 @@ export function resolverHorario(params: SolverParams): SolverResult {
       : Array.from(slotsLibresBloqueados as Set<string>);
     for (const k of arr) {
       slotLibreBloqueadoSet.add(k);
+      const parts = k.split("_");
+      if (parts.length >= 3) {
+        const dia = parts[0];
+        const per = parts[1];
+        const ent = parts.slice(2).join("_");
+        const aliases = aliasMap.get(ent) || aliasMap.get(normalizarId(ent));
+        if (aliases) {
+          for (const alias of aliases) {
+            slotLibreBloqueadoSet.add(`${dia}_${per}_${alias}`);
+          }
+        }
+      }
     }
   }
 
   const docenteIndisponibleSet = new Set<string>();
   for (const r of restriccionesDocentes) {
     const docId = normalizarId(r.docenteId);
-    if (r.diasIndisponibles) {
-      for (const d of r.diasIndisponibles) {
-        for (let p = 1; p <= horasPorDia; p++) {
-          docenteIndisponibleSet.add(`${d}_${p}_${docId}`);
+    const aliases = aliasMap.get(docId) || [docId];
+    const dias = r.diasIndisponibles || (r as any).diasNoDisponibles || [];
+    for (const d of dias) {
+      for (let p = 1; p <= horasPorDia; p++) {
+        for (const a of aliases) {
+          docenteIndisponibleSet.add(`${d}_${p}_${a}`);
         }
       }
     }
-    if (r.periodosIndisponibles) {
-      for (const item of r.periodosIndisponibles) {
-        docenteIndisponibleSet.add(`${item.dia}_${item.periodo}_${docId}`);
+    const periodos = r.periodosIndisponibles || (r as any).horasBloqueadas || [];
+    for (const item of periodos) {
+      for (const a of aliases) {
+        docenteIndisponibleSet.add(`${item.dia}_${item.periodo}_${a}`);
       }
     }
   }
@@ -313,7 +379,10 @@ export function resolverHorario(params: SolverParams): SolverResult {
       const allGroupSlots: number[] = [];
       for (let d = 1; d <= diasLectivos; d++) {
         for (let p = 1; p <= maxP; p++) {
-          allGroupSlots.push(slotIndex(d, p));
+          const kGrp = `${d}_${p}_${gid}`;
+          if (!slotLibreBloqueadoSet.has(kGrp)) {
+            allGroupSlots.push(slotIndex(d, p));
+          }
         }
       }
 
@@ -401,8 +470,11 @@ export function resolverHorario(params: SolverParams): SolverResult {
           });
           for (const s of allSorted) {
             if (!usedSlots.has(s)) {
-              bestSlot = s;
-              break;
+              const pos = slotFromIndex(s);
+              if (!isSlotBloqueadoOIndisponible(pos.dia, pos.periodo, u.grupoId, u.docenteId, u.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                bestSlot = s;
+                break;
+              }
             }
           }
         }
@@ -691,10 +763,10 @@ export function resolverHorario(params: SolverParams): SolverResult {
   // 3. Horas duales/consecutivas: solo cuando se asignen 2 horas en un mismo día (módulos o necesidad).
   // 4. Compactación: jornada continua desde la Hora 1, dejando horas libres estrictamente al final del día.
   if (solverRun.success) {
-    redistribuirEquitativamenteMaterias(resultCeldas, grupos, diasLectivos, horasPorDia);
-    optimizarHuecosEstudiantes(resultCeldas, grupos, diasLectivos, horasPorDia);
-    redistribuirEquitativamenteMaterias(resultCeldas, grupos, diasLectivos, horasPorDia);
-    agruparHorasDualesExistentes(resultCeldas, grupos, diasLectivos);
+    redistribuirEquitativamenteMaterias(resultCeldas, grupos, diasLectivos, horasPorDia, slotLibreBloqueadoSet, docenteIndisponibleSet);
+    optimizarHuecosEstudiantes(resultCeldas, grupos, diasLectivos, horasPorDia, slotLibreBloqueadoSet, docenteIndisponibleSet);
+    redistribuirEquitativamenteMaterias(resultCeldas, grupos, diasLectivos, horasPorDia, slotLibreBloqueadoSet, docenteIndisponibleSet);
+    agruparHorasDualesExistentes(resultCeldas, grupos, diasLectivos, slotLibreBloqueadoSet, docenteIndisponibleSet);
   }
 
   // 8. Cálculo de Métricas de Calidad Pedagógica (Soft Constraints)
@@ -798,10 +870,30 @@ export function resolverHorario(params: SolverParams): SolverResult {
   if (!solverRun.success) rawScore -= solverRun.conflicts * 25;
   const softScore = Math.max(10, Math.min(100, Math.round(rawScore)));
 
+  // Verificación final estricta de invariantes: Garantizar que NINGUNA clase quede en un slot bloqueado o día indisponible
+  const celdasEnSlotsBloqueados = resultCeldas.filter(c =>
+    isSlotBloqueadoOIndisponible(
+      c.diaSemana,
+      c.periodo,
+      c.grupoId,
+      c.docenteId,
+      c.aulaId,
+      slotLibreBloqueadoSet,
+      docenteIndisponibleSet
+    )
+  );
+
+  if (celdasEnSlotsBloqueados.length > 0) {
+    console.error(`[SOLVER VIOLATION] Se detectaron ${celdasEnSlotsBloqueados.length} celdas en slots bloqueados.`, celdasEnSlotsBloqueados);
+    for (const viol of celdasEnSlotsBloqueados) {
+      conflictos.push(`Conflicto de bloqueo: La clase de ${viol.asignaturaId} (Grupo: ${viol.grupoId}, Docente: ${viol.docenteId}) cayó en un slot bloqueado en Día ${viol.diaSemana} Hora ${viol.periodo}.`);
+    }
+  }
+
   const tiempoEjecucionMs = Date.now() - globalStartTime;
 
   return {
-    exito: solverRun.success,
+    exito: solverRun.success && celdasEnSlotsBloqueados.length === 0,
     celdas: resultCeldas,
     conflictos,
     metricas: {
@@ -822,16 +914,19 @@ export function resolverHorario(params: SolverParams): SolverResult {
 /**
  * Optimización Post-Procesamiento: Compactación Inteligente de Horarios para Grupos de Estudiantes
  * Garantiza que:
- * 1. Las clases siempre inicien en el Periodo 1 (los alumnos no llegan a esperar horas muertas tempranas).
- * 2. Las clases sean continuas en cada día (cero horas muertas intermedias).
+ * 1. Las clases siempre inicien en el Periodo 1 (a menos que el usuario haya bloqueado el Periodo 1 para ese grupo).
+ * 2. Las clases sean continuas en cada día (cero horas muertas intermedias, salvo horas bloqueadas por el usuario).
  * 3. Cualquier hora libre quede ubicada al final de la jornada (e.g. 6ª hora en 1° o 8ª hora en 3°),
  *    permitiendo la salida temprana de los alumnos.
+ * 4. REGLA ESTRICTA DE ORO: NUNCA colocar clases en horas bloqueadas ni en días bloqueados/indisponibles.
  */
 function optimizarHuecosEstudiantes(
   celdas: CeldaResultado[],
   grupos: GrupoInput[],
   diasLectivos: number,
-  maxHoras: number
+  maxHoras: number,
+  slotLibreBloqueadoSet: Set<string>,
+  docenteIndisponibleSet: Set<string>
 ) {
   let cambio = true;
   let iter = 0;
@@ -850,6 +945,12 @@ function optimizarHuecosEstudiantes(
 
         for (let p_vacio = 1; p_vacio <= k; p_vacio++) {
           if (!periodosOcupados.has(p_vacio)) {
+            // REGLA CRÍTICA: Si p_vacio está bloqueado para el grupo por el usuario,
+            // NO es un hueco que deba compactarse. Debe permanecer libre como el usuario especificó.
+            if (slotLibreBloqueadoSet.has(`${d}_${p_vacio}_${grpId}`)) {
+              continue;
+            }
+
             // Paso 1: Mover directamente cualquier clase posterior a p_vacio (la más cercana primero)
             const clasesPosteriores = celdasDia
               .filter(c => c.periodo > p_vacio && !c.esBloqueado)
@@ -857,6 +958,11 @@ function optimizarHuecosEstudiantes(
 
             let movido = false;
             for (const cand of clasesPosteriores) {
+              // Verificar que p_vacio NO esté bloqueado ni sea día indisponible para cand
+              if (isSlotBloqueadoOIndisponible(d, p_vacio, grpId, cand.docenteId, cand.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                continue;
+              }
+
               const docenteOcupado = celdas.some(c =>
                 c !== cand &&
                 normalizarId(c.docenteId) === normalizarId(cand.docenteId) &&
@@ -877,6 +983,14 @@ function optimizarHuecosEstudiantes(
             // Si cand no puede ir a p_vacio pero otra clase 'inter' sí puede ir a p_vacio y cand puede ir a inter.periodo
             for (const cand of clasesPosteriores) {
               for (const inter of celdasDia.filter(c => c.periodo < cand.periodo && !c.esBloqueado && c.periodo !== p_vacio)) {
+                // Verificar bloqueos para inter en p_vacio y cand en inter.periodo
+                if (isSlotBloqueadoOIndisponible(d, p_vacio, grpId, inter.docenteId, inter.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                  continue;
+                }
+                if (isSlotBloqueadoOIndisponible(d, inter.periodo, grpId, cand.docenteId, cand.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                  continue;
+                }
+
                 const interDocLibreEnVacio = !celdas.some(c =>
                   c !== inter &&
                   normalizarId(c.docenteId) === normalizarId(inter.docenteId) &&
@@ -904,7 +1018,7 @@ function optimizarHuecosEstudiantes(
 
             if (movido) break;
 
-            // Paso 3: Swap entre días (cuidando estrictamente no generar más de 2 horas de la misma materia)
+            // Paso 3: Swap entre días (cuidando estrictamente no violar bloqueos de días/horas ni generar >2 horas)
             for (let d2 = 1; d2 <= diasLectivos; d2++) {
               if (d2 === d) continue;
               const celdasD2 = celdas.filter(c => normalizarId(c.grupoId) === grpId && c.diaSemana === d2);
@@ -917,6 +1031,16 @@ function optimizarHuecosEstudiantes(
                   // Verificar que mover c2 a d no cause más de 2 horas de c2.asignaturaId en d
                   const countC2InD = celdasDia.filter(c => c !== cand && c.asignaturaId === c2.asignaturaId).length;
                   if (countC2InD >= 2) continue;
+
+                  // REGLA CRÍTICA DE BLOQUEOS:
+                  // 1. (d, p_vacio) NO debe estar bloqueado para c2 (docente, grupo o aula)
+                  if (isSlotBloqueadoOIndisponible(d, p_vacio, grpId, c2.docenteId, c2.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                    continue;
+                  }
+                  // 2. (d2, c2.periodo) NO debe estar bloqueado para cand (docente, grupo o aula)
+                  if (isSlotBloqueadoOIndisponible(d2, c2.periodo, grpId, cand.docenteId, cand.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                    continue;
+                  }
 
                   const docC2Libre = !celdas.some(c =>
                     c !== c2 &&
@@ -953,20 +1077,24 @@ function optimizarHuecosEstudiantes(
         }
       }
     }
-}
+  }
 }
 
 /**
  * Optimización Post-Procesamiento: Distribución Equitativa Semanal y Límite Pedagógico
- * 1. Prioridad: Distribuir las asignaturas equitativamente a lo largo de la semana (1 hora por día para materias de <= 5h).
+ * 1. Prioridad Pedagógica: Distribuir las asignaturas equitativamente a lo largo de la semana (1 hora por día para materias de <= 5h).
  * 2. Máximo estricto de 2 horas por día (jamás 3 horas para ninguna materia).
  * 3. En caso de materias de más de 5 horas (módulos) o restricciones de docentes, se permiten hasta 2 horas por día.
+ * 4. REGLA ESTRICTA DE ORO: Las horas bloqueadas y días bloqueados por el usuario JAMÁS se violan.
+ *    La disponibilidad y los bloqueos están SIEMPRE por encima de la distribución uniforme.
  */
 function redistribuirEquitativamenteMaterias(
   celdas: CeldaResultado[],
   grupos: GrupoInput[],
   diasLectivos: number,
-  horasPorDia: number
+  horasPorDia: number,
+  slotLibreBloqueadoSet: Set<string>,
+  docenteIndisponibleSet: Set<string>
 ) {
   for (const g of grupos) {
     const grpId = normalizarId(g.id);
@@ -1018,6 +1146,33 @@ function redistribuirEquitativamenteMaterias(
                   const countDestMatInD = celdasDia.filter(c => c !== cOrigen && c.asignaturaId === cDestino.asignaturaId).length;
                   if (countDestMatInD >= destMaxPermitido) continue;
 
+                  // REGLA CRÍTICA DE ORO:
+                  // 1. (d2, cDestino.periodo) NO debe estar bloqueado ni ser día indisponible para cOrigen
+                  if (isSlotBloqueadoOIndisponible(
+                    d2,
+                    cDestino.periodo,
+                    grpId,
+                    cOrigen.docenteId,
+                    cOrigen.aulaId,
+                    slotLibreBloqueadoSet,
+                    docenteIndisponibleSet
+                  )) {
+                    continue;
+                  }
+
+                  // 2. (d, cOrigen.periodo) NO debe estar bloqueado ni ser día indisponible para cDestino
+                  if (isSlotBloqueadoOIndisponible(
+                    d,
+                    cOrigen.periodo,
+                    grpId,
+                    cDestino.docenteId,
+                    cDestino.aulaId,
+                    slotLibreBloqueadoSet,
+                    docenteIndisponibleSet
+                  )) {
+                    continue;
+                  }
+
                   const docOrigenLibre = !celdas.some(c =>
                     c !== cOrigen &&
                     normalizarId(c.docenteId) === normalizarId(cOrigen.docenteId) &&
@@ -1059,11 +1214,14 @@ function redistribuirEquitativamenteMaterias(
  * Optimización Post-Procesamiento: Agrupación de Horas Duales
  * Cuando una asignatura tenga asignadas 2 horas en el mismo día (módulos o por necesidad),
  * intenta agruparlas de forma consecutiva (horas duales) si la disponibilidad del docente lo permite.
+ * NUNCA coloca clases en horas bloqueadas ni en días no disponibles.
  */
 function agruparHorasDualesExistentes(
   celdas: CeldaResultado[],
   grupos: GrupoInput[],
-  diasLectivos: number
+  diasLectivos: number,
+  slotLibreBloqueadoSet: Set<string>,
+  docenteIndisponibleSet: Set<string>
 ) {
   for (const g of grupos) {
     const grpId = normalizarId(g.id);
@@ -1084,6 +1242,16 @@ function agruparHorasDualesExistentes(
             const targetP = p1 + 1;
             const interCell = celdasDia.find(c => c.periodo === targetP && !c.esBloqueado && c.asignaturaId !== mat);
             if (interCell) {
+              // REGLA CRÍTICA DE BLOQUEOS:
+              // 1. targetP NO debe estar bloqueado para list[1]
+              if (isSlotBloqueadoOIndisponible(d, targetP, grpId, list[1].docenteId, list[1].aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                continue;
+              }
+              // 2. p2 NO debe estar bloqueado para interCell
+              if (isSlotBloqueadoOIndisponible(d, p2, grpId, interCell.docenteId, interCell.aulaId, slotLibreBloqueadoSet, docenteIndisponibleSet)) {
+                continue;
+              }
+
               const docInterLibre = !celdas.some(c =>
                 c !== interCell &&
                 normalizarId(c.docenteId) === normalizarId(interCell.docenteId) &&

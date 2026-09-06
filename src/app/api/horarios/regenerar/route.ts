@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     const teacherId = teacher.id;
     const body = await req.json();
-    const { horarioId, slotsLibresBloqueados = [], celdas = [] } = body;
+    const { horarioId, celdas = [] } = body;
 
     // 1. Cargar configuración existente
     let configRows: any[] = [];
@@ -29,6 +29,18 @@ export async function POST(req: NextRequest) {
       console.warn("[api/horarios/regenerar POST] Error consultando horario_config:", e);
     }
     const configRow = configRows[0] || null;
+
+    const bodySlots = body.slotsLibresBloqueados;
+    const savedSlots = configRow?.horario_generado?.scoreMetricas?.slotsLibresBloqueados;
+    const rawSlots: string[] = Array.isArray(bodySlots)
+      ? bodySlots
+      : (Array.isArray(savedSlots) ? savedSlots : []);
+
+    const bodyRestricciones = body.restriccionesDocentes;
+    const savedRestricciones = configRow?.horario_generado?.scoreMetricas?.restriccionesDocentes || configRow?.horario_generado?.restriccionesDocentes;
+    const restriccionesDocentes = Array.isArray(bodyRestricciones)
+      ? bodyRestricciones
+      : (Array.isArray(savedRestricciones) ? savedRestricciones : []);
 
     const horasPorDia = configRow?.horas_por_dia || 6;
     const diasLectivos = configRow?.dias_lectivos || 5;
@@ -99,7 +111,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. Extraer celdas fijas con candado (excluyendo las que colisionen con bloqueos recién fijados)
-    const slotsBloqArr: string[] = Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : [];
+    const slotsBloqArr: string[] = rawSlots;
     const slotsBloqSet = new Set<string>(slotsBloqArr);
 
     const celdasFijas = (Array.isArray(celdas) ? celdas : [])
@@ -185,7 +197,8 @@ export async function POST(req: NextRequest) {
       aulas: [{ id: "aula-gen", nombre: "Aula General", tipo: "REGULAR" }],
       cargas,
       celdasFijas,
-      slotsLibresBloqueados: slotsBloqArr
+      slotsLibresBloqueados: slotsBloqArr,
+      restriccionesDocentes
     };
 
     // 8. Ejecutar el Solver Global CSP + Min-Conflicts
@@ -210,7 +223,8 @@ export async function POST(req: NextRequest) {
       config: { horasPorDia: maxHorasPlantel, diasLectivos },
       scoreMetricas: {
         ...resultado.metricas,
-        slotsLibresBloqueados: Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : []
+        slotsLibresBloqueados: slotsBloqArr,
+        restriccionesDocentes
       },
       celdas: resultado.celdas.map((c: any, idx: number) => {
         const docObj = personalRows.find((d: any) => String(d.id) === String(c.docenteId));
