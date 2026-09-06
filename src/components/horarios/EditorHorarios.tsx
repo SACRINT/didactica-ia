@@ -783,7 +783,7 @@ export default function EditorHorarios({
       horario?.celdas?.some((c: any) => c.docenteId === d.id)
     );
 
-    const zonaEscolarEfectiva = (escuela as any)?.zonaEscolar || (escuela as any)?.zona || "004";
+    const zonaEscolarEfectiva = (escuela as any)?.zonaEscolar || (escuela as any)?.zona || "";
 
     if (opcion === "LIBRO_COMPLETO") {
       await exportarLibroIntegralExcel({
