@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       id: normalizarId(g.id),
       nombre: g.nombre,
       semestre: g.semestre || 1,
-      horasPorDia: g.semestre === 1 ? 5 : horasPorDia
+      horasPorDia: g.horasPorDia || horasPorDia
     }));
 
     if (respuestaIA.acciones && respuestaIA.acciones.length > 0) {

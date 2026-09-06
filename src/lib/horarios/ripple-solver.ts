@@ -58,7 +58,7 @@ function getMaxPeriodosGrupo(
     const g = gruposInfo.find((x) => normId(x.id) === gid);
     if (g) {
       if (g.horasPorDia) return g.horasPorDia;
-      if (g.semestre === 1) return 5;
+      // Eliminada restricción de 1er semestre - la jornada se calcula dinámicamente en la API
       return fallback;
     }
   }
@@ -66,7 +66,7 @@ function getMaxPeriodosGrupo(
     const c = celdasOriginales.find((x) => normId(x.grupoId) === gid);
     if (c?.grupo) {
       if (c.grupo.horasPorDia) return c.grupo.horasPorDia;
-      if (c.grupo.semestre === 1) return 5;
+      // Eliminada restricción de 1er semestre - la jornada se calcula dinámicamente en la API
     }
   }
   return fallback;
