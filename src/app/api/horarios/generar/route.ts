@@ -67,32 +67,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Determinar la jornada máxima diaria requerida para que quepan todas las materias
-    // Ej. En Bachillerato Tecnológico, 39h / 5 días = 7.8 -> Requiere mínimo 8 horas diarias
-    let minHorasDiariasRequeridas = 6;
-    for (const [, totalHoras] of horasPorGrupo) {
-      const minDiario = Math.ceil(totalHoras / diasLectivos);
-      if (minDiario > minHorasDiariasRequeridas) {
-        minHorasDiariasRequeridas = minDiario;
-      }
-    }
-
-    const horasPorDiaFinal = Math.max(
-      Number(rawParams.horasPorDia || 6),
-      minHorasDiariasRequeridas
-    );
-
-    // Normalizar grupos con la jornada requerida
+    // Normalizar grupos con su jornada individual requerida
     const grupos = gruposRaw.map((g: any) => {
       const gId = String(g.id || g.nombre);
       const horasTotalesGrupo = horasPorGrupo.get(gId) || 0;
       const minDiarioGrupo = Math.ceil(horasTotalesGrupo / diasLectivos);
+      const defaultHoras = g.semestre === 3 ? 8 : g.semestre === 5 ? 7 : 6;
+      const gHorasConfig = g.horasPorDia ? Number(g.horasPorDia) : (g.horas_por_dia ? Number(g.horas_por_dia) : defaultHoras);
       return {
         id: gId,
         nombre: String(g.nombre || g.id),
         semestre: Number(g.semestre || 1),
-        horasPorDia: Math.max(Number(g.horasPorDia || horasPorDiaFinal), minDiarioGrupo, horasPorDiaFinal),
+        horasPorDia: Math.max(gHorasConfig, minDiarioGrupo, 1),
       };
     });
+
+    // La jornada global de la retícula escolar (Horario Maestro) debe ser la máxima de los grupos
+    const horasPorDiaFinal = Math.max(
+      Number(rawParams.horasPorDia || 6),
+      ...grupos.map((g: any) => g.horasPorDia),
+      6
+    );
 
     const params: SolverParams = {
       diasLectivos,

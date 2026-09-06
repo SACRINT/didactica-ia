@@ -37,18 +37,26 @@ export async function POST(req: NextRequest) {
 
     // 2. Cargar grupos del semestre activo
     const gruposRows = await sql()`
-      SELECT id::text, nombre, semestre
+      SELECT id::text, nombre, semestre, horas_por_dia
       FROM horario_grupos
       WHERE teacher_id = ${teacherId}::uuid AND semestre = ANY(${semestresDeseados}::int[])
       ORDER BY semestre ASC, nombre ASC
     `;
 
-    const grupos = gruposRows.map((g: any) => ({
-      id: String(g.id || g.nombre),
-      nombre: String(g.nombre),
-      semestre: Number(g.semestre || 1),
-      horasPorDia: Number(horasPorDia)
-    }));
+    const grupos = gruposRows.map((g: any) => {
+      const defaultHoras = g.semestre === 3 ? 8 : g.semestre === 5 ? 7 : 6;
+      return {
+        id: String(g.id || g.nombre),
+        nombre: String(g.nombre),
+        semestre: Number(g.semestre || 1),
+        horasPorDia: g.horas_por_dia ? Number(g.horas_por_dia) : defaultHoras
+      };
+    });
+
+    const maxHorasPlantel = Math.max(
+      ...grupos.map((g: any) => g.horasPorDia),
+      Number(horasPorDia || 6)
+    );
 
     // 3. Cargar personal docente registrado
     const personalRows = await sql()`
@@ -171,7 +179,7 @@ export async function POST(req: NextRequest) {
     // 7. Preparar parámetros del Solver Global
     const params: SolverParams = {
       diasLectivos,
-      horasPorDia,
+      horasPorDia: maxHorasPlantel,
       grupos,
       docentes,
       aulas: [{ id: "aula-gen", nombre: "Aula General", tipo: "REGULAR" }],
@@ -199,7 +207,7 @@ export async function POST(req: NextRequest) {
     const horarioIdFinal = horarioId || configRow?.horario_generado?.id || `horario_${Date.now()}`;
     const horarioActualizado = {
       id: horarioIdFinal,
-      config: { horasPorDia, diasLectivos },
+      config: { horasPorDia: maxHorasPlantel, diasLectivos },
       scoreMetricas: {
         ...resultado.metricas,
         slotsLibresBloqueados: Array.isArray(slotsLibresBloqueados) ? slotsLibresBloqueados : []

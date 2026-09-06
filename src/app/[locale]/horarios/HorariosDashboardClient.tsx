@@ -140,32 +140,37 @@ export default function HorariosDashboardClient({
         setEscuelaState((prev: any) => ({ ...prev, ...paramsFromWizard.escuela }));
       }
 
-      // Calcular si algún grupo requiere más horas por día según sus cargas
-      let maxHorasDiarias = Number(finalConfig.horasPorDia || 6);
-      for (const g of finalGrupos) {
+      // Calcular jornada requerida por cada grupo individualmente y jornada máxima del plantel
+      const gruposMapeados = finalGrupos.map((g: any) => {
         const cargasG = finalCargas.filter((c: any) => (c.grupoId || c.grupo_nombre) === g.id || (c.grupoId || c.grupo_nombre) === g.nombre);
         const tot = cargasG.reduce((s: number, c: any) => s + Number(c.horasSemanales || c.horas_semanales || 0), 0);
         const minD = Math.ceil(tot / (finalConfig.diasLectivos || 5));
-        if (minD > maxHorasDiarias) maxHorasDiarias = minD;
-      }
-      const horasPorDiaFinal = Math.max(Number(finalConfig.horasPorDia || 6), maxHorasDiarias);
+        const defaultHoras = g.semestre === 3 ? 8 : g.semestre === 5 ? 7 : 6;
+        const gHoras = g.horasPorDia ? Number(g.horasPorDia) : (g.horas_por_dia ? Number(g.horas_por_dia) : defaultHoras);
+        return {
+          ...g,
+          horasPorDia: Math.max(gHoras, minD, 1)
+        };
+      });
+
+      const maxHorasPlantel = Math.max(
+        ...gruposMapeados.map((g: any) => g.horasPorDia),
+        Number(finalConfig.horasPorDia || 6)
+      );
 
       const res = await fetch('/api/horarios/generar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           params: {
-            grupos: finalGrupos.map((g: any) => ({
-              ...g,
-              horasPorDia: Math.max(Number(g.horasPorDia || horasPorDiaFinal), horasPorDiaFinal)
-            })),
+            grupos: gruposMapeados,
             docentes: finalDocentes,
             aulas: finalAulas,
             cargas: finalCargas,
             diasLectivos: finalConfig.diasLectivos || 5,
-            horasPorDia: horasPorDiaFinal,
+            horasPorDia: maxHorasPlantel,
             horaInicio: finalConfig.horaInicio || '08:00',
-            config: { ...finalConfig, horasPorDia: horasPorDiaFinal },
+            config: { ...finalConfig, horasPorDia: maxHorasPlantel },
           },
         }),
       });

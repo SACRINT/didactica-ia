@@ -345,10 +345,15 @@ export function resolverHorario(params: SolverParams): SolverResult {
         let minLoad = 999;
         const dArr = docGrid.get(u.docenteId)!;
 
-        // Mezclar aleatoriamente las opciones con la misma carga
-        const slotsShuffled = [...u.validSlots].sort(() => Math.random() - 0.5);
+        // Ordenar slots prefiriendo periodos tempranos (1, 2, 3...) para compactar horario escolar
+        const slotsSorted = [...u.validSlots].sort((a, b) => {
+          const pA = (a % horasPorDia) + 1;
+          const pB = (b % horasPorDia) + 1;
+          if (pA !== pB) return pA - pB;
+          return Math.random() - 0.5;
+        });
 
-        for (const s of slotsShuffled) {
+        for (const s of slotsSorted) {
           if (!usedSlots.has(s)) {
             const load = dArr[s];
             if (load < minLoad) {
@@ -359,8 +364,13 @@ export function resolverHorario(params: SolverParams): SolverResult {
         }
 
         if (bestSlot === -1) {
-          // Fallback a cualquier slot disponible del grupo
-          for (const s of allGroupSlots) {
+          // Fallback a cualquier slot disponible del grupo (priorizando periodos tempranos)
+          const allSorted = [...allGroupSlots].sort((a, b) => {
+            const pA = (a % horasPorDia) + 1;
+            const pB = (b % horasPorDia) + 1;
+            return pA - pB;
+          });
+          for (const s of allSorted) {
             if (!usedSlots.has(s)) {
               bestSlot = s;
               break;
@@ -569,6 +579,13 @@ export function resolverHorario(params: SolverParams): SolverResult {
     conflictos.push(`El solver terminó con ${solverRun.conflicts} conflictos no resueltos por restricciones de capacidad.`);
   }
 
+  // 7.1 Compactación Post-Procesamiento para Grupos de Estudiantes:
+  // Garantiza que las clases inicien a primera hora (Hora 1), no existan horas muertas intermedias,
+  // y cualquier hora libre quede estrictamente al final de la jornada escolar (e.g. 6ª hora o 8ª hora).
+  if (solverRun.success) {
+    optimizarHuecosEstudiantes(resultCeldas, grupos, diasLectivos, horasPorDia);
+  }
+
   // 8. Cálculo de Métricas de Calidad Pedagógica (Soft Constraints)
   let huecosDocentes = 0;
   let diasAisladosDocentes = 0;
@@ -690,3 +707,133 @@ export function resolverHorario(params: SolverParams): SolverResult {
     distribucionDocentes
   };
 }
+
+/**
+ * Optimización Post-Procesamiento: Compactación Inteligente de Horarios para Grupos de Estudiantes
+ * Garantiza que:
+ * 1. Las clases siempre inicien en el Periodo 1 (los alumnos no llegan a esperar horas muertas tempranas).
+ * 2. Las clases sean continuas en cada día (cero horas muertas intermedias).
+ * 3. Cualquier hora libre quede ubicada al final de la jornada (e.g. 6ª hora en 1° o 8ª hora en 3°),
+ *    permitiendo la salida temprana de los alumnos.
+ */
+function optimizarHuecosEstudiantes(
+  celdas: CeldaResultado[],
+  grupos: GrupoInput[],
+  diasLectivos: number,
+  maxHoras: number
+) {
+  let cambio = true;
+  let iter = 0;
+
+  while (cambio && iter < 60) {
+    cambio = false;
+    iter++;
+
+    for (const g of grupos) {
+      const grpId = normalizarId(g.id);
+
+      for (let d = 1; d <= diasLectivos; d++) {
+        const celdasDia = celdas.filter(c => normalizarId(c.grupoId) === grpId && c.diaSemana === d);
+        const periodosOcupados = new Set(celdasDia.map(c => c.periodo));
+        const k = celdasDia.length; // En un horario compacto, las k clases deben ocupar exactamente 1..k
+
+        for (let p_vacio = 1; p_vacio <= k; p_vacio++) {
+          if (!periodosOcupados.has(p_vacio)) {
+            // Paso 1: Mover directamente cualquier clase posterior a p_vacio (la más cercana primero)
+            const clasesPosteriores = celdasDia
+              .filter(c => c.periodo > p_vacio && !c.esBloqueado)
+              .sort((a, b) => a.periodo - b.periodo);
+
+            let movido = false;
+            for (const cand of clasesPosteriores) {
+              const docenteOcupado = celdas.some(c =>
+                c !== cand &&
+                normalizarId(c.docenteId) === normalizarId(cand.docenteId) &&
+                c.diaSemana === d &&
+                c.periodo === p_vacio
+              );
+              if (!docenteOcupado) {
+                cand.periodo = p_vacio;
+                cambio = true;
+                movido = true;
+                break;
+              }
+            }
+
+            if (movido) break;
+
+            // Paso 2: Swap indirecto en el mismo día.
+            // Si cand no puede ir a p_vacio pero otra clase 'inter' sí puede ir a p_vacio y cand puede ir a inter.periodo
+            for (const cand of clasesPosteriores) {
+              for (const inter of celdasDia.filter(c => c.periodo < cand.periodo && !c.esBloqueado && c.periodo !== p_vacio)) {
+                const interDocLibreEnVacio = !celdas.some(c =>
+                  c !== inter &&
+                  normalizarId(c.docenteId) === normalizarId(inter.docenteId) &&
+                  c.diaSemana === d &&
+                  c.periodo === p_vacio
+                );
+                const candDocLibreEnInter = !celdas.some(c =>
+                  c !== cand &&
+                  normalizarId(c.docenteId) === normalizarId(cand.docenteId) &&
+                  c.diaSemana === d &&
+                  c.periodo === inter.periodo
+                );
+
+                if (interDocLibreEnVacio && candDocLibreEnInter) {
+                  const pInter = inter.periodo;
+                  inter.periodo = p_vacio;
+                  cand.periodo = pInter;
+                  cambio = true;
+                  movido = true;
+                  break;
+                }
+              }
+              if (movido) break;
+            }
+
+            if (movido) break;
+
+            // Paso 3: Swap entre días
+            for (let d2 = 1; d2 <= diasLectivos; d2++) {
+              if (d2 === d) continue;
+              const celdasD2 = celdas.filter(c => normalizarId(c.grupoId) === grpId && c.diaSemana === d2);
+              for (const cand of clasesPosteriores) {
+                for (const c2 of celdasD2.filter(c => !c.esBloqueado)) {
+                  const docC2Libre = !celdas.some(c =>
+                    c !== c2 &&
+                    normalizarId(c.docenteId) === normalizarId(c2.docenteId) &&
+                    c.diaSemana === d &&
+                    c.periodo === p_vacio
+                  );
+                  const docCandLibre = !celdas.some(c =>
+                    c !== cand &&
+                    normalizarId(c.docenteId) === normalizarId(cand.docenteId) &&
+                    c.diaSemana === d2 &&
+                    c.periodo === c2.periodo
+                  );
+
+                  if (docC2Libre && docCandLibre) {
+                    const oldD2 = c2.diaSemana;
+                    const oldP2 = c2.periodo;
+                    c2.diaSemana = d;
+                    c2.periodo = p_vacio;
+                    cand.diaSemana = oldD2;
+                    cand.periodo = oldP2;
+                    cambio = true;
+                    movido = true;
+                    break;
+                  }
+                }
+                if (movido) break;
+              }
+              if (movido) break;
+            }
+
+            if (movido) break;
+          }
+        }
+      }
+    }
+  }
+}
+
