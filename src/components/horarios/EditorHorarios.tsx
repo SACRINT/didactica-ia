@@ -340,7 +340,7 @@ export default function EditorHorarios({
 
   const horasGrupoActual = React.useMemo(() => {
     if (!grupoActivoObj) return numHorasPorDia;
-    return (grupoActivoObj as any).horasPorDia || (grupoActivoObj.semestre === 1 ? 5 : numHorasPorDia);
+    return (grupoActivoObj as any).horasPorDia || numHorasPorDia;
   }, [grupoActivoObj, numHorasPorDia]);
 
   const periodosVisibles = React.useMemo(() => {
@@ -409,7 +409,7 @@ export default function EditorHorarios({
     if (celda.esBloqueado) return { ok: false, razon: "🔒 Celda fijada con candado." };
     const gid = normalizarId(celda.grupoId);
     const grp = grupos.find((g: any) => normalizarId(g.id) === gid);
-    const maxP = grp?.horasPorDia || (grp?.semestre === 1 ? 5 : numHorasPorDia);
+    const maxP = grp?.horasPorDia || numHorasPorDia;
     if (periodo > maxP) return { ok: false, razon: `⚠️ Jornada del grupo: ${maxP}h máx. No cabe en Hora ${periodo}.` };
     if (esSlotLibreBloqueado(dia, periodo, normalizarId(celda.docenteId)) || esSlotLibreBloqueado(dia, periodo, gid)) {
       return { ok: false, razon: "🔒 Hora libre bloqueada para este docente o grupo." };
@@ -524,7 +524,7 @@ export default function EditorHorarios({
     const gruposInfo = grupos.map((g: any) => ({
       id: normalizarId(g.id),
       semestre: g.semestre,
-      horasPorDia: g.horasPorDia ?? (g.semestre === 1 ? 5 : numHorasPorDia),
+      horasPorDia: g.horasPorDia ?? numHorasPorDia,
       nombre: g.nombre
     }));
 

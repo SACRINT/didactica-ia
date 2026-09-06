@@ -50,8 +50,7 @@ function slotValido(
 
   // Jornada del grupo
   const maxP =
-    gruposInfo?.find((g) => normalizarId(g.id) === gid)?.horasPorDia ??
-    (gruposInfo?.find((g) => normalizarId(g.id) === gid)?.semestre === 1 ? 5 : numHorasPorDia);
+    gruposInfo?.find((g) => normalizarId(g.id) === gid)?.horasPorDia ?? numHorasPorDia;
   if (p > maxP) return false;
 
   // Bloqueado con candado de hora libre
@@ -107,8 +106,7 @@ export function buscarCadenaSwap(
 
   for (let d = 1; d <= 5; d++) {
     const maxP =
-      gruposInfo?.find((g) => normalizarId(g.id) === targetGid)?.horasPorDia ??
-      (gruposInfo?.find((g) => normalizarId(g.id) === targetGid)?.semestre === 1 ? 5 : numHorasPorDia);
+      gruposInfo?.find((g) => normalizarId(g.id) === targetGid)?.horasPorDia ?? numHorasPorDia;
     for (let p = 1; p <= maxP; p++) {
       if (slotValido(d, p, celdaDesplazada, occ, slotsLibresBloqueados, gruposInfo, numHorasPorDia)) {
         const celdasR = celdasBase.map((c) => ({ ...c }));
@@ -141,8 +139,7 @@ export function buscarCadenaSwap(
     // Intentar slot vacío directo
     for (let d = 1; d <= 5; d++) {
       const maxP =
-        gruposInfo?.find((g) => normalizarId(g.id) === normalizarId(disp.grupoId))?.horasPorDia ??
-        (gruposInfo?.find((g) => normalizarId(g.id) === normalizarId(disp.grupoId))?.semestre === 1 ? 5 : numHorasPorDia);
+        gruposInfo?.find((g) => normalizarId(g.id) === normalizarId(disp.grupoId))?.horasPorDia ?? numHorasPorDia;
       for (let p = 1; p <= maxP; p++) {
         if (slotValido(d, p, disp, occCur, slotsLibresBloqueados, gruposInfo, numHorasPorDia)) {
           return [{ cellFromIndex: currDisplacedIdx, targetDia: d, targetPeriodo: p }];

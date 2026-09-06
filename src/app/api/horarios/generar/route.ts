@@ -21,14 +21,7 @@ export async function POST(req: NextRequest) {
     const gruposRaw = Array.isArray(rawParams.grupos) ? rawParams.grupos : [];
     const docentesRaw = Array.isArray(rawParams.docentes) ? rawParams.docentes : [];
     const cargasRaw = Array.isArray(rawParams.cargas) ? rawParams.cargas : [];
-
-    // Normalizar grupos
-    const grupos = gruposRaw.map((g: any) => ({
-      id: String(g.id || g.nombre),
-      nombre: String(g.nombre || g.id),
-      semestre: Number(g.semestre || 1),
-      horasPorDia: Number(g.horasPorDia || rawParams.horasPorDia || 6),
-    }));
+    const diasLectivos = Number(rawParams.diasLectivos || 5);
 
     // Normalizar docentes
     const docentes = docentesRaw.map((d: any) => ({
@@ -37,14 +30,21 @@ export async function POST(req: NextRequest) {
       horasMaxDia: Number(d.horasMaxDia || 6),
     }));
 
+    // Pre-normalizar IDs de grupos
+    const grupoNombres = new Map<string, string>();
+    gruposRaw.forEach((g: any) => {
+      const gid = String(g.id || g.nombre);
+      const gnom = String(g.nombre || g.id);
+      grupoNombres.set(gid, gid);
+      grupoNombres.set(gnom, gid);
+      grupoNombres.set(gnom.replace(/º/g, '°'), gid);
+    });
+
     // Normalizar cargas (soportar docenteId / personalId, grupoId / grupo_nombre, asignaturaId / uacName)
     const cargas = cargasRaw.map((c: any, idx: number) => {
       const docId = String(c.docenteId || c.personalId || '');
       const rawGrp = String(c.grupoId || c.grupo_nombre || '');
-      const matchedGroup = grupos.find(
-        (g: any) => g.id === rawGrp || g.nombre === rawGrp || g.nombre?.replace(/º/g, '°') === rawGrp.replace(/º/g, '°')
-      );
-      const grpId = matchedGroup ? matchedGroup.id : rawGrp;
+      const grpId = grupoNombres.get(rawGrp) || grupoNombres.get(rawGrp.replace(/º/g, '°')) || rawGrp;
       const asigId = String(c.uacName || c.asignaturaId || `uac_${idx}`);
       const horas = Number(c.horasSemanales || c.horas_semanales || 3);
 
@@ -60,9 +60,43 @@ export async function POST(req: NextRequest) {
       };
     }).filter((c: any) => c.docenteId && c.grupoId && c.horasSemanales > 0);
 
+    // Calcular carga total por grupo para asegurar capacidad de ranuras suficiente
+    const horasPorGrupo = new Map<string, number>();
+    for (const c of cargas) {
+      horasPorGrupo.set(c.grupoId, (horasPorGrupo.get(c.grupoId) || 0) + c.horasSemanales);
+    }
+
+    // Determinar la jornada máxima diaria requerida para que quepan todas las materias
+    // Ej. En Bachillerato Tecnológico, 39h / 5 días = 7.8 -> Requiere mínimo 8 horas diarias
+    let minHorasDiariasRequeridas = 6;
+    for (const [, totalHoras] of horasPorGrupo) {
+      const minDiario = Math.ceil(totalHoras / diasLectivos);
+      if (minDiario > minHorasDiariasRequeridas) {
+        minHorasDiariasRequeridas = minDiario;
+      }
+    }
+
+    const horasPorDiaFinal = Math.max(
+      Number(rawParams.horasPorDia || 6),
+      minHorasDiariasRequeridas
+    );
+
+    // Normalizar grupos con la jornada requerida
+    const grupos = gruposRaw.map((g: any) => {
+      const gId = String(g.id || g.nombre);
+      const horasTotalesGrupo = horasPorGrupo.get(gId) || 0;
+      const minDiarioGrupo = Math.ceil(horasTotalesGrupo / diasLectivos);
+      return {
+        id: gId,
+        nombre: String(g.nombre || g.id),
+        semestre: Number(g.semestre || 1),
+        horasPorDia: Math.max(Number(g.horasPorDia || horasPorDiaFinal), minDiarioGrupo, horasPorDiaFinal),
+      };
+    });
+
     const params: SolverParams = {
-      diasLectivos: Number(rawParams.diasLectivos || 5),
-      horasPorDia: Number(rawParams.horasPorDia || 6),
+      diasLectivos,
+      horasPorDia: horasPorDiaFinal,
       grupos,
       docentes,
       aulas: Array.isArray(rawParams.aulas) && rawParams.aulas.length > 0
@@ -127,6 +161,7 @@ export async function POST(req: NextRequest) {
       await sql()`
         UPDATE horario_config
         SET horario_generado = ${JSON.stringify(horarioGenerado)}::jsonb,
+            horas_por_dia = ${params.horasPorDia},
             updated_at = NOW()
         WHERE teacher_id = ${teacher.id}::uuid
       `;

@@ -124,19 +124,32 @@ export default function HorariosDashboardClient({
         setEscuelaState((prev: any) => ({ ...prev, ...paramsFromWizard.escuela }));
       }
 
+      // Calcular si algún grupo requiere más horas por día según sus cargas
+      let maxHorasDiarias = Number(finalConfig.horasPorDia || 6);
+      for (const g of finalGrupos) {
+        const cargasG = finalCargas.filter((c: any) => (c.grupoId || c.grupo_nombre) === g.id || (c.grupoId || c.grupo_nombre) === g.nombre);
+        const tot = cargasG.reduce((s: number, c: any) => s + Number(c.horasSemanales || c.horas_semanales || 0), 0);
+        const minD = Math.ceil(tot / (finalConfig.diasLectivos || 5));
+        if (minD > maxHorasDiarias) maxHorasDiarias = minD;
+      }
+      const horasPorDiaFinal = Math.max(Number(finalConfig.horasPorDia || 6), maxHorasDiarias);
+
       const res = await fetch('/api/horarios/generar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           params: {
-            grupos: finalGrupos,
+            grupos: finalGrupos.map((g: any) => ({
+              ...g,
+              horasPorDia: Math.max(Number(g.horasPorDia || horasPorDiaFinal), horasPorDiaFinal)
+            })),
             docentes: finalDocentes,
             aulas: finalAulas,
             cargas: finalCargas,
             diasLectivos: finalConfig.diasLectivos || 5,
-            horasPorDia: finalConfig.horasPorDia || 6,
+            horasPorDia: horasPorDiaFinal,
             horaInicio: finalConfig.horaInicio || '08:00',
-            config: finalConfig,
+            config: { ...finalConfig, horasPorDia: horasPorDiaFinal },
           },
         }),
       });

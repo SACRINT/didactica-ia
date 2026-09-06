@@ -65,8 +65,14 @@ export default function WizardConfiguracion({
   const [periodoActivo, setPeriodoActivo] = useState<"A" | "B">("A");
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Jornada Escolar predeterminada estrictamente a 6 Horas Diarias (30 hrs semanales)
-  const [numPeriodos, setNumPeriodos] = useState<number>(6);
+  // Jornada Escolar predeterminada (8 horas para Tecnológico por las 39h de 3er semestre, 6 para BGE)
+  const [numPeriodos, setNumPeriodos] = useState<number>(() => {
+    if (configInicial?.horasPorDia) return Number(configInicial.horasPorDia);
+    if (configInicial?.horas_por_dia) return Number(configInicial.horas_por_dia);
+    const sub = (configInicial?.escuela?.subsystem || configInicial?.subsystem || "").toLowerCase();
+    if (sub.includes("tecnol")) return 8;
+    return 6;
+  });
   const [horaInicio, setHoraInicio] = useState<string>("08:00");
 
   // Flag: true = ya se cargaron grupos desde BD, NO regenerar automáticamente
@@ -110,6 +116,12 @@ export default function WizardConfiguracion({
     if (sub.includes("tecnol")) return true;
     return (gruposIniciales || []).some((g: any) => Boolean(g.carreraTecnicaId || g.carrera_tecnica_id));
   }, [configInicial, gruposIniciales]);
+
+  useEffect(() => {
+    if (esTecnologico && numPeriodos < 8) {
+      setNumPeriodos(8);
+    }
+  }, [esTecnologico]);
 
   const [inicializadoConfig, setInicializadoConfig] = useState(false);
 
@@ -1107,10 +1119,30 @@ export default function WizardConfiguracion({
       return;
     }
 
+    // Calcular requerimiento diario por grupo según sus asignaturas
+    let maxHorasDiariasRequeridas = 6;
+    for (const g of grupos) {
+      const uacs = getUACsIndividualesGrupo(g);
+      const totalHorasGrupo = uacs.reduce((sum: number, u: any) => sum + (Number(u.horas) || 0), 0);
+      const minDiarias = Math.ceil(totalHorasGrupo / 5);
+      if (minDiarias > maxHorasDiariasRequeridas) {
+        maxHorasDiariasRequeridas = minDiarias;
+      }
+    }
+
+    const periodosFinales = Math.max(numPeriodos, maxHorasDiariasRequeridas);
+    if (periodosFinales !== numPeriodos) {
+      setNumPeriodos(periodosFinales);
+    }
+
     const gruposConCustom = grupos.map((g) => {
       const customList = getCustomUacsDeGrupo(g);
+      const uacs = getUACsIndividualesGrupo(g);
+      const totalHorasGrupo = uacs.reduce((sum: number, u: any) => sum + (Number(u.horas) || 0), 0);
+      const minDiarias = Math.ceil(totalHorasGrupo / 5);
       return {
         ...g,
+        horasPorDia: Math.max(periodosFinales, minDiarias),
         customUacs: customList && customList.length > 0 ? customList : (g.customUacs || null)
       };
     });
@@ -1129,7 +1161,7 @@ export default function WizardConfiguracion({
           escuelaId,
           config: {
             diasLectivos: 5,
-            horasPorDia: numPeriodos,
+            horasPorDia: periodosFinales,
             horaInicio,
             periodoActivo
           },
@@ -1159,7 +1191,7 @@ export default function WizardConfiguracion({
           cargas: cargasCompletas,
           config: {
             diasLectivos: 5,
-            horasPorDia: numPeriodos,
+            horasPorDia: periodosFinales,
             horaInicio,
             periodoActivo,
             zonaEscolar
@@ -1176,7 +1208,7 @@ export default function WizardConfiguracion({
             mapaCurricularCompletado: true
           },
           diasLectivos: 5,
-          horasPorDia: numPeriodos,
+          horasPorDia: periodosFinales,
           horaInicio
         });
       } else {
@@ -1829,17 +1861,17 @@ export default function WizardConfiguracion({
             <div style={{ background: "#1e293b", padding: "1rem", borderRadius: "12px", border: "1px solid #334155" }}>
               <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.4rem" }}>
                 <Clock style={{ width: "15px", height: "15px", color: "#4ade80", display: "inline", marginRight: "5px" }} />
-                Jornada Escolar (BGE)
+                {esTecnologico ? "Jornada Escolar (Bachillerato Tecnológico)" : "Jornada Escolar"}
               </label>
               <select
                 value={numPeriodos}
                 onChange={(e) => setNumPeriodos(Number(e.target.value))}
                 style={{ width: "100%", padding: "0.45rem", borderRadius: "8px", border: "2px solid #22c55e", background: "#0f172a", fontWeight: 800, fontSize: "0.8125rem", color: "#ffffff" }}
               >
-                <option value={6} style={{ background: "#0f172a", color: "#ffffff" }}>6 Horas diarias (30 hrs/sem)</option>
-                <option value={5} style={{ background: "#0f172a", color: "#ffffff" }}>5 Horas diarias (25 hrs/sem)</option>
+                <option value={8} style={{ background: "#0f172a", color: "#ffffff" }}>8 Horas diarias (40 hrs/sem) {esTecnologico ? "— Requerido para BT (39 hrs)" : ""}</option>
                 <option value={7} style={{ background: "#0f172a", color: "#ffffff" }}>7 Horas diarias (35 hrs/sem)</option>
-                <option value={8} style={{ background: "#0f172a", color: "#ffffff" }}>8 Horas diarias (40 hrs/sem)</option>
+                <option value={6} style={{ background: "#0f172a", color: "#ffffff" }}>6 Horas diarias (30 hrs/sem) — Estándar BGE</option>
+                <option value={5} style={{ background: "#0f172a", color: "#ffffff" }}>5 Horas diarias (25 hrs/sem)</option>
               </select>
             </div>
           </div>
@@ -1997,13 +2029,14 @@ export default function WizardConfiguracion({
                                   Jornada Diaria del Grupo (Horas por día)
                                 </label>
                                 <select
-                                  value={g.horasPorDia || (g.semestre === 1 ? 5 : 6)}
+                                  value={g.horasPorDia || (esTecnologico || g.carreraTecnicaId ? (g.semestre === 3 ? 8 : g.semestre === 5 ? 7 : 6) : 6)}
                                   onChange={(e) => handleActualizarConfigGrupo(idx, "horasPorDia", Number(e.target.value))}
                                   style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.75rem", fontWeight: 700, color: "#ffffff" }}
                                 >
-                                  <option value={5} style={{ background: "#0f172a", color: "#ffffff" }}>5 horas por día (25 hrs / semana)</option>
-                                  <option value={6} style={{ background: "#0f172a", color: "#ffffff" }}>6 horas por día (30 hrs / semana)</option>
+                                  <option value={8} style={{ background: "#0f172a", color: "#ffffff" }}>8 horas por día (40 hrs / semana) — Requerido BT 3° (39h)</option>
                                   <option value={7} style={{ background: "#0f172a", color: "#ffffff" }}>7 horas por día (35 hrs / semana)</option>
+                                  <option value={6} style={{ background: "#0f172a", color: "#ffffff" }}>6 horas por día (30 hrs / semana)</option>
+                                  <option value={5} style={{ background: "#0f172a", color: "#ffffff" }}>5 horas por día (25 hrs / semana)</option>
                                 </select>
                               </div>
 

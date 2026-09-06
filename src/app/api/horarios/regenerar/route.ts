@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       id: String(g.id || g.nombre),
       nombre: String(g.nombre),
       semestre: Number(g.semestre || 1),
-      horasPorDia: Number(g.semestre === 1 ? 5 : horasPorDia)
+      horasPorDia: Number(horasPorDia)
     }));
 
     // 3. Cargar personal docente registrado
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     // Validar capacidad por grupo
     for (const g of grupos) {
-      const maxP = g.horasPorDia || (g.semestre === 1 ? 5 : horasPorDia);
+      const maxP = g.horasPorDia || horasPorDia;
       const totalCapacidadTeorica = diasLectivos * maxP;
       const slotsBloqGrupo = slotsBloqArr.filter((k: string) => {
         const parts = k.split("_");

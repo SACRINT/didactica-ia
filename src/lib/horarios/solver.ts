@@ -224,7 +224,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
 
   for (const g of grupos) {
     const grpId = normalizarId(g.id);
-    const maxP = g.horasPorDia || (g.semestre === 1 ? 5 : horasPorDia);
+    const maxP = g.horasPorDia || horasPorDia;
     const grpCargas = cargas.filter(c => normalizarId(c.grupoId) === grpId);
     const fijasGrp = celdasFijasValidas.filter(f => normalizarId(f.grupoId) === grpId);
 
@@ -310,7 +310,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
     // 5.1 Asignación inicial greedy con desempate aleatorizado
     for (const [gid, gUnits] of groupMap.entries()) {
       const gObj = grupos.find(g => normalizarId(g.id) === gid);
-      const maxP = gObj?.horasPorDia || (gObj?.semestre === 1 ? 5 : horasPorDia);
+      const maxP = gObj?.horasPorDia || horasPorDia;
       const allGroupSlots: number[] = [];
       for (let d = 1; d <= diasLectivos; d++) {
         for (let p = 1; p <= maxP; p++) {
