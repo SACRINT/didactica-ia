@@ -52,6 +52,11 @@ export default function WizardConfiguracion({
 
   const setPaso = (nuevoPaso: number) => {
     setPasoState(nuevoPaso);
+    if (typeof window !== "undefined" && escuelaId) {
+      try {
+        localStorage.setItem(`horarios_paso_${escuelaId}`, String(nuevoPaso));
+      } catch {}
+    }
     if (onStepChange) onStepChange(nuevoPaso);
   };
 
@@ -87,7 +92,7 @@ export default function WizardConfiguracion({
       (gruposIniciales || []).filter(g => g.semestre === 1).length,
       (gruposIniciales || []).filter(g => g.semestre === 2).length
     );
-    return g1Count > 0 ? g1Count : 3;
+    return g1Count > 0 ? g1Count : 1;
   });
   const [g2, setG2] = useState<number>(() => {
     if (configInicial?.escuela?.gruposSegundoAno) return Number(configInicial.escuela.gruposSegundoAno);
@@ -95,7 +100,7 @@ export default function WizardConfiguracion({
       (gruposIniciales || []).filter(g => g.semestre === 3).length,
       (gruposIniciales || []).filter(g => g.semestre === 4).length
     );
-    return g2Count > 0 ? g2Count : 3;
+    return g2Count > 0 ? g2Count : 1;
   });
   const [g3, setG3] = useState<number>(() => {
     if (configInicial?.escuela?.gruposTercerAno) return Number(configInicial.escuela.gruposTercerAno);
@@ -103,13 +108,13 @@ export default function WizardConfiguracion({
       (gruposIniciales || []).filter(g => g.semestre === 5).length,
       (gruposIniciales || []).filter(g => g.semestre === 6).length
     );
-    return g3Count > 0 ? g3Count : 3;
+    return g3Count > 0 ? g3Count : 1;
   });
 
   // Datos del Plantel y Supervisión Escolar dinámicos
   const [nombreEscuela, setNombreEscuela] = useState<string>(() => configInicial?.escuela?.nombre || configInicial?.escuela?.school_name || "Mi Plantel");
   const [cctEscuela, setCctEscuela] = useState<string>(() => configInicial?.escuela?.cct || "");
-  const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "086");
+  const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "");
 
   const esTecnologico = React.useMemo(() => {
     const sub = (configInicial?.escuela?.subsystem || configInicial?.subsystem || "").toLowerCase();
@@ -445,40 +450,41 @@ export default function WizardConfiguracion({
         const letra = letras[i] || `G${i + 1}`;
         const nombreGrupo = `${sem}° ${letra}`;
 
+        const grupoEnMemoria = gruposActuales.find(
+          (g) => normalizarNombreGrupo(g.nombre) === nombreGrupo
+        );
         const grupoDbOficial = (gruposIniciales || []).find(
           (g: any) => normalizarNombreGrupo(g.nombre) === nombreGrupo
         );
 
-        let grupoExistente = grupoDbOficial || gruposActuales.find(
-          (g) => normalizarNombreGrupo(g.nombre) === nombreGrupo
-        );
+        let grupoExistente = grupoEnMemoria || grupoDbOficial;
 
         const semBaseTrack = sem === 4 ? 3 : sem === 6 ? 5 : sem;
         const nombreBaseTrack = `${semBaseTrack}° ${letra}`;
-        const grupoBaseTrack = (gruposIniciales || []).find(
+        const grupoBaseTrack = gruposActuales.find(
           (g: any) => normalizarNombreGrupo(g.nombre) === nombreBaseTrack
-        ) || gruposActuales.find(
+        ) || (gruposIniciales || []).find(
           (g: any) => normalizarNombreGrupo(g.nombre) === nombreBaseTrack
         );
 
-        let ffeOpts = grupoDbOficial?.ffeOptativas || grupoExistente?.ffeOptativas || grupoBaseTrack?.ffeOptativas;
+        let ffeOpts = grupoExistente?.ffeOptativas || grupoDbOficial?.ffeOptativas || grupoBaseTrack?.ffeOptativas;
         if (typeof ffeOpts === "string") {
           try { ffeOpts = JSON.parse(ffeOpts); } catch { ffeOpts = null; }
         }
 
-        const g3Socio = (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional
-          || gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional;
-        const g5Socio = (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional
-          || gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional;
+        const g3Socio = gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional
+          || (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional;
+        const g5Socio = gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional
+          || (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional;
         const resolvedSocio = resolverSocioemocionalGrupo(g3Socio, g5Socio);
 
         let socioCalculado: string;
         if (sem === 3) {
-          socioCalculado = grupoDbOficial?.ffeoSocioemocional || resolvedSocio.sem3;
+          socioCalculado = grupoExistente?.ffeoSocioemocional || resolvedSocio.sem3;
         } else if (sem === 4) {
           socioCalculado = resolvedSocio.sem4;
         } else if (sem === 5) {
-          socioCalculado = grupoDbOficial?.ffeoSocioemocional || resolvedSocio.sem5;
+          socioCalculado = grupoExistente?.ffeoSocioemocional || resolvedSocio.sem5;
         } else if (sem === 6) {
           socioCalculado = resolvedSocio.sem6;
         } else {
@@ -486,13 +492,20 @@ export default function WizardConfiguracion({
         }
 
         const tieneLaboral = sem >= 3;
-        const capFinal = grupoDbOficial?.capacitacionNombre || grupoExistente?.capacitacionNombre || grupoBaseTrack?.capacitacionNombre || FORMACIONES_LABORALES[i % FORMACIONES_LABORALES.length];
+        const capFinal = grupoExistente?.capacitacionNombre || grupoDbOficial?.capacitacionNombre || grupoBaseTrack?.capacitacionNombre || FORMACIONES_LABORALES[i % FORMACIONES_LABORALES.length];
+
+        const hrsDia = (grupoEnMemoria as any)?.horasPorDia
+          || (grupoEnMemoria as any)?.horas_por_dia
+          || (grupoDbOficial as any)?.horasPorDia
+          || (grupoDbOficial as any)?.horas_por_dia
+          || (esTecnologico || grupoExistente?.carreraTecnicaId || grupoDbOficial?.carreraTecnicaId ? (sem === 3 ? 8 : sem === 5 ? 7 : 6) : (sem === 1 ? 5 : 6));
 
         nuevosGrupos.push({
-          id: grupoDbOficial?.id || grupoExistente?.id || `temp_${sem}_${letra}`,
+          id: grupoExistente?.id || grupoDbOficial?.id || `temp_${sem}_${letra}`,
           nombre: nombreGrupo,
           semestre: sem,
-          horasPorDia: (grupoDbOficial as any)?.horasPorDia || (grupoExistente as any)?.horasPorDia || (sem === 1 ? 5 : 6),
+          horasPorDia: Number(hrsDia),
+          customUacs: grupoExistente?.customUacs || (grupoDbOficial as any)?.customUacs || undefined,
           capacitacionNombre: tieneLaboral ? capFinal : undefined,
           ffeoSocioemocional: tieneLaboral ? socioCalculado : undefined,
           ffeOptativas: (Array.isArray(ffeOpts) && ffeOpts.length > 0) ? ffeOpts : [
@@ -501,9 +514,9 @@ export default function WizardConfiguracion({
             FFE_OPTATIVAS_CATALOGO[7],
             FFE_OPTATIVAS_CATALOGO[8]
           ],
-          carreraTecnicaId: grupoDbOficial?.carreraTecnicaId || (grupoDbOficial as any)?.carrera_tecnica_id || grupoExistente?.carreraTecnicaId || (grupoExistente as any)?.carrera_tecnica_id || grupoBaseTrack?.carreraTecnicaId || (grupoBaseTrack as any)?.carrera_tecnica_id || (esTecnologico ? "contabilidad" : undefined),
-          versionPrograma: grupoDbOficial?.versionPrograma || (grupoDbOficial as any)?.version_programa || grupoExistente?.versionPrograma || (grupoExistente as any)?.version_programa || grupoBaseTrack?.versionPrograma || (grupoBaseTrack as any)?.version_programa || (esTecnologico ? "nuevo" : undefined),
-          materiaPropedutica5to: grupoDbOficial?.materiaPropedutica5to || (grupoDbOficial as any)?.materia_propedutica_5to || grupoExistente?.materiaPropedutica5to || (grupoExistente as any)?.materia_propedutica_5to || grupoBaseTrack?.materiaPropedutica5to || (grupoBaseTrack as any)?.materia_propedutica_5to || (esTecnologico ? "Derecho y Sociedad I" : undefined)
+          carreraTecnicaId: grupoExistente?.carreraTecnicaId || (grupoExistente as any)?.carrera_tecnica_id || grupoDbOficial?.carreraTecnicaId || (grupoDbOficial as any)?.carrera_tecnica_id || grupoBaseTrack?.carreraTecnicaId || (grupoBaseTrack as any)?.carrera_tecnica_id || (esTecnologico ? "contabilidad" : undefined),
+          versionPrograma: grupoExistente?.versionPrograma || (grupoExistente as any)?.version_programa || grupoDbOficial?.versionPrograma || (grupoDbOficial as any)?.version_programa || grupoBaseTrack?.versionPrograma || (grupoBaseTrack as any)?.version_programa || (esTecnologico ? "nuevo" : undefined),
+          materiaPropedutica5to: grupoExistente?.materiaPropedutica5to || (grupoExistente as any)?.materia_propedutica_5to || grupoDbOficial?.materiaPropedutica5to || (grupoDbOficial as any)?.materia_propedutica_5to || grupoBaseTrack?.materiaPropedutica5to || (grupoBaseTrack as any)?.materia_propedutica_5to || (esTecnologico ? "Derecho y Sociedad I" : undefined)
         });
       }
     }
@@ -531,6 +544,7 @@ export default function WizardConfiguracion({
     const maxGrupos = Math.max(n1, n2, n3);
     const letrasActivas = letras.slice(0, maxGrupos);
     setGrupoActivoManual(prev => letrasActivas.includes(prev) ? prev : "A");
+    return nuevosGrupos;
   };
 
   useEffect(() => {
@@ -1041,10 +1055,17 @@ export default function WizardConfiguracion({
     return total;
   };
 
-  const handleAvanzarPaso1 = () => {
-    generarGruposSegunEstructura(g1, g2, g3);
+  const handleAvanzarPaso1 = async () => {
+    const gruposGenerados = generarGruposSegunEstructura(g1, g2, g3);
+    const gruposFinales = (gruposGenerados && gruposGenerados.length > 0 ? gruposGenerados : grupos);
+    const gruposAGuardar = gruposFinales.map((g: any) => ({
+      ...g,
+      horasPorDia: g.horasPorDia ? Number(g.horasPorDia) : (g.horas_por_dia ? Number(g.horas_por_dia) : (esTecnologico || g.carreraTecnicaId ? (g.semestre === 3 ? 8 : g.semestre === 5 ? 7 : 6) : (g.semestre === 1 ? 5 : 6))),
+      customUacs: g.customUacs || undefined
+    }));
+
     try {
-      fetch("/api/horarios/configuracion", {
+      await fetch("/api/horarios/configuracion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1057,6 +1078,7 @@ export default function WizardConfiguracion({
             g1, g2, g3,
             zonaEscolar
           },
+          grupos: gruposAGuardar,
           escuela: {
             id: escuelaId,
             nombre: nombreEscuela,
@@ -1069,8 +1091,17 @@ export default function WizardConfiguracion({
             mapaCurricularCompletado: true
           }
         })
-      }).catch(() => {});
-    } catch {}
+      });
+    } catch (e) {
+      console.error("[handleAvanzarPaso1] Error al guardar configuración de grupos:", e);
+    }
+
+    guardarProgresoLocal();
+    if (typeof window !== "undefined" && escuelaId) {
+      try {
+        localStorage.setItem(`horarios_paso_${escuelaId}`, "2");
+      } catch {}
+    }
     setPaso(2);
   };
 
@@ -1142,7 +1173,7 @@ export default function WizardConfiguracion({
       const minDiarias = Math.ceil(totalHorasGrupo / 5);
       return {
         ...g,
-        horasPorDia: Math.max(periodosFinales, minDiarias),
+        horasPorDia: g.horasPorDia ? Number(g.horasPorDia) : Math.max(minDiarias, (esTecnologico || g.carreraTecnicaId ? (g.semestre === 3 ? 8 : g.semestre === 5 ? 7 : 6) : (g.semestre === 1 ? 5 : 6))),
         customUacs: customList && customList.length > 0 ? customList : (g.customUacs || null)
       };
     });
@@ -2020,7 +2051,9 @@ export default function WizardConfiguracion({
                                   Grupo {g.nombre} ({g.semestre}° Semestre)
                                 </span>
                                 <span style={{ fontSize: "0.6875rem", fontWeight: 700, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)", padding: "0.2rem 0.4rem", borderRadius: "6px" }}>
-                                  {g.semestre === 1 ? "Universal (8 UACs • 25 hrs)" : (g.semestre === 2 ? "Universal (10 UACs • 30 hrs)" : (g.semestre === 3 || g.semestre === 4) ? "Laboral (9 UACs • 30 hrs)" : "Laboral + FFE (10 UACs • 30 hrs)")}
+                                  {(esTecnologico || g.carreraTecnicaId)
+                                    ? (g.semestre === 1 ? "Universal Tecnológica (10 UACs • 28 hrs)" : (g.semestre === 2 ? "Universal Tecnológica (10 UACs • 30 hrs)" : (g.semestre === 3 || g.semestre === 4) ? "Módulos Profesionales (39-40 hrs)" : "Técnica + Propedéutica (35 hrs)"))
+                                    : (g.semestre === 1 ? "Universal (8 UACs • 25 hrs)" : (g.semestre === 2 ? "Universal (10 UACs • 30 hrs)" : (g.semestre === 3 || g.semestre === 4) ? "Laboral (9 UACs • 30 hrs)" : "Laboral + FFE (10 UACs • 30 hrs)"))}
                                 </span>
                               </div>
 

@@ -79,6 +79,34 @@ export async function POST(
         updated_at = NOW();
     `;
 
+    // Purgar grupos en BD que excedan la nueva estructura g1, g2, g3
+    const letrasPermitidas = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+    const maxLetrasSem1y2 = letrasPermitidas.slice(0, g1);
+    const maxLetrasSem3y4 = letrasPermitidas.slice(0, g2);
+    const maxLetrasSem5y6 = letrasPermitidas.slice(0, g3);
+
+    try {
+      const dbGrupos = await sql()`SELECT id, nombre, semestre FROM horario_grupos WHERE teacher_id = ${targetTeacherId}::uuid`;
+      const idsAEliminar: string[] = [];
+      for (const dg of dbGrupos) {
+        const partes = (dg.nombre || "").trim().split(" ");
+        const letra = partes[partes.length - 1] || "";
+        const sem = Number(dg.semestre);
+        if ((sem === 1 || sem === 2) && !maxLetrasSem1y2.includes(letra)) {
+          idsAEliminar.push(dg.id);
+        } else if ((sem === 3 || sem === 4) && !maxLetrasSem3y4.includes(letra)) {
+          idsAEliminar.push(dg.id);
+        } else if ((sem === 5 || sem === 6) && !maxLetrasSem5y6.includes(letra)) {
+          idsAEliminar.push(dg.id);
+        }
+      }
+      if (idsAEliminar.length > 0) {
+        await sql()`DELETE FROM horario_grupos WHERE id = ANY(${idsAEliminar}::uuid[])`;
+      }
+    } catch (e) {
+      console.warn("[api/escuelas/[id]/mapa-curricular POST] Error podando grupos excedentes:", e);
+    }
+
     // 2. Guardar gruposConfig si se proporcionaron
     if (Array.isArray(gruposConfig) && gruposConfig.length > 0) {
       for (const item of gruposConfig) {
@@ -86,11 +114,12 @@ export async function POST(
         const nombre = (item.grupoNombre || "").trim();
         const sem = Math.max(1, parseInt(`${item.semestre || 1}`, 10));
         const ffeOpts = item.ffeOptativas ? JSON.stringify(item.ffeOptativas) : "[]";
+        const horasDia = item.horasPorDia ? Number(item.horasPorDia) : null;
 
         await sql()`
           INSERT INTO horario_grupos (
             teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas,
-            carrera_tecnica_id, version_programa, materia_propedutica_5to
+            carrera_tecnica_id, version_programa, materia_propedutica_5to, horas_por_dia
           )
           VALUES (
             ${targetTeacherId}::uuid,
@@ -101,7 +130,8 @@ export async function POST(
             ${ffeOpts}::jsonb,
             ${item.carreraTecnicaId || null},
             ${item.versionPrograma || null},
-            ${item.materiaPropedutica5to || null}
+            ${item.materiaPropedutica5to || null},
+            ${horasDia}
           )
           ON CONFLICT (teacher_id, nombre) DO UPDATE SET
             semestre = EXCLUDED.semestre,
@@ -110,7 +140,8 @@ export async function POST(
             ffe_optativas = EXCLUDED.ffe_optativas,
             carrera_tecnica_id = EXCLUDED.carrera_tecnica_id,
             version_programa = EXCLUDED.version_programa,
-            materia_propedutica_5to = EXCLUDED.materia_propedutica_5to;
+            materia_propedutica_5to = EXCLUDED.materia_propedutica_5to,
+            horas_por_dia = COALESCE(EXCLUDED.horas_por_dia, horario_grupos.horas_por_dia);
         `;
       }
     }

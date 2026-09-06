@@ -40,6 +40,7 @@ ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS carrera_tecnica_id TEXT;
 ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS version_programa TEXT;
 ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS materia_propedutica_5to TEXT;
 ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS custom_uacs JSONB;
+ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS horas_por_dia INTEGER;
 
 CREATE TABLE IF NOT EXISTS horario_cargas (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

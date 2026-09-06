@@ -35,6 +35,9 @@ export async function GET(req: NextRequest) {
       duracionMinutos: 50,
       recesoTrasPeriodo: 3,
       duracionReceso: 20,
+      g1: configDB?.g1 !== undefined ? Number(configDB.g1) : 1,
+      g2: configDB?.g2 !== undefined ? Number(configDB.g2) : 1,
+      g3: configDB?.g3 !== undefined ? Number(configDB.g3) : 1,
     };
 
     // ── Grupos guardados ───────────────────────────────────────────────
@@ -51,7 +54,8 @@ export async function GET(req: NextRequest) {
           carrera_tecnica_id       AS "carreraTecnicaId",
           version_programa         AS "versionPrograma",
           materia_propedutica_5to  AS "materiaPropedutica5to",
-          custom_uacs              AS "customUacs"
+          custom_uacs              AS "customUacs",
+          horas_por_dia            AS "horasPorDia"
         FROM horario_grupos
         WHERE teacher_id = ${teacherId}::uuid
         ORDER BY semestre ASC, nombre ASC
@@ -73,7 +77,7 @@ export async function GET(req: NextRequest) {
       gruposRows.filter(g => g.semestre === 6).length
     );
 
-    const zonaGuardada = configDB?.zona_escolar || (teacher.custom_preferences as any)?.zonaEscolar || (teacher.custom_preferences as any)?.zona || "004";
+    const zonaGuardada = configDB?.zona_escolar || (teacher.custom_preferences as any)?.zonaEscolar || (teacher.custom_preferences as any)?.zona || "";
     const escuela = {
       id: teacherId,
       cct: teacher.cct || teacher.school_name || "SIN CCT",
@@ -81,9 +85,9 @@ export async function GET(req: NextRequest) {
       zonaEscolar: zonaGuardada,
       zona: zonaGuardada,
       subsystem: teacher.subsystem || "bge",
-      gruposPrimerAno: Math.max(configDB?.g1 || 0, g1Count || 0, 3),
-      gruposSegundoAno: Math.max(configDB?.g2 || 0, g2Count || 0, 3),
-      gruposTercerAno: Math.max(configDB?.g3 || 0, g3Count || 0, 3),
+      gruposPrimerAno: configDB?.g1 !== undefined ? Number(configDB.g1) : (g1Count > 0 ? g1Count : 1),
+      gruposSegundoAno: configDB?.g2 !== undefined ? Number(configDB.g2) : (g2Count > 0 ? g2Count : 1),
+      gruposTercerAno: configDB?.g3 !== undefined ? Number(configDB.g3) : (g3Count > 0 ? g3Count : 1),
       mapaCurricularCompletado: configDB?.mapa_curricular_completado !== undefined ? Boolean(configDB.mapa_curricular_completado) : tieneGruposDB,
     };
 
@@ -196,7 +200,7 @@ export async function POST(req: NextRequest) {
     const g1 = escuelaBody?.gruposPrimerAno  ?? config?.g1  ?? 1;
     const g2 = escuelaBody?.gruposSegundoAno ?? config?.g2  ?? 1;
     const g3 = escuelaBody?.gruposTercerAno  ?? config?.g3  ?? 1;
-    const zonaEscolar = escuelaBody?.zonaEscolar || escuelaBody?.zona || config?.zonaEscolar || "004";
+    const zonaEscolar = escuelaBody?.zonaEscolar || escuelaBody?.zona || config?.zonaEscolar || "";
     const mapaDone = true; // Si se guarda configuración desde el Wizard, siempre está completado
 
     try {
@@ -241,6 +245,20 @@ export async function POST(req: NextRequest) {
 
     // ── 2. Guardar grupos (upsert por teacher_id + nombre) ─────────────
     if (Array.isArray(grupos) && grupos.length > 0) {
+      // Purgar grupos obsoletos si la estructura se redujo (ej: de 3 grupos a 2 grupos)
+      const nombresActivos = grupos.map((g: any) => (g.nombre || "").trim()).filter(Boolean);
+      if (nombresActivos.length > 0) {
+        try {
+          await sql()`
+            DELETE FROM horario_grupos
+            WHERE teacher_id = ${teacherId}::uuid
+              AND NOT (nombre = ANY(${nombresActivos}))
+          `;
+        } catch (e) {
+          console.warn("[api/horarios/configuracion POST] Error purgando grupos obsoletos:", e);
+        }
+      }
+
       for (const g of grupos) {
         try {
           const ffeOpts = g.ffeOptativas
@@ -249,9 +267,10 @@ export async function POST(req: NextRequest) {
           const customUacsJson = (Array.isArray(g.customUacs) && g.customUacs.length > 0)
             ? JSON.stringify(g.customUacs)
             : null;
+          const horasDia = g.horasPorDia ? Number(g.horasPorDia) : (g.horas_por_dia ? Number(g.horas_por_dia) : null);
           await sql()`
             INSERT INTO horario_grupos
-              (teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas, carrera_tecnica_id, version_programa, materia_propedutica_5to, custom_uacs)
+              (teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas, carrera_tecnica_id, version_programa, materia_propedutica_5to, custom_uacs, horas_por_dia)
             VALUES
               (${teacherId}::uuid,
                ${g.nombre},
@@ -262,7 +281,8 @@ export async function POST(req: NextRequest) {
                ${g.carreraTecnicaId ?? null},
                ${g.versionPrograma ?? null},
                ${g.materiaPropedutica5to ?? null},
-               ${customUacsJson}::jsonb)
+               ${customUacsJson}::jsonb,
+               ${horasDia})
             ON CONFLICT (teacher_id, nombre) DO UPDATE SET
               semestre                = EXCLUDED.semestre,
               capacitacion_nombre     = EXCLUDED.capacitacion_nombre,
@@ -271,7 +291,8 @@ export async function POST(req: NextRequest) {
               carrera_tecnica_id      = EXCLUDED.carrera_tecnica_id,
               version_programa        = EXCLUDED.version_programa,
               materia_propedutica_5to = EXCLUDED.materia_propedutica_5to,
-              custom_uacs             = EXCLUDED.custom_uacs
+              custom_uacs             = EXCLUDED.custom_uacs,
+              horas_por_dia           = EXCLUDED.horas_por_dia
           `;
         } catch (e) {
           console.error("[api/horarios/configuracion POST] Error guardando grupo:", g.nombre, e);

@@ -267,6 +267,7 @@ export default function ModalConfiguracionMapaCurricular({
       try {
         localStorage.removeItem(`horarios_wizard_config_v4_${escuela.id}`);
         localStorage.removeItem(`horarios_wizard_config_${escuela.id}`);
+        localStorage.setItem(`horarios_paso_${escuela.id}`, "1");
       } catch (e) {
         console.warn("No se pudo limpiar localStorage", e);
       }

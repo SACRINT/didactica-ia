@@ -34,9 +34,9 @@ export default function HorariosDashboardClient({
     id: teacherId,
     cct,
     nombre: schoolName,
-    gruposPrimerAno: 3,
-    gruposSegundoAno: 3,
-    gruposTercerAno: 3,
+    gruposPrimerAno: 1,
+    gruposSegundoAno: 1,
+    gruposTercerAno: 1,
     mapaCurricularCompletado: false,
   };
 
@@ -47,6 +47,15 @@ export default function HorariosDashboardClient({
   const [docentes, setDocentes] = useState<any[]>([]);
   const [cargas, setCargas] = useState<any[]>([]);
   const [horario, setHorario] = useState<any>(null);
+
+  // Guardar paso actual en localStorage cuando cambie
+  useEffect(() => {
+    if (typeof window !== 'undefined' && teacherId && pasoActual >= 1 && pasoActual <= 3) {
+      try {
+        localStorage.setItem(`horarios_paso_${teacherId}`, String(pasoActual));
+      } catch {}
+    }
+  }, [pasoActual, teacherId]);
 
   useEffect(() => {
     if (isDirector) {
@@ -96,8 +105,15 @@ export default function HorariosDashboardClient({
         setPasoActual(4);
       } else {
         setModo('WIZARD');
-        // Si ya hay grupos guardados, ir al paso 2 o 3; si no, paso 1
-        setPasoActual(data.grupos?.length > 0 ? 3 : 1);
+        // Restaurar paso guardado o iniciar en Paso 1
+        let pasoGuardado: string | null = null;
+        if (typeof window !== 'undefined') {
+          try {
+            pasoGuardado = localStorage.getItem(`horarios_paso_${teacherId}`);
+          } catch {}
+        }
+        const pasoNum = pasoGuardado ? parseInt(pasoGuardado, 10) : 1;
+        setPasoActual(pasoNum >= 1 && pasoNum <= 3 ? pasoNum : 1);
       }
     } catch (e) {
       console.error('Error cargando configuración de horarios:', e);
