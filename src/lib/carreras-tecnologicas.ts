@@ -73,8 +73,8 @@ export const CARRERAS_TECNOLOGICAS: CarreraTecnica[] = [
         semestre: 3,
         horasSemanales: 17,
         submodulos: [
-          { nombre: "Elabora contabilidad de costos", abreviatura: "CONT-COST", horasSemanales: 11 },
-          { nombre: "Realiza nómina de forma electrónica", abreviatura: "NOM-ELEC", horasSemanales: 6 }
+          { nombre: "Elabora contabilidad de costos", abreviatura: "CONT-COST", horasSemanales: 12 },
+          { nombre: "Realiza nómina de forma electrónica", abreviatura: "NOM-ELEC", horasSemanales: 5 }
         ]
       },
       {

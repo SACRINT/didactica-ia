@@ -35,10 +35,11 @@ CREATE TABLE IF NOT EXISTS horario_grupos (
   UNIQUE(teacher_id, nombre)
 );
 
--- Nuevas columnas para Bachillerato Tecnológico (las existentes se mantienen para BGE)
+-- Nuevas columnas para Bachillerato Tecnológico y Personalización de UACs (las existentes se mantienen para BGE)
 ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS carrera_tecnica_id TEXT;
 ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS version_programa TEXT;
 ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS materia_propedutica_5to TEXT;
+ALTER TABLE horario_grupos ADD COLUMN IF NOT EXISTS custom_uacs JSONB;
 
 CREATE TABLE IF NOT EXISTS horario_cargas (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

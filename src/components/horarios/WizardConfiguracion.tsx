@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Sparkles, Users, BookOpen, Clock, AlertCircle, ShieldCheck, UserCheck, Plus, Trash2, CheckCircle2, UserPlus, Layers, Search, Save, AlertTriangle, FileSpreadsheet, Download, Upload } from "lucide-react";
+import { Sparkles, Users, BookOpen, Clock, AlertCircle, ShieldCheck, UserCheck, Plus, Trash2, CheckCircle2, UserPlus, Layers, Search, Save, AlertTriangle, FileSpreadsheet, Download, Upload, Scissors, Edit2, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import { parsearExcelPersonal, descargarPlantillaExcelDocentes, DocenteImportado } from "@/lib/excel-plantilla";
 import { parsearExcelMatriz, parsearLibroIntegralExcel, descargarPlantillaIntegralHorarios, descargarPlantillaMatrizDocente, ResultadoParseoMatriz, ResultadoLibroIntegral } from "@/lib/excel-matriz";
@@ -164,6 +164,50 @@ export default function WizardConfiguracion({
   // Currículo manual por grupo: clave = "semestre_letra" (ej: "1_A", "3_B", "5_C")
   const [curriculoManualPorGrupo, setCurriculoManualPorGrupo] = useState<Record<string, any[]>>({});
 
+  // Estado customUacsPorGrupo: mapa por grupo (id o nombre) con su lista de UACs personalizadas
+  const [customUacsPorGrupo, setCustomUacsPorGrupo] = useState<Record<string, any[]>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem(`custom_uacs_${escuelaId}`);
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && typeof parsed === "object") return parsed;
+        }
+      } catch (e) {
+        console.warn("Error leyendo custom_uacs de localStorage", e);
+      }
+    }
+    return {};
+  });
+
+  // Modales de personalización de UACs en Paso 3
+  const [modalDividir, setModalDividir] = useState<{
+    grupo: any;
+    uac: any;
+    horasTotalOriginal: number;
+    horasA: number;
+    horasB: number;
+    nombreA: string;
+    nombreB: string;
+    abrevA: string;
+    abrevB: string;
+  } | null>(null);
+
+  const [modalEditarNombre, setModalEditarNombre] = useState<{
+    grupo: any;
+    uac: any;
+    nuevoNombre: string;
+    nuevaAbrev: string;
+  } | null>(null);
+
+  const [modalAgregarUac, setModalAgregarUac] = useState<{
+    grupo: any;
+    nombre: string;
+    abrev: string;
+    horas: number;
+    tipo: string;
+  } | null>(null);
+
   // Estado de Grupos
   const [grupos, setGrupos] = useState<any[]>([]);
 
@@ -295,7 +339,81 @@ export default function WizardConfiguracion({
 
   // Normaliza nombre de grupo: convierte tanto "3º A" como "3° A" a "3° A" (símbolo grado)
   const normalizarNombreGrupo = (nombre: string) =>
-    nombre.replace(/º/g, "°");
+    (nombre || "").replace(/º/g, "°");
+
+  // Sincronizar customUacs desde la base de datos (gruposIniciales)
+  useEffect(() => {
+    if (Array.isArray(gruposIniciales) && gruposIniciales.length > 0) {
+      setCustomUacsPorGrupo((prev) => {
+        const next = { ...prev };
+        let huboCambios = false;
+        gruposIniciales.forEach((g: any) => {
+          let uacs = g.customUacs || g.custom_uacs;
+          if (typeof uacs === "string") {
+            try { uacs = JSON.parse(uacs); } catch {}
+          }
+          if (Array.isArray(uacs) && uacs.length > 0) {
+            const keyId = g.id ? String(g.id) : "";
+            const keyNombre = g.nombre ? String(g.nombre) : "";
+            const keyNorm = g.nombre ? normalizarNombreGrupo(g.nombre) : "";
+            if ((keyId && !next[keyId]) || (keyNombre && !next[keyNombre]) || (keyNorm && !next[keyNorm])) {
+              if (keyId) next[keyId] = uacs;
+              if (keyNombre) next[keyNombre] = uacs;
+              if (keyNorm) next[keyNorm] = uacs;
+              huboCambios = true;
+            }
+          }
+        });
+        if (huboCambios) {
+          try {
+            localStorage.setItem(`custom_uacs_${escuelaId}`, JSON.stringify(next));
+          } catch {}
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, [gruposIniciales, escuelaId]);
+
+  const getCustomUacsDeGrupo = (grupo: any): any[] | null => {
+    if (!grupo) return null;
+    const keyId = grupo.id ? String(grupo.id) : "";
+    const keyNombre = grupo.nombre ? String(grupo.nombre) : "";
+    const keyNorm = grupo.nombre ? normalizarNombreGrupo(grupo.nombre) : "";
+
+    const list = (keyId && customUacsPorGrupo[keyId]) ||
+                 (keyNombre && customUacsPorGrupo[keyNombre]) ||
+                 (keyNorm && customUacsPorGrupo[keyNorm]);
+
+    if (Array.isArray(list) && list.length > 0) return list;
+    return null;
+  };
+
+  const setCustomUacsDeGrupo = (grupo: any, nuevaLista: any[] | null) => {
+    setCustomUacsPorGrupo((prev) => {
+      const next = { ...prev };
+      const keyId = grupo.id ? String(grupo.id) : "";
+      const keyNombre = grupo.nombre ? String(grupo.nombre) : "";
+      const keyNorm = grupo.nombre ? normalizarNombreGrupo(grupo.nombre) : "";
+
+      if (nuevaLista === null) {
+        if (keyId) delete next[keyId];
+        if (keyNombre) delete next[keyNombre];
+        if (keyNorm) delete next[keyNorm];
+      } else {
+        if (keyId) next[keyId] = nuevaLista;
+        if (keyNombre) next[keyNombre] = nuevaLista;
+        if (keyNorm) next[keyNorm] = nuevaLista;
+      }
+
+      try {
+        localStorage.setItem(`custom_uacs_${escuelaId}`, JSON.stringify(next));
+      } catch (e) {
+        console.warn("Error guardando custom_uacs en localStorage", e);
+      }
+      return next;
+    });
+  };
 
   const generarGruposSegunEstructura = (n1: number, n2: number, n3: number) => {
     const letras = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -989,6 +1107,20 @@ export default function WizardConfiguracion({
       return;
     }
 
+    const gruposConCustom = grupos.map((g) => {
+      const customList = getCustomUacsDeGrupo(g);
+      return {
+        ...g,
+        customUacs: customList && customList.length > 0 ? customList : (g.customUacs || null)
+      };
+    });
+
+    try {
+      localStorage.setItem(`custom_uacs_${escuelaId}`, JSON.stringify(customUacsPorGrupo));
+    } catch (e) {
+      console.warn("Error guardando custom_uacs en localStorage", e);
+    }
+
     try {
       const res = await fetch("/api/horarios/configuracion", {
         method: "POST",
@@ -1001,7 +1133,7 @@ export default function WizardConfiguracion({
             horaInicio,
             periodoActivo
           },
-          grupos,
+          grupos: gruposConCustom,
           aulas: aulasIniciales.length > 0 ? aulasIniciales : [{ nombre: "Aula General", tipo: "REGULAR" }],
           cargas: cargasCompletas,
           escuela: {
@@ -1021,7 +1153,7 @@ export default function WizardConfiguracion({
       if (data.success) {
         toast.success("Configuración guardada correctamente");
         onGenerarClick({
-          grupos,
+          grupos: gruposConCustom,
           docentes,
           aulas: aulasIniciales.length > 0 ? aulasIniciales : [{ id: "aula-gen", nombre: "Aula General", tipo: "REGULAR" }],
           cargas: cargasCompletas,
@@ -1058,6 +1190,12 @@ export default function WizardConfiguracion({
   };
 
   const getUACsIndividualesGrupo = (grupo: any) => {
+    // 1. Si el grupo tiene una lista personalizada de UACs (horas modificadas, divididas o agregadas), usarla con máxima prioridad
+    const customList = getCustomUacsDeGrupo(grupo);
+    if (customList && customList.length > 0) {
+      return customList;
+    }
+
     const sem = grupo.semestre;
 
     if (modoConfiguracion === "MANUAL_TECNOLOGICO") {
@@ -1208,6 +1346,194 @@ export default function WizardConfiguracion({
     }
 
     return [];
+  };
+
+  const handleCambiarHorasUAC = (grupo: any, uacId: string, nuevasHoras: number) => {
+    const horasValidadas = Math.max(1, Math.min(25, Math.round(nuevasHoras) || 1));
+    const listaActual = getUACsIndividualesGrupo(grupo).map(u => ({ ...u }));
+    const idx = listaActual.findIndex(u => u.id === uacId);
+    if (idx !== -1) {
+      listaActual[idx].horasSemanales = horasValidadas;
+      listaActual[idx].esPersonalizada = true;
+      setCustomUacsDeGrupo(grupo, listaActual);
+
+      // Actualizar carga docente existente si corresponde
+      setCargas(prev => prev.map(c => {
+        if (matchGrupoCarga(c.grupoId, grupo.id) && matchUacCarga(c.uacName, c.asignaturaId, listaActual[idx])) {
+          return { ...c, horasSemanales: horasValidadas };
+        }
+        return c;
+      }));
+    }
+  };
+
+  const handleConfirmarRenombrarUAC = (grupo: any, uacId: string, nuevoNombre: string, nuevaAbrev: string) => {
+    const nombreLimpio = nuevoNombre.trim();
+    if (!nombreLimpio) {
+      toast.error("El nombre de la asignatura no puede estar vacío");
+      return;
+    }
+    const listaActual = getUACsIndividualesGrupo(grupo).map(u => ({ ...u }));
+    const idx = listaActual.findIndex(u => u.id === uacId);
+    if (idx !== -1) {
+      const nombreAnterior = listaActual[idx].uacName;
+      listaActual[idx].uacName = nombreLimpio;
+      listaActual[idx].abrev = (nuevaAbrev || nombreLimpio.substring(0, 12)).toUpperCase();
+      listaActual[idx].esPersonalizada = true;
+      setCustomUacsDeGrupo(grupo, listaActual);
+
+      setCargas(prev => prev.map(c => {
+        if (matchGrupoCarga(c.grupoId, grupo.id) && (c.asignaturaId === uacId || c.uacName === nombreAnterior)) {
+          return { ...c, uacName: nombreLimpio };
+        }
+        return c;
+      }));
+      toast.success("Nombre de la asignatura actualizado");
+    }
+    setModalEditarNombre(null);
+  };
+
+  const handleConfirmarDivisionUAC = (
+    grupo: any,
+    uacOriginal: any,
+    horasA: number,
+    horasB: number,
+    nombreA: string,
+    nombreB: string,
+    abrevA: string,
+    abrevB: string
+  ) => {
+    const totalOriginal = uacOriginal.horasSemanales || 3;
+    if (horasA + horasB !== totalOriginal) {
+      toast.error(`La suma (${horasA} + ${horasB} = ${horasA + horasB}h) debe ser exactamente igual a ${totalOriginal}h`);
+      return;
+    }
+
+    const listaActual = getUACsIndividualesGrupo(grupo).map(u => ({ ...u }));
+    const idx = listaActual.findIndex(u => u.id === uacOriginal.id);
+    if (idx === -1) return;
+
+    const timestamp = Date.now();
+    const itemA = {
+      ...uacOriginal,
+      id: `${uacOriginal.id}_part_a_${timestamp}`,
+      uacName: nombreA.trim() || `${uacOriginal.uacName} A`,
+      abrev: (abrevA || `${uacOriginal.abrev || 'UAC'}-A`).toUpperCase(),
+      horasSemanales: horasA,
+      esDividida: true,
+      esPersonalizada: true,
+      originalUacId: uacOriginal.id
+    };
+
+    const itemB = {
+      ...uacOriginal,
+      id: `${uacOriginal.id}_part_b_${timestamp}`,
+      uacName: nombreB.trim() || `${uacOriginal.uacName} B`,
+      abrev: (abrevB || `${uacOriginal.abrev || 'UAC'}-B`).toUpperCase(),
+      horasSemanales: horasB,
+      esDividida: true,
+      esPersonalizada: true,
+      originalUacId: uacOriginal.id
+    };
+
+    listaActual.splice(idx, 1, itemA, itemB);
+    setCustomUacsDeGrupo(grupo, listaActual);
+
+    // Limpiar cargas previas de la UAC original para que cada parte se asigne limpiamente
+    setCargas(prev => prev.filter(c => !(matchGrupoCarga(c.grupoId, grupo.id) && (c.asignaturaId === uacOriginal.id || c.uacName === uacOriginal.uacName))));
+
+    toast.success(`Asignatura dividida exitosamente en ${horasA}h y ${horasB}h`);
+    setModalDividir(null);
+  };
+
+  const handleConfirmarAgregarUAC = (
+    grupo: any,
+    nombre: string,
+    abrev: string,
+    horas: number,
+    tipo: string
+  ) => {
+    const nombreLimpio = nombre.trim();
+    if (!nombreLimpio) {
+      toast.error("El nombre de la asignatura es requerido");
+      return;
+    }
+    const horasValidadas = Math.max(1, Math.min(25, Number(horas) || 3));
+    const nuevaAbrev = (abrev || nombreLimpio.substring(0, 10)).toUpperCase();
+    const nuevoId = `uac_custom_${grupo.semestre}_${Date.now()}`;
+
+    const nuevaUAC = {
+      id: nuevoId,
+      uacName: nombreLimpio,
+      abrev: nuevaAbrev,
+      tipo: tipo || "CUSTOM",
+      horasSemanales: horasValidadas,
+      esPersonalizada: true
+    };
+
+    const listaActual = [...getUACsIndividualesGrupo(grupo).map(u => ({ ...u })), nuevaUAC];
+    setCustomUacsDeGrupo(grupo, listaActual);
+    toast.success(`Asignatura "${nombreLimpio}" (${horasValidadas}h) agregada al Grupo ${grupo.nombre}`);
+    setModalAgregarUac(null);
+  };
+
+  const handleEliminarUAC = (grupo: any, uacId: string) => {
+    const uacAEliminar = getUACsIndividualesGrupo(grupo).find(u => u.id === uacId);
+    const nombre = uacAEliminar?.uacName || "la asignatura";
+    if (!window.confirm(`¿Seguro que deseas eliminar "${nombre}" del Grupo ${grupo.nombre}?`)) {
+      return;
+    }
+    const listaActual = getUACsIndividualesGrupo(grupo).filter(u => u.id !== uacId);
+    setCustomUacsDeGrupo(grupo, listaActual);
+    setCargas(prev => prev.filter(c => !(matchGrupoCarga(c.grupoId, grupo.id) && (c.asignaturaId === uacId || c.uacName === nombre))));
+    toast.success(`Asignatura eliminada del Grupo ${grupo.nombre}`);
+  };
+
+  const handleRestaurarUACsOficiales = (grupo: any) => {
+    if (window.confirm(`¿Restaurar las asignaturas oficiales para el Grupo ${grupo.nombre}? Se descartarán las divisiones, cambios de horas o asignaturas agregadas para este grupo.`)) {
+      setCustomUacsDeGrupo(grupo, null);
+      toast.success(`Asignaturas oficiales restauradas para el Grupo ${grupo.nombre}`);
+    }
+  };
+
+  const abrirModalDividir = (grupo: any, uac: any) => {
+    const totalHoras = uac.horasSemanales || 3;
+    let horasA = Math.ceil(totalHoras / 2);
+    let horasB = Math.floor(totalHoras / 2);
+    if (totalHoras === 12) {
+      horasA = 7;
+      horasB = 5;
+    }
+    setModalDividir({
+      grupo,
+      uac,
+      horasTotalOriginal: totalHoras,
+      horasA,
+      horasB,
+      nombreA: `${uac.uacName} A`,
+      nombreB: `${uac.uacName} B`,
+      abrevA: `${uac.abrev || 'UAC'}-A`,
+      abrevB: `${uac.abrev || 'UAC'}-B`
+    });
+  };
+
+  const abrirModalEditarNombre = (grupo: any, uac: any) => {
+    setModalEditarNombre({
+      grupo,
+      uac,
+      nuevoNombre: uac.uacName || "",
+      nuevaAbrev: uac.abrev || ""
+    });
+  };
+
+  const abrirModalAgregarUac = (grupo: any) => {
+    setModalAgregarUac({
+      grupo,
+      nombre: "",
+      abrev: "",
+      horas: 3,
+      tipo: "MODULAR"
+    });
   };
 
   const semestresActivosPeriodo = periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6];
@@ -2103,9 +2429,10 @@ export default function WizardConfiguracion({
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78125rem" }}>
                           <thead>
                             <tr style={{ background: "#1e293b", borderBottom: "1px solid #334155" }}>
-                              <th style={{ padding: "0.5rem 0.625rem", textAlign: "left", fontWeight: 800, color: "#cbd5e1", width: "55%" }}>Materia (UAC)</th>
-                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#38bdf8", width: "15%" }}>Horas</th>
-                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#cbd5e1", width: "30%" }}>Docente Asignado</th>
+                              <th style={{ padding: "0.5rem 0.625rem", textAlign: "left", fontWeight: 800, color: "#cbd5e1", width: "42%" }}>Materia (UAC)</th>
+                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#38bdf8", width: "16%" }}>Horas</th>
+                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#cbd5e1", width: "26%" }}>Docente Asignado</th>
+                              <th style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#cbd5e1", width: "16%" }}>Acciones</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2125,48 +2452,143 @@ export default function WizardConfiguracion({
                                         <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", display: "block" }}>
                                           Formación Laboral {uac.tipo === "LABORAL_A" ? '"A"' : '"B"'} ({(uac as any).capNombre})
                                         </span>
-                                        <span style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.8125rem" }}>
-                                          {uac.uacName}
-                                        </span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#60a5fa", marginLeft: "0.35rem" }}>
-                                          ({uac.abrev})
-                                        </span>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexWrap: "wrap" }}>
+                                          {uac.esDividida && (
+                                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "#0284c7", color: "#ffffff", padding: "0.1rem 0.35rem", borderRadius: "4px" }}>
+                                              ✂️ Dividida
+                                            </span>
+                                          )}
+                                          <span style={{ color: "#fbbf24", fontWeight: 900, fontSize: "0.8125rem" }}>
+                                            {uac.uacName}
+                                          </span>
+                                          <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#60a5fa" }}>
+                                            ({uac.abrev})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirModalEditarNombre(g, uac)}
+                                            title="Editar nombre de asignatura"
+                                            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "0.8rem", padding: "1px 4px", color: "#94a3b8" }}
+                                          >
+                                            ✏️
+                                          </button>
+                                        </div>
                                       </div>
                                     ) : uac.tipo === "AMPLIADO" ? (
                                       <div>
                                         <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#38bdf8", display: "block" }}>
                                           Currículum Ampliado (FFEO)
                                         </span>
-                                        <span style={{ color: "#7dd3fc", fontWeight: 800 }}>
-                                          {uac.uacName}
-                                        </span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", marginLeft: "0.35rem" }}>
-                                          ({uac.abrev})
-                                        </span>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexWrap: "wrap" }}>
+                                          {uac.esDividida && (
+                                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "#0284c7", color: "#ffffff", padding: "0.1rem 0.35rem", borderRadius: "4px" }}>
+                                              ✂️ Dividida
+                                            </span>
+                                          )}
+                                          <span style={{ color: "#7dd3fc", fontWeight: 800 }}>
+                                            {uac.uacName}
+                                          </span>
+                                          <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8" }}>
+                                            ({uac.abrev})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirModalEditarNombre(g, uac)}
+                                            title="Editar nombre de asignatura"
+                                            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "0.8rem", padding: "1px 4px", color: "#94a3b8" }}
+                                          >
+                                            ✏️
+                                          </button>
+                                        </div>
                                       </div>
                                     ) : uac.tipo?.startsWith("FFE_") ? (
                                       <div>
                                         <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#c084fc", display: "block" }}>
                                           Formación Fundamental Extendida (Optativa FFE)
                                         </span>
-                                        <span style={{ color: "#d8b4fe", fontWeight: 800 }}>
-                                          {uac.uacName}
-                                        </span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", marginLeft: "0.35rem" }}>
-                                          ({uac.abrev})
-                                        </span>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexWrap: "wrap" }}>
+                                          {uac.esDividida && (
+                                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "#0284c7", color: "#ffffff", padding: "0.1rem 0.35rem", borderRadius: "4px" }}>
+                                              ✂️ Dividida
+                                            </span>
+                                          )}
+                                          <span style={{ color: "#d8b4fe", fontWeight: 800 }}>
+                                            {uac.uacName}
+                                          </span>
+                                          <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8" }}>
+                                            ({uac.abrev})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirModalEditarNombre(g, uac)}
+                                            title="Editar nombre de asignatura"
+                                            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "0.8rem", padding: "1px 4px", color: "#94a3b8" }}
+                                          >
+                                            ✏️
+                                          </button>
+                                        </div>
                                       </div>
                                     ) : (
                                       <div>
-                                        <span style={{ color: "#f8fafc" }}>{uac.uacName}</span>
-                                        <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#38bdf8", marginLeft: "0.35rem" }}>
-                                          ({uac.abrev})
-                                        </span>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexWrap: "wrap" }}>
+                                          {uac.esDividida && (
+                                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "#0284c7", color: "#ffffff", padding: "0.1rem 0.35rem", borderRadius: "4px" }}>
+                                              ✂️ Dividida
+                                            </span>
+                                          )}
+                                          {uac.tipo === "MODULAR" && (
+                                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "rgba(245, 158, 11, 0.2)", color: "#fbbf24", padding: "0.1rem 0.35rem", borderRadius: "4px", border: "1px solid rgba(245, 158, 11, 0.4)" }}>
+                                              Módulo Técnico
+                                            </span>
+                                          )}
+                                          {uac.esPersonalizada && !uac.esDividida && (
+                                            <span style={{ fontSize: "0.65rem", fontWeight: 800, background: "rgba(16, 185, 129, 0.2)", color: "#34d399", padding: "0.1rem 0.35rem", borderRadius: "4px" }}>
+                                              Personalizada
+                                            </span>
+                                          )}
+                                          <span style={{ color: "#f8fafc" }}>{uac.uacName}</span>
+                                          <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#38bdf8" }}>
+                                            ({uac.abrev})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirModalEditarNombre(g, uac)}
+                                            title="Editar nombre de asignatura"
+                                            style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "0.8rem", padding: "1px 4px", color: "#94a3b8" }}
+                                          >
+                                            ✏️
+                                          </button>
+                                        </div>
                                       </div>
                                     )}
                                   </td>
-                                  <td style={{ padding: "0.5rem", textAlign: "center", fontWeight: 800, color: "#38bdf8" }}>
-                                    {uac.horasSemanales || 3}h
+                                  <td style={{ padding: "0.4rem 0.25rem", textAlign: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.2rem" }}>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={25}
+                                        value={uac.horasSemanales || 3}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value, 10);
+                                          if (!isNaN(val)) {
+                                            handleCambiarHorasUAC(g, uac.id, val);
+                                          }
+                                        }}
+                                        style={{
+                                          width: "44px",
+                                          padding: "0.25rem 0.1rem",
+                                          borderRadius: "6px",
+                                          border: "1px solid #475569",
+                                          background: "#0f172a",
+                                          color: "#38bdf8",
+                                          fontWeight: 800,
+                                          fontSize: "0.8125rem",
+                                          textAlign: "center"
+                                        }}
+                                      />
+                                      <span style={{ color: "#94a3b8", fontSize: "0.75rem", fontWeight: 700 }}>h</span>
+                                    </div>
                                   </td>
                                   <td style={{ padding: "0.35rem" }}>
                                     <select
@@ -2200,11 +2622,100 @@ export default function WizardConfiguracion({
                                       })}
                                     </select>
                                   </td>
+                                  <td style={{ padding: "0.35rem 0.25rem", textAlign: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem" }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => abrirModalDividir(g, uac)}
+                                        title="Dividir asignatura en 2 partes (Parte A y Parte B para diferentes docentes)"
+                                        style={{
+                                          background: "rgba(56, 189, 248, 0.12)",
+                                          border: "1px solid rgba(56, 189, 248, 0.3)",
+                                          color: "#38bdf8",
+                                          borderRadius: "6px",
+                                          padding: "0.25rem 0.4rem",
+                                          cursor: "pointer",
+                                          fontSize: "0.78rem",
+                                          fontWeight: 700,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "2px"
+                                        }}
+                                      >
+                                        ✂️ <span style={{ fontSize: "0.6875rem" }}>Dividir</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEliminarUAC(g, uac.id)}
+                                        title="Eliminar asignatura del grupo"
+                                        style={{
+                                          background: "rgba(239, 68, 68, 0.12)",
+                                          border: "1px solid rgba(239, 68, 68, 0.3)",
+                                          color: "#f87171",
+                                          borderRadius: "6px",
+                                          padding: "0.25rem 0.4rem",
+                                          cursor: "pointer",
+                                          fontSize: "0.78rem"
+                                        }}
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  </td>
                                 </tr>
                               );
                             })}
                           </tbody>
                         </table>
+
+                        {/* Pie de tabla con Agregar Asignatura, Restaurar y Total de Horas */}
+                        <div style={{ padding: "0.6rem 0.8rem", background: "#1e293b", borderTop: "1px solid #334155", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <button
+                              type="button"
+                              onClick={() => abrirModalAgregarUac(g)}
+                              style={{
+                                background: "#0284c7",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "0.35rem 0.75rem",
+                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.3rem"
+                              }}
+                            >
+                              ➕ Agregar Asignatura
+                            </button>
+                            {getCustomUacsDeGrupo(g) && (
+                              <button
+                                type="button"
+                                onClick={() => handleRestaurarUACsOficiales(g)}
+                                style={{
+                                  background: "transparent",
+                                  color: "#94a3b8",
+                                  border: "1px solid #475569",
+                                  borderRadius: "6px",
+                                  padding: "0.35rem 0.6rem",
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.3rem"
+                                }}
+                              >
+                                🔄 Restaurar Oficiales
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#f8fafc" }}>
+                            Total: <span style={{ color: "#38bdf8", fontSize: "0.9rem" }}>{uacsEspecificas.reduce((s, u) => s + (u.horasSemanales || 3), 0)}h</span> / sem
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -2792,6 +3303,450 @@ export default function WizardConfiguracion({
                   {loading ? "Procesando..." : (resultadoParseoMatriz && resultadoParseoMatriz.cargas.length > 0) ? "Confirmar e Importar a Matriz" : "Confirmar e Importar Personal"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Dividir Asignatura en 2 Partes (Parte A y B para distintos docentes) */}
+      {modalDividir && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem"
+          }}
+        >
+          <div
+            style={{
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)",
+              overflow: "hidden"
+            }}
+          >
+            <div
+              style={{
+                background: "#1e293b",
+                padding: "1rem 1.25rem",
+                borderBottom: "1px solid #334155",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "1.25rem" }}>✂️</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "#f8fafc" }}>
+                    Dividir Asignatura en 2 Partes
+                  </h3>
+                  <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                    Grupo {modalDividir.grupo.nombre} • Total original: {modalDividir.horasTotalOriginal} horas semanales
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalDividir(null)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "1.1rem" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div style={{ background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.25)", borderRadius: "8px", padding: "0.75rem", fontSize: "0.78rem", color: "#bae6fd", lineHeight: 1.4 }}>
+                💡 <strong>Asignación independiente:</strong> Esta acción dividirá <em>&quot;{modalDividir.uac.uacName}&quot;</em> en dos bloques independientes para poder asignar dos docentes diferentes. Las horas totales del grupo se mantienen idénticas.
+              </div>
+
+              {/* Parte A */}
+              <div style={{ background: "#1e293b", padding: "0.85rem", borderRadius: "10px", border: "1px solid #334155" }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#38bdf8", marginBottom: "0.5rem" }}>
+                  🔹 Parte A
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: "0.5rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.2rem", fontWeight: 700 }}>
+                      Nombre de la Parte A:
+                    </label>
+                    <input
+                      type="text"
+                      value={modalDividir.nombreA}
+                      onChange={(e) => setModalDividir({ ...modalDividir, nombreA: e.target.value })}
+                      style={{ width: "100%", padding: "0.45rem 0.6rem", background: "#0f172a", border: "1px solid #475569", borderRadius: "6px", color: "#ffffff", fontSize: "0.8rem", fontWeight: 600 }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.2rem", fontWeight: 700 }}>
+                      Horas:
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={modalDividir.horasTotalOriginal - 1}
+                      value={modalDividir.horasA}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10) || 1;
+                        const complemento = Math.max(1, modalDividir.horasTotalOriginal - val);
+                        setModalDividir({
+                          ...modalDividir,
+                          horasA: val,
+                          horasB: complemento
+                        });
+                      }}
+                      style={{ width: "100%", padding: "0.45rem 0.6rem", background: "#0f172a", border: "1px solid #475569", borderRadius: "6px", color: "#38bdf8", fontSize: "0.85rem", fontWeight: 800, textAlign: "center" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parte B */}
+              <div style={{ background: "#1e293b", padding: "0.85rem", borderRadius: "10px", border: "1px solid #334155" }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#a855f7", marginBottom: "0.5rem" }}>
+                  🟣 Parte B
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: "0.5rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.2rem", fontWeight: 700 }}>
+                      Nombre de la Parte B:
+                    </label>
+                    <input
+                      type="text"
+                      value={modalDividir.nombreB}
+                      onChange={(e) => setModalDividir({ ...modalDividir, nombreB: e.target.value })}
+                      style={{ width: "100%", padding: "0.45rem 0.6rem", background: "#0f172a", border: "1px solid #475569", borderRadius: "6px", color: "#ffffff", fontSize: "0.8rem", fontWeight: 600 }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.7rem", color: "#94a3b8", marginBottom: "0.2rem", fontWeight: 700 }}>
+                      Horas:
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={modalDividir.horasTotalOriginal - 1}
+                      value={modalDividir.horasB}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10) || 1;
+                        const complemento = Math.max(1, modalDividir.horasTotalOriginal - val);
+                        setModalDividir({
+                          ...modalDividir,
+                          horasB: val,
+                          horasA: complemento
+                        });
+                      }}
+                      style={{ width: "100%", padding: "0.45rem 0.6rem", background: "#0f172a", border: "1px solid #475569", borderRadius: "6px", color: "#a855f7", fontSize: "0.85rem", fontWeight: 800, textAlign: "center" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Verificación de suma */}
+              {modalDividir.horasA + modalDividir.horasB !== modalDividir.horasTotalOriginal ? (
+                <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "8px", padding: "0.6rem 0.8rem", fontSize: "0.75rem", color: "#fca5a5" }}>
+                  ⚠️ La suma de horas es {modalDividir.horasA + modalDividir.horasB}h, pero debe sumar exactamente {modalDividir.horasTotalOriginal}h.
+                </div>
+              ) : (
+                <div style={{ background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", borderRadius: "8px", padding: "0.6rem 0.8rem", fontSize: "0.75rem", color: "#86efac", display: "flex", justifyContent: "space-between" }}>
+                  <span>✓ Reparto exacto: {modalDividir.horasA}h + {modalDividir.horasB}h</span>
+                  <strong>Total: {modalDividir.horasTotalOriginal}h</strong>
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: "#1e293b", padding: "0.85rem 1.25rem", borderTop: "1px solid #334155", display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+              <button
+                type="button"
+                onClick={() => setModalDividir(null)}
+                style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer", fontSize: "0.8125rem" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={modalDividir.horasA + modalDividir.horasB !== modalDividir.horasTotalOriginal || !modalDividir.nombreA.trim() || !modalDividir.nombreB.trim()}
+                onClick={() => handleConfirmarDivisionUAC(
+                  modalDividir.grupo,
+                  modalDividir.uac,
+                  modalDividir.horasA,
+                  modalDividir.horasB,
+                  modalDividir.nombreA,
+                  modalDividir.nombreB,
+                  modalDividir.abrevA,
+                  modalDividir.abrevB
+                )}
+                style={{
+                  background: (modalDividir.horasA + modalDividir.horasB === modalDividir.horasTotalOriginal && modalDividir.nombreA.trim() && modalDividir.nombreB.trim()) ? "#0284c7" : "#475569",
+                  color: "#ffffff",
+                  padding: "0.5rem 1.3rem",
+                  borderRadius: "8px",
+                  fontWeight: 800,
+                  border: "none",
+                  cursor: (modalDividir.horasA + modalDividir.horasB === modalDividir.horasTotalOriginal && modalDividir.nombreA.trim() && modalDividir.nombreB.trim()) ? "pointer" : "not-allowed",
+                  fontSize: "0.8125rem"
+                }}
+              >
+                Confirmar División
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Editar Nombre de Asignatura */}
+      {modalEditarNombre && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem"
+          }}
+        >
+          <div
+            style={{
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "460px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              overflow: "hidden"
+            }}
+          >
+            <div
+              style={{
+                background: "#1e293b",
+                padding: "1rem 1.25rem",
+                borderBottom: "1px solid #334155",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "#f8fafc" }}>
+                ✏️ Editar Nombre de Asignatura
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalEditarNombre(null)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "1.1rem" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.3rem", fontWeight: 700 }}>
+                  Nombre de la Asignatura / UAC:
+                </label>
+                <input
+                  type="text"
+                  value={modalEditarNombre.nuevoNombre}
+                  onChange={(e) => setModalEditarNombre({ ...modalEditarNombre, nuevoNombre: e.target.value })}
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", background: "#1e293b", border: "1px solid #475569", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem", fontWeight: 600 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.3rem", fontWeight: 700 }}>
+                  Abreviatura / Código:
+                </label>
+                <input
+                  type="text"
+                  value={modalEditarNombre.nuevaAbrev}
+                  onChange={(e) => setModalEditarNombre({ ...modalEditarNombre, nuevaAbrev: e.target.value })}
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", background: "#1e293b", border: "1px solid #475569", borderRadius: "8px", color: "#38bdf8", fontSize: "0.85rem", fontWeight: 700 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ background: "#1e293b", padding: "0.85rem 1.25rem", borderTop: "1px solid #334155", display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+              <button
+                type="button"
+                onClick={() => setModalEditarNombre(null)}
+                style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer", fontSize: "0.8125rem" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!modalEditarNombre.nuevoNombre.trim()}
+                onClick={() => handleConfirmarRenombrarUAC(
+                  modalEditarNombre.grupo,
+                  modalEditarNombre.uac.id,
+                  modalEditarNombre.nuevoNombre,
+                  modalEditarNombre.nuevaAbrev
+                )}
+                style={{ background: "#10b981", color: "#ffffff", padding: "0.5rem 1.3rem", borderRadius: "8px", fontWeight: 800, border: "none", cursor: "pointer", fontSize: "0.8125rem" }}
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Agregar Asignatura al Grupo */}
+      {modalAgregarUac && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem"
+          }}
+        >
+          <div
+            style={{
+              background: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "480px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              overflow: "hidden"
+            }}
+          >
+            <div
+              style={{
+                background: "#1e293b",
+                padding: "1rem 1.25rem",
+                borderBottom: "1px solid #334155",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "#f8fafc" }}>
+                  ➕ Agregar Asignatura al Grupo
+                </h3>
+                <span style={{ fontSize: "0.75rem", color: "#38bdf8" }}>
+                  Grupo {modalAgregarUac.grupo.nombre} ({modalAgregarUac.grupo.semestre}° Semestre)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalAgregarUac(null)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "1.1rem" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.3rem", fontWeight: 700 }}>
+                  Nombre de la Asignatura / UAC:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Taller Especial de Contabilidad"
+                  value={modalAgregarUac.nombre}
+                  onChange={(e) => setModalAgregarUac({ ...modalAgregarUac, nombre: e.target.value })}
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", background: "#1e293b", border: "1px solid #475569", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem", fontWeight: 600 }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.3rem", fontWeight: 700 }}>
+                    Abreviatura:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: TALL-CONT"
+                    value={modalAgregarUac.abrev}
+                    onChange={(e) => setModalAgregarUac({ ...modalAgregarUac, abrev: e.target.value })}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", background: "#1e293b", border: "1px solid #475569", borderRadius: "8px", color: "#38bdf8", fontSize: "0.85rem", fontWeight: 700 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.3rem", fontWeight: 700 }}>
+                    Horas/Sem:
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={25}
+                    value={modalAgregarUac.horas}
+                    onChange={(e) => setModalAgregarUac({ ...modalAgregarUac, horas: parseInt(e.target.value, 10) || 1 })}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", background: "#1e293b", border: "1px solid #475569", borderRadius: "8px", color: "#38bdf8", fontSize: "0.85rem", fontWeight: 800, textAlign: "center" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.3rem", fontWeight: 700 }}>
+                  Tipo / Categoría:
+                </label>
+                <select
+                  value={modalAgregarUac.tipo}
+                  onChange={(e) => setModalAgregarUac({ ...modalAgregarUac, tipo: e.target.value })}
+                  style={{ width: "100%", padding: "0.5rem 0.75rem", background: "#1e293b", border: "1px solid #475569", borderRadius: "8px", color: "#cbd5e1", fontSize: "0.85rem", fontWeight: 600 }}
+                >
+                  <option value="MODULAR">Formación Técnica / Modular</option>
+                  <option value="UNIVERSAL">Fundamental / Universal</option>
+                  <option value="PROPEDUTICA">Propedéutica</option>
+                  <option value="LABORAL">Formación Laboral</option>
+                  <option value="AMPLIADO">Currículum Ampliado (FFEO)</option>
+                  <option value="CUSTOM">Personalizada / Taller</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ background: "#1e293b", padding: "0.85rem 1.25rem", borderTop: "1px solid #334155", display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+              <button
+                type="button"
+                onClick={() => setModalAgregarUac(null)}
+                style={{ background: "#334155", color: "#ffffff", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 700, border: "none", cursor: "pointer", fontSize: "0.8125rem" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!modalAgregarUac.nombre.trim()}
+                onClick={() => handleConfirmarAgregarUAC(
+                  modalAgregarUac.grupo,
+                  modalAgregarUac.nombre,
+                  modalAgregarUac.abrev,
+                  modalAgregarUac.horas,
+                  modalAgregarUac.tipo
+                )}
+                style={{ background: "#0284c7", color: "#ffffff", padding: "0.5rem 1.3rem", borderRadius: "8px", fontWeight: 800, border: "none", cursor: "pointer", fontSize: "0.8125rem" }}
+              >
+                Agregar Asignatura
+              </button>
             </div>
           </div>
         </div>

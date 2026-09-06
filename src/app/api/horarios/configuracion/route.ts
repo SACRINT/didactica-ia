@@ -50,7 +50,8 @@ export async function GET(req: NextRequest) {
           ffe_optativas            AS "ffeOptativas",
           carrera_tecnica_id       AS "carreraTecnicaId",
           version_programa         AS "versionPrograma",
-          materia_propedutica_5to  AS "materiaPropedutica5to"
+          materia_propedutica_5to  AS "materiaPropedutica5to",
+          custom_uacs              AS "customUacs"
         FROM horario_grupos
         WHERE teacher_id = ${teacherId}::uuid
         ORDER BY semestre ASC, nombre ASC
@@ -245,9 +246,12 @@ export async function POST(req: NextRequest) {
           const ffeOpts = g.ffeOptativas
             ? JSON.stringify(g.ffeOptativas)
             : null;
+          const customUacsJson = (Array.isArray(g.customUacs) && g.customUacs.length > 0)
+            ? JSON.stringify(g.customUacs)
+            : null;
           await sql()`
             INSERT INTO horario_grupos
-              (teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas, carrera_tecnica_id, version_programa, materia_propedutica_5to)
+              (teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas, carrera_tecnica_id, version_programa, materia_propedutica_5to, custom_uacs)
             VALUES
               (${teacherId}::uuid,
                ${g.nombre},
@@ -257,7 +261,8 @@ export async function POST(req: NextRequest) {
                ${ffeOpts}::jsonb,
                ${g.carreraTecnicaId ?? null},
                ${g.versionPrograma ?? null},
-               ${g.materiaPropedutica5to ?? null})
+               ${g.materiaPropedutica5to ?? null},
+               ${customUacsJson}::jsonb)
             ON CONFLICT (teacher_id, nombre) DO UPDATE SET
               semestre                = EXCLUDED.semestre,
               capacitacion_nombre     = EXCLUDED.capacitacion_nombre,
@@ -265,7 +270,8 @@ export async function POST(req: NextRequest) {
               ffe_optativas           = EXCLUDED.ffe_optativas,
               carrera_tecnica_id      = EXCLUDED.carrera_tecnica_id,
               version_programa        = EXCLUDED.version_programa,
-              materia_propedutica_5to = EXCLUDED.materia_propedutica_5to
+              materia_propedutica_5to = EXCLUDED.materia_propedutica_5to,
+              custom_uacs             = EXCLUDED.custom_uacs
           `;
         } catch (e) {
           console.error("[api/horarios/configuracion POST] Error guardando grupo:", g.nombre, e);
