@@ -36,7 +36,23 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { gruposPrimerAno, gruposSegundoAno, gruposTercerAno, gruposConfig } = body;
+    const { gruposPrimerAno, gruposSegundoAno, gruposTercerAno, gruposConfig, subsystem } = body;
+
+    // Actualizar subsistema del plantel si fue seleccionado explícitamente
+    if (subsystem) {
+      const subsysNormalizado = (`${subsystem}`.toLowerCase().includes("tecnol"))
+        ? "Bachillerato Tecnológico"
+        : "bge";
+      try {
+        await sql()`
+          UPDATE teachers
+          SET subsystem = ${subsysNormalizado}, updated_at = NOW()
+          WHERE id = ${targetTeacherId}::uuid;
+        `;
+      } catch (e) {
+        console.error("[api/escuelas/[id]/mapa-curricular POST] Error actualizando subsistema en teachers:", e);
+      }
+    }
 
     const g1 = Math.max(1, parseInt(`${gruposPrimerAno || 1}`, 10));
     const g2 = Math.max(1, parseInt(`${gruposSegundoAno || 1}`, 10));
@@ -73,7 +89,8 @@ export async function POST(
 
         await sql()`
           INSERT INTO horario_grupos (
-            teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas
+            teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas,
+            carrera_tecnica_id, version_programa, materia_propedutica_5to
           )
           VALUES (
             ${targetTeacherId}::uuid,
@@ -81,13 +98,19 @@ export async function POST(
             ${sem},
             ${item.capacitacionNombre || "Administracion"},
             ${item.ffeoSocioemocional || null},
-            ${ffeOpts}::jsonb
+            ${ffeOpts}::jsonb,
+            ${item.carreraTecnicaId || null},
+            ${item.versionPrograma || null},
+            ${item.materiaPropedutica5to || null}
           )
           ON CONFLICT (teacher_id, nombre) DO UPDATE SET
             semestre = EXCLUDED.semestre,
             capacitacion_nombre = EXCLUDED.capacitacion_nombre,
             ffeo_socioemocional = EXCLUDED.ffeo_socioemocional,
-            ffe_optativas = EXCLUDED.ffe_optativas;
+            ffe_optativas = EXCLUDED.ffe_optativas,
+            carrera_tecnica_id = EXCLUDED.carrera_tecnica_id,
+            version_programa = EXCLUDED.version_programa,
+            materia_propedutica_5to = EXCLUDED.materia_propedutica_5to;
         `;
       }
     }

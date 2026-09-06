@@ -13,17 +13,34 @@ import {
   obtenerAsignaturasParaGrupo,
   GrupoDefinicion
 } from "@/lib/escuela-grupos";
+import {
+  CARRERAS_TECNOLOGICAS,
+  CATALOGO_PROPEDUTICAS_5TO,
+  getModulosPorSemestre,
+  CarreraTecnica,
+} from "@/lib/carreras-tecnologicas";
+
+export interface GrupoConfigItem {
+  capacitacionNombre: string;
+  ffeOptativas: string[];
+  ffeoSocioemocional: string;
+  carreraTecnicaId?: string;
+  versionPrograma?: "nuevo" | "anterior";
+  materiaPropedutica5to?: string;
+}
 
 interface Props {
   escuela: {
     id: string;
     cct: string;
     nombre: string;
+    subsystem?: string;
     gruposPrimerAno?: number;
     gruposSegundoAno?: number;
     gruposTercerAno?: number;
     mapaCurricularCompletado?: boolean;
   };
+  subsystem?: "bge" | "tecnologico";
   gruposIniciales?: any[];
   isOpen: boolean;
   onClose?: () => void;
@@ -34,6 +51,7 @@ interface Props {
 
 export default function ModalConfiguracionMapaCurricular({
   escuela,
+  subsystem,
   gruposIniciales = [],
   isOpen,
   onClose,
@@ -41,6 +59,13 @@ export default function ModalConfiguracionMapaCurricular({
   forceObligatorio = false,
   isAdmin = false,
 }: Props) {
+  const subsysProp = (subsystem || escuela?.subsystem || "").toLowerCase();
+  const initialEsTec = subsysProp.includes("tecnol") || (escuela?.cct || "").toUpperCase().startsWith("21ECT");
+  const [subsistemaSeleccionado, setSubsistemaSeleccionado] = useState<"bge" | "tecnologico">(
+    initialEsTec ? "tecnologico" : "bge"
+  );
+  const esTecnologico = subsistemaSeleccionado === "tecnologico";
+
   const [paso, setPaso] = useState<1 | 2>(1);
   const [guardando, setGuardando] = useState(false);
 
@@ -49,19 +74,23 @@ export default function ModalConfiguracionMapaCurricular({
   const [g2, setG2] = useState<number>(escuela.gruposSegundoAno || 1);
   const [g3, setG3] = useState<number>(escuela.gruposTercerAno || 1);
 
-  // Config por Grupo (nombre -> { capacitacionNombre, ffeOptativas, ffeoSocioemocional })
-  const [mapaConfig, setMapaConfig] = useState<Record<string, { capacitacionNombre: string; ffeOptativas: string[]; ffeoSocioemocional: string }>>({});
+  // Config por Grupo (nombre -> GrupoConfigItem)
+  const [mapaConfig, setMapaConfig] = useState<Record<string, GrupoConfigItem>>({});
 
   const [initialized, setInitialized] = useState(false);
 
   // Reset y sincronización al abrir el modal (solo una vez por apertura)
   useEffect(() => {
     if (isOpen && !initialized) {
+      const sProp = (subsystem || escuela?.subsystem || "").toLowerCase();
+      const isTec = sProp.includes("tecnol") || (escuela?.cct || "").toUpperCase().startsWith("21ECT");
+      setSubsistemaSeleccionado(isTec ? "tecnologico" : "bge");
+
       setG1(Math.max(1, escuela?.gruposPrimerAno || 1));
       setG2(Math.max(1, escuela?.gruposSegundoAno || 1));
       setG3(Math.max(1, escuela?.gruposTercerAno || 1));
 
-      const initialMap: Record<string, { capacitacionNombre: string; ffeOptativas: string[]; ffeoSocioemocional: string }> = {};
+      const initialMap: Record<string, GrupoConfigItem> = {};
       if (Array.isArray(gruposIniciales)) {
         gruposIniciales.forEach(g => {
           let opts = g.ffeOptativas;
@@ -76,10 +105,13 @@ export default function ModalConfiguracionMapaCurricular({
             FFE_AREAS_CONOCIMIENTO[1]
           ];
 
-          const itemData = {
+          const itemData: GrupoConfigItem = {
             capacitacionNombre: g.capacitacionNombre || "Administracion",
             ffeOptativas: parsedOpts,
-            ffeoSocioemocional: g.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1])
+            ffeoSocioemocional: g.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1]),
+            carreraTecnicaId: g.carreraTecnicaId || "contabilidad",
+            versionPrograma: (g.versionPrograma as "nuevo" | "anterior") || "nuevo",
+            materiaPropedutica5to: g.materiaPropedutica5to || "Derecho y Sociedad I"
           };
 
           if (g.nombre) {
@@ -119,7 +151,10 @@ export default function ModalConfiguracionMapaCurricular({
           FFE_AREAS_CONOCIMIENTO[0],
           FFE_AREAS_CONOCIMIENTO[1]
         ],
-        ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0]
+        ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0],
+        carreraTecnicaId: "contabilidad",
+        versionPrograma: "nuevo",
+        materiaPropedutica5to: "Derecho y Sociedad I"
       };
 
       const updatedConfig = {
@@ -190,8 +225,21 @@ export default function ModalConfiguracionMapaCurricular({
             "Fundamentos de Administración I",
             "Lógica y Pensamiento Crítico"
           ],
-          ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0]
+          ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0],
+          carreraTecnicaId: "contabilidad",
+          versionPrograma: "nuevo",
+          materiaPropedutica5to: "Derecho y Sociedad I"
         };
+
+        if (esTecnologico) {
+          return {
+            grupoNombre: g.nombre,
+            semestre: g.semestre,
+            carreraTecnicaId: cfg.carreraTecnicaId || "contabilidad",
+            versionPrograma: cfg.versionPrograma || "nuevo",
+            materiaPropedutica5to: cfg.materiaPropedutica5to || "Derecho y Sociedad I",
+          };
+        }
 
         return {
           grupoNombre: g.nombre,
@@ -209,7 +257,8 @@ export default function ModalConfiguracionMapaCurricular({
           gruposPrimerAno: g1,
           gruposSegundoAno: g2,
           gruposTercerAno: g3,
-          gruposConfig
+          gruposConfig,
+          subsystem: subsistemaSeleccionado === "tecnologico" ? "Bachillerato Tecnológico" : "bge"
         })
       });
 
@@ -269,8 +318,32 @@ export default function ModalConfiguracionMapaCurricular({
           alignItems: "center"
         }}>
           <div>
-            <div style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.9 }}>
-              {escuela.cct} • {escuela.nombre}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.9 }}>
+                {escuela.cct} • {escuela.nombre}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSubsistemaSeleccionado(prev => prev === "tecnologico" ? "bge" : "tecnologico")}
+                title="Haga clic para cambiar de subsistema"
+                style={{
+                  background: esTecnologico ? "#f59e0b" : "#38bdf8",
+                  color: "#0f172a",
+                  border: "none",
+                  borderRadius: "12px",
+                  padding: "3px 10px",
+                  fontSize: "0.6875rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                {esTecnologico ? "🏫 Bachillerato Tecnológico (DBEPA Puebla) ▾" : "🏛️ Bachillerato General Estatal (BGE Puebla) ▾"}
+              </button>
             </div>
             <h3 style={{ margin: "0.2rem 0 0", fontSize: "1.15rem", fontWeight: 800, display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <Sparkles size={18} /> Mapa Curricular y Estructura del Plantel (1.º a 6.º Semestre)
@@ -343,7 +416,7 @@ export default function ModalConfiguracionMapaCurricular({
               borderBottom: paso === 2 ? "3px solid #38bdf8" : "none"
             }}
           >
-            <BookOpen size={16} /> 2. Formaciones Laborales & Optativas FFE
+            <BookOpen size={16} /> 2. {esTecnologico ? "Carreras Técnicas & Módulos" : "Formaciones Laborales & Optativas FFE"}
           </button>
         </div>
 
@@ -366,6 +439,97 @@ export default function ModalConfiguracionMapaCurricular({
                 <div style={{ fontSize: "0.85rem", color: "#bfdbfe", lineHeight: 1.4 }}>
                   <strong style={{ color: "#ffffff" }}>Paso 1: Confirme los grupos activos en su plantel.</strong><br />
                   Escriba la cantidad de grupos activos por grado/año. Esta información se usará para construir automáticamente las listas en Horarios IA y Planeaciones Didácticas.
+                </div>
+              </div>
+
+              {/* Selector Interactivo de Subsistema */}
+              <div style={{
+                background: "#1e293b",
+                border: "1px solid #334155",
+                borderRadius: "14px",
+                padding: "1.25rem",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.25)"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <Layers size={18} color="#38bdf8" /> Subsistema Educativo del Plantel:
+                    </h4>
+                    <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "#94a3b8" }}>
+                      Seleccione el modelo educativo oficial aplicable a su escuela para configurar la malla curricular, horas semanales y módulos:
+                    </p>
+                  </div>
+                  <span style={{
+                    fontSize: "0.75rem",
+                    fontWeight: 800,
+                    padding: "0.25rem 0.65rem",
+                    borderRadius: "6px",
+                    background: esTecnologico ? "rgba(245, 158, 11, 0.2)" : "rgba(37, 99, 235, 0.2)",
+                    color: esTecnologico ? "#fbbf24" : "#60a5fa",
+                    border: esTecnologico ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(59, 130, 246, 0.4)"
+                  }}>
+                    {esTecnologico ? "🏫 Bachillerato Tecnológico Activo" : "🏛️ Bachillerato General Activo"}
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
+                  {/* Opción BGE */}
+                  <button
+                    type="button"
+                    onClick={() => setSubsistemaSeleccionado("bge")}
+                    style={{
+                      textAlign: "left",
+                      padding: "1rem",
+                      borderRadius: "12px",
+                      border: `2px solid ${!esTecnologico ? "#38bdf8" : "#334155"}`,
+                      background: !esTecnologico ? "rgba(37, 99, 235, 0.18)" : "#0f172a",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                      <span style={{ fontWeight: 800, fontSize: "0.9rem", color: !esTecnologico ? "#38bdf8" : "#f1f5f9" }}>
+                        🏛️ Bachillerato General Estatal (BGE)
+                      </span>
+                      {!esTecnologico && (
+                        <span style={{ color: "#38bdf8", fontWeight: 800, fontSize: "0.75rem", background: "rgba(56, 189, 248, 0.2)", padding: "2px 8px", borderRadius: "4px" }}>
+                          ✓ Seleccionado
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", lineHeight: 1.45 }}>
+                      <strong>Plan Normativo MCCEMS Puebla:</strong> 25h en 1.er sem, 30h en 3.er y 5.º sem. Configura <strong>15 Capacitaciones Laborales</strong> y Formación Fundamental Extendida (<strong>Optativas FFE</strong>).
+                    </div>
+                  </button>
+
+                  {/* Opción Tecnológico */}
+                  <button
+                    type="button"
+                    onClick={() => setSubsistemaSeleccionado("tecnologico")}
+                    style={{
+                      textAlign: "left",
+                      padding: "1rem",
+                      borderRadius: "12px",
+                      border: `2px solid ${esTecnologico ? "#f59e0b" : "#334155"}`,
+                      background: esTecnologico ? "rgba(245, 158, 11, 0.18)" : "#0f172a",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                      <span style={{ fontWeight: 800, fontSize: "0.9rem", color: esTecnologico ? "#fbbf24" : "#f1f5f9" }}>
+                        🏫 Bachillerato Tecnológico (BT / DBEPA)
+                      </span>
+                      {esTecnologico && (
+                        <span style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.75rem", background: "rgba(245, 158, 11, 0.2)", padding: "2px 8px", borderRadius: "4px" }}>
+                          ✓ Seleccionado
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", lineHeight: 1.45 }}>
+                      <strong>Estructura Tecnológica DBEPA Puebla:</strong> 28h en 1.er sem (10 UACs), 39h en 3.er sem (Módulo II 17h) y 35h en 5.º sem (Módulo IV 12h + Propedéutica 3h). Configura <strong>Carreras Técnicas</strong>.
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -486,8 +650,14 @@ export default function ModalConfiguracionMapaCurricular({
                 fontSize: "0.8rem",
                 color: "#cbd5e1"
               }}>
-                <strong style={{ color: "#38bdf8" }}>Paso 2: Configure la Formación Laboral, Optativas FFE y Socioemocional por Grupo.</strong><br />
-                Para cada grupo de 3.º y 5.º semestre, seleccione las asignaturas correspondientes a su oferta educativa.
+                <strong style={{ color: "#38bdf8" }}>
+                  {esTecnologico
+                    ? "Paso 2: Configure la Carrera Técnica y Materias Propedéuticas por Grupo."
+                    : "Paso 2: Configure la Formación Laboral, Optativas FFE y Socioemocional por Grupo."}
+                </strong><br />
+                {esTecnologico
+                  ? "Para cada grupo de 3.º y 5.º semestre, seleccione la Carrera Técnica y la Materia Propedéutica correspondiente a su oferta educativa tecnológica."
+                  : "Para cada grupo de 3.º y 5.º semestre, seleccione las asignaturas correspondientes a su oferta educativa."}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -501,7 +671,10 @@ export default function ModalConfiguracionMapaCurricular({
                       FFE_AREAS_CONOCIMIENTO[0],
                       FFE_AREAS_CONOCIMIENTO[1]
                     ],
-                    ffeoSocioemocional: rawCfg?.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1])
+                    ffeoSocioemocional: rawCfg?.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1]),
+                    carreraTecnicaId: rawCfg?.carreraTecnicaId || "contabilidad",
+                    versionPrograma: rawCfg?.versionPrograma || "nuevo",
+                    materiaPropedutica5to: rawCfg?.materiaPropedutica5to || "Derecho y Sociedad I"
                   };
 
                   return (
@@ -525,20 +698,142 @@ export default function ModalConfiguracionMapaCurricular({
                           color: g.semestre === 1 ? "#34d399" : g.semestre === 3 ? "#60a5fa" : "#a78bfa",
                           border: `1px solid ${g.semestre === 1 ? "rgba(52, 211, 153, 0.3)" : g.semestre === 3 ? "rgba(96, 165, 246, 0.3)" : "rgba(167, 139, 250, 0.3)"}`
                         }}>
-                          {g.semestre === 1 ? "100% Fundamental Universal" : g.semestre === 3 ? "Laboral (9 UACs)" : "Laboral + FFE (10 UACs)"}
+                          {esTecnologico ? (
+                            g.semestre === 1 ? "10 UACs Fundamentales (28h)" :
+                            g.semestre === 3 ? "6 Fundamentales (22h) + Módulo II (17h) = 39h" :
+                            "5 Fundamentales (20h) + Propedéutica (3h) + Módulo IV (12h) = 35h"
+                          ) : (
+                            g.semestre === 1 ? "100% Fundamental Universal" : g.semestre === 3 ? "Laboral (9 UACs)" : "Laboral + FFE (10 UACs)"
+                          )}
                         </span>
                       </div>
 
                       {/* Grupos de 1º Semestre */}
                       {g.semestre === 1 && (
-                        <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontStyle: "italic" }}>
-                          ✓ Asignaturas del Currículum Fundamental MCCEMS 100% universales (Ciencias Naturales, Experimentales y Tecnología I, Pensamiento Matemático I, Humanidades I, Lenguaje y Comunicación I, etc.).
-                        </div>
+                        esTecnologico ? (
+                          <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "0.85rem 1rem", borderRadius: "10px" }}>
+                            <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#34d399", marginBottom: "0.3rem" }}>
+                              ✓ 10 UACs del Currículum Fundamental MCCEMS (28 Horas Semanales)
+                            </div>
+                            <div style={{ fontSize: "0.75rem", color: "#cbd5e1", lineHeight: 1.5 }}>
+                              Incluye las 8 UACs Fundamentales comunes (24h) + las 2 UACs estatales obligatorias de Puebla (4h):<br />
+                              • <strong>Bioética Social</strong> (2 horas semanales)<br />
+                              • <strong>Humanismo Mexicano</strong> (2 horas semanales)
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontStyle: "italic" }}>
+                            ✓ Asignaturas del Currículum Fundamental MCCEMS 100% universales (Ciencias Naturales, Experimentales y Tecnología I, Pensamiento Matemático I, Humanidades I, Lenguaje y Comunicación I, etc.).
+                          </div>
+                        )
                       )}
 
                       {/* Grupos de 3º Semestre */}
                       {g.semestre === 3 && (() => {
                         const letra = g.nombre.split(" ")[1];
+
+                        if (esTecnologico) {
+                          const moduloSem3 = getModulosPorSemestre(cfg.carreraTecnicaId, 3);
+                          const moduloSem4 = getModulosPorSemestre(cfg.carreraTecnicaId, 4);
+                          const horasMod3 = moduloSem3 ? moduloSem3.submodulos.reduce((acc, sub) => acc + sub.horasSemanales, 0) : 17;
+                          const horasMod4 = moduloSem4 ? moduloSem4.submodulos.reduce((acc, sub) => acc + sub.horasSemanales, 0) : 17;
+
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
+                                <div>
+                                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                    CARRERA TÉCNICA:
+                                  </label>
+                                  <select
+                                    className="form-control"
+                                    value={cfg.carreraTecnicaId}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleUpdateGrupoConfig(g.nombre, "carreraTecnicaId", val);
+                                      const carrera = CARRERAS_TECNOLOGICAS.find(c => c.id === val);
+                                      if (carrera) {
+                                        handleUpdateGrupoConfig(g.nombre, "versionPrograma", carrera.tipoPrograma);
+                                      }
+                                    }}
+                                    style={{
+                                      fontSize: "0.85rem",
+                                      fontWeight: 700,
+                                      background: "#0f172a",
+                                      color: "#ffffff",
+                                      border: "1px solid #475569",
+                                      borderRadius: "8px",
+                                      padding: "0.5rem 0.75rem",
+                                      width: "100%"
+                                    }}
+                                  >
+                                    {CARRERAS_TECNOLOGICAS.map(c => (
+                                      <option key={c.id} value={c.id} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                        {c.nombre} ({c.tipoPrograma === "nuevo" ? "Nuevo Prog. 2024" : "Acuerdo 653"})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                    VERSIÓN DEL PROGRAMA:
+                                  </label>
+                                  <select
+                                    className="form-control"
+                                    value={cfg.versionPrograma}
+                                    onChange={(e) => handleUpdateGrupoConfig(g.nombre, "versionPrograma", e.target.value)}
+                                    style={{
+                                      fontSize: "0.85rem",
+                                      fontWeight: 700,
+                                      background: "#0f172a",
+                                      color: "#ffffff",
+                                      border: "1px solid #475569",
+                                      borderRadius: "8px",
+                                      padding: "0.5rem 0.75rem",
+                                      width: "100%"
+                                    }}
+                                  >
+                                    <option value="nuevo" style={{ background: "#0f172a", color: "#ffffff" }}>Nuevo Programa 2024 (Acuerdos 09/08/23 y 09/05/24)</option>
+                                    <option value="anterior" style={{ background: "#0f172a", color: "#ffffff" }}>Programa Anterior (Acuerdo Secretarial 653)</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Desglose dinámico del Módulo II */}
+                              {moduloSem3 && (
+                                <div style={{ background: "rgba(59, 130, 246, 0.12)", border: "1px solid rgba(59, 130, 246, 0.3)", padding: "0.75rem 1rem", borderRadius: "10px" }}>
+                                  <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#60a5fa", marginBottom: "0.4rem" }}>
+                                    🛠️ Formación Profesional: {moduloSem3.nombre} ({horasMod3} Horas Semanales)
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", fontSize: "0.75rem", color: "#cbd5e1" }}>
+                                    {moduloSem3.submodulos.map(sub => (
+                                      <div key={sub.abreviatura}>• <strong>{sub.nombre}</strong> — <span style={{ color: "#93c5fd" }}>{sub.horasSemanales}h/semana</span></div>
+                                    ))}
+                                    <div style={{ marginTop: "0.2rem", paddingTop: "0.3rem", borderTop: "1px dashed rgba(255,255,255,0.15)", color: "#86efac", fontWeight: 700 }}>
+                                      Total semanal grupo: 6 UACs Fundamentales (22h) + Módulo II ({horasMod3}h) = {22 + horasMod3} Horas
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Semestre B Informativo (4.º Semestre) */}
+                              {moduloSem4 && (
+                                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "0.75rem 1rem", borderRadius: "10px" }}>
+                                  <div style={{ fontSize: "0.78125rem", fontWeight: 800, color: "#34d399", marginBottom: "0.3rem" }}>
+                                    📗 Semestre B Correspondiente (4.º Semestre - Grupo 4° {letra})
+                                  </div>
+                                  <div style={{ fontSize: "0.725rem", color: "#86efac", lineHeight: 1.4 }}>
+                                    • <strong>Módulo Profesional:</strong> {moduloSem4.nombre} ({horasMod4}h) (Automático)<br />
+                                    • 6 UACs Fundamentales (22h) + Módulo III ({horasMod4}h) = {22 + horasMod4} Horas Semanales
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // Lógica existente para Bachillerato General Estatal (BGE)
                         const config5 = mapaConfig[normalizarNombreGrupo(`5° ${letra}`)] || mapaConfig[`5° ${letra}`] || mapaConfig[`5º ${letra}`];
                         const socio5 = config5?.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1];
                         const socio4y6 = FORMACIONES_SOCIOEMOCIONALES.find(soc => soc !== cfg.ffeoSocioemocional && soc !== socio5) || FORMACIONES_SOCIOEMOCIONALES[2];
@@ -614,6 +909,114 @@ export default function ModalConfiguracionMapaCurricular({
                       {/* Grupos de 5º Semestre */}
                       {g.semestre === 5 && (() => {
                         const letra = g.nombre.split(" ")[1];
+
+                        if (esTecnologico) {
+                          const moduloSem5 = getModulosPorSemestre(cfg.carreraTecnicaId, 5);
+                          const moduloSem6 = getModulosPorSemestre(cfg.carreraTecnicaId, 6);
+                          const horasMod5 = moduloSem5 ? moduloSem5.submodulos.reduce((acc, sub) => acc + sub.horasSemanales, 0) : 12;
+                          const horasMod6 = moduloSem6 ? moduloSem6.submodulos.reduce((acc, sub) => acc + sub.horasSemanales, 0) : 12;
+
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
+                                <div>
+                                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                    CARRERA TÉCNICA:
+                                  </label>
+                                  <select
+                                    className="form-control"
+                                    value={cfg.carreraTecnicaId}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleUpdateGrupoConfig(g.nombre, "carreraTecnicaId", val);
+                                      const carrera = CARRERAS_TECNOLOGICAS.find(c => c.id === val);
+                                      if (carrera) {
+                                        handleUpdateGrupoConfig(g.nombre, "versionPrograma", carrera.tipoPrograma);
+                                      }
+                                    }}
+                                    style={{
+                                      fontSize: "0.85rem",
+                                      fontWeight: 700,
+                                      background: "#0f172a",
+                                      color: "#ffffff",
+                                      border: "1px solid #475569",
+                                      borderRadius: "8px",
+                                      padding: "0.5rem 0.75rem",
+                                      width: "100%"
+                                    }}
+                                  >
+                                    {CARRERAS_TECNOLOGICAS.map(c => (
+                                      <option key={c.id} value={c.id} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                        {c.nombre} ({c.tipoPrograma === "nuevo" ? "Nuevo Prog. 2024" : "Acuerdo 653"})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                    MATERIA PROPEDÉUTICA (3 HORAS SEMANALES):
+                                  </label>
+                                  <select
+                                    className="form-control"
+                                    value={cfg.materiaPropedutica5to}
+                                    onChange={(e) => handleUpdateGrupoConfig(g.nombre, "materiaPropedutica5to", e.target.value)}
+                                    style={{
+                                      fontSize: "0.85rem",
+                                      fontWeight: 700,
+                                      background: "#0f172a",
+                                      color: "#ffffff",
+                                      border: "1px solid #475569",
+                                      borderRadius: "8px",
+                                      padding: "0.5rem 0.75rem",
+                                      width: "100%"
+                                    }}
+                                  >
+                                    {CATALOGO_PROPEDUTICAS_5TO.map(prop => (
+                                      <option key={prop.nombre} value={prop.nombre} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                        {prop.nombre} ({prop.area}) - 3 hrs
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Desglose dinámico del Módulo IV + Propedéutica */}
+                              {moduloSem5 && (
+                                <div style={{ background: "rgba(168, 85, 247, 0.12)", border: "1px solid rgba(168, 85, 247, 0.3)", padding: "0.75rem 1rem", borderRadius: "10px" }}>
+                                  <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#c084fc", marginBottom: "0.4rem" }}>
+                                    🛠️ Formación Profesional: {moduloSem5.nombre} ({horasMod5}h) + Propedéutica ({cfg.materiaPropedutica5to}) 3h
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", fontSize: "0.75rem", color: "#cbd5e1" }}>
+                                    {moduloSem5.submodulos.map(sub => (
+                                      <div key={sub.abreviatura}>• <strong>{sub.nombre}</strong> — <span style={{ color: "#d8b4fe" }}>{sub.horasSemanales}h/semana</span></div>
+                                    ))}
+                                    <div>• <strong>{cfg.materiaPropedutica5to}</strong> (Propedéutica I) — <span style={{ color: "#d8b4fe" }}>3h/semana</span></div>
+                                    <div style={{ marginTop: "0.2rem", paddingTop: "0.3rem", borderTop: "1px dashed rgba(255,255,255,0.15)", color: "#86efac", fontWeight: 700 }}>
+                                      Total semanal grupo: 5 UACs Fundamentales (20h) + Propedéutica (3h) + Módulo IV ({horasMod5}h) = {20 + 3 + horasMod5} Horas
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Semestre B Informativo (6.º Semestre) */}
+                              {moduloSem6 && (
+                                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "0.75rem 1rem", borderRadius: "10px" }}>
+                                  <div style={{ fontSize: "0.78125rem", fontWeight: 800, color: "#34d399", marginBottom: "0.3rem" }}>
+                                    📗 Semestre B Correspondiente (6.º Semestre - Grupo 6° {letra})
+                                  </div>
+                                  <div style={{ fontSize: "0.725rem", color: "#86efac", lineHeight: 1.4 }}>
+                                    • <strong>Módulo Profesional:</strong> {moduloSem6.nombre} ({horasMod6}h) (Automático)<br />
+                                    • <strong>Materia Propedéutica II:</strong> Continuación de <em>{cfg.materiaPropedutica5to}</em> (3h) (Automático)<br />
+                                    • 5 UACs Fundamentales (20h) + Propedéutica (3h) + Módulo V ({horasMod6}h) = {20 + 3 + horasMod6} Horas Semanales
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // Lógica existente para Bachillerato General Estatal (BGE)
                         const config3 = mapaConfig[normalizarNombreGrupo(`3° ${letra}`)] || mapaConfig[`3° ${letra}`] || mapaConfig[`3º ${letra}`];
                         const socio3 = config3?.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[0];
                         const opcionesSocio5 = FORMACIONES_SOCIOEMOCIONALES.filter(soc => soc !== socio3);

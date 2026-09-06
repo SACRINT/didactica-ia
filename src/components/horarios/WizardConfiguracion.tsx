@@ -27,8 +27,13 @@ import {
   FFE_OPTATIVAS_CATALOGO,
   obtenerFfeSemestre6,
   resolverSocioemocionalGrupo,
-  UACS_LABORALES_MAPA
+  UACS_LABORALES_MAPA,
+  obtenerAsignaturasParaGrupoTecnologico
 } from "@/lib/escuela-grupos";
+import {
+  CARRERAS_TECNOLOGICAS,
+  CATALOGO_PROPEDUTICAS_5TO
+} from "@/lib/carreras-tecnologicas";
 
 export default function WizardConfiguracion({
   escuelaId,
@@ -99,6 +104,12 @@ export default function WizardConfiguracion({
   const [nombreEscuela, setNombreEscuela] = useState<string>(() => configInicial?.escuela?.nombre || configInicial?.escuela?.school_name || "Mi Plantel");
   const [cctEscuela, setCctEscuela] = useState<string>(() => configInicial?.escuela?.cct || "");
   const [zonaEscolar, setZonaEscolar] = useState<string>(() => configInicial?.escuela?.zonaEscolar || configInicial?.escuela?.zona || "086");
+
+  const esTecnologico = React.useMemo(() => {
+    const sub = (configInicial?.escuela?.subsystem || configInicial?.subsystem || "").toLowerCase();
+    if (sub.includes("tecnol")) return true;
+    return (gruposIniciales || []).some((g: any) => Boolean(g.carreraTecnicaId || g.carrera_tecnica_id));
+  }, [configInicial, gruposIniciales]);
 
   const [inicializadoConfig, setInicializadoConfig] = useState(false);
 
@@ -359,7 +370,10 @@ export default function WizardConfiguracion({
             FFE_OPTATIVAS_CATALOGO[1],
             FFE_OPTATIVAS_CATALOGO[7],
             FFE_OPTATIVAS_CATALOGO[8]
-          ]
+          ],
+          carreraTecnicaId: grupoDbOficial?.carreraTecnicaId || (grupoDbOficial as any)?.carrera_tecnica_id || grupoExistente?.carreraTecnicaId || (grupoExistente as any)?.carrera_tecnica_id || grupoBaseTrack?.carreraTecnicaId || (grupoBaseTrack as any)?.carrera_tecnica_id || (esTecnologico ? "contabilidad" : undefined),
+          versionPrograma: grupoDbOficial?.versionPrograma || (grupoDbOficial as any)?.version_programa || grupoExistente?.versionPrograma || (grupoExistente as any)?.version_programa || grupoBaseTrack?.versionPrograma || (grupoBaseTrack as any)?.version_programa || (esTecnologico ? "nuevo" : undefined),
+          materiaPropedutica5to: grupoDbOficial?.materiaPropedutica5to || (grupoDbOficial as any)?.materia_propedutica_5to || grupoExistente?.materiaPropedutica5to || (grupoExistente as any)?.materia_propedutica_5to || grupoBaseTrack?.materiaPropedutica5to || (grupoBaseTrack as any)?.materia_propedutica_5to || (esTecnologico ? "Derecho y Sociedad I" : undefined)
         });
       }
     }
@@ -1059,6 +1073,23 @@ export default function WizardConfiguracion({
       }));
     }
 
+    // Si el grupo pertenece a un Bachillerato Tecnológico o tiene Carrera Técnica configurada
+    const carreraId = grupo.carreraTecnicaId || (esTecnologico ? "contabilidad" : undefined);
+    if (carreraId) {
+      const versionProg = (grupo.versionPrograma as "nuevo" | "anterior") || "nuevo";
+      const propedutica = grupo.materiaPropedutica5to || "Derecho y Sociedad I";
+
+      const asignaturasTec = obtenerAsignaturasParaGrupoTecnologico(sem, carreraId, versionProg, propedutica);
+      return asignaturasTec.map((asig, i) => ({
+        id: `uac_tec_${sem}_${i + 1}`,
+        uacName: asig.nombre,
+        abrev: asig.nombre.substring(0, 12).toUpperCase(),
+        tipo: asig.tipo,
+        horasSemanales: asig.horas,
+        carreraId
+      }));
+    }
+
     if (sem === 1) {
       return [
         { id: `uac_1_1`, uacName: "Ciencias Naturales, Experimentales y Tecnología I", abrev: "CNEyT-I", tipo: "UNIVERSAL", horasSemanales: 4 },
@@ -1330,11 +1361,24 @@ export default function WizardConfiguracion({
             </div>
           </div>
 
-          {/* Banner Selector de Modo de Carga */}
+          {/* Banner Selector de Subsistema Educativo */}
           <div style={{ background: "#1e293b", padding: "1.25rem", borderRadius: "14px", border: "1px solid #334155", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <Layers style={{ width: "18px", height: "18px", color: "#38bdf8" }} /> Seleccione el Modo de Generación de Horarios:
-            </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#ffffff", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Layers style={{ width: "18px", height: "18px", color: "#38bdf8" }} /> Subsistema Educativo Oficial del Plantel:
+              </h3>
+              <span style={{
+                fontSize: "0.75rem",
+                fontWeight: 800,
+                padding: "0.25rem 0.65rem",
+                borderRadius: "6px",
+                background: esTecnologico ? "rgba(245, 158, 11, 0.2)" : "rgba(37, 99, 235, 0.2)",
+                color: esTecnologico ? "#fbbf24" : "#60a5fa",
+                border: esTecnologico ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid rgba(59, 130, 246, 0.4)"
+              }}>
+                {esTecnologico ? "🏫 Bachillerato Tecnológico Activo" : "🏛️ Bachillerato General Estatal Activo"}
+              </span>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <button
                 type="button"
@@ -1343,16 +1387,17 @@ export default function WizardConfiguracion({
                   textAlign: "left",
                   padding: "1rem",
                   borderRadius: "10px",
-                  border: "2px solid " + (modoConfiguracion === "SEMIAUTOMATICO" ? "#38bdf8" : "#334155"),
-                  background: modoConfiguracion === "SEMIAUTOMATICO" ? "rgba(37,99,235,0.2)" : "#0f172a",
-                  cursor: "pointer"
+                  border: "2px solid " + (!esTecnologico ? "#38bdf8" : "#334155"),
+                  background: !esTecnologico ? "rgba(37,99,235,0.2)" : "#0f172a",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
                 }}
               >
-                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: modoConfiguracion === "SEMIAUTOMATICO" ? "#60a5fa" : "#f8fafc" }}>
-                  🏫 Modo Semiautomático (SEP Bachillerato General Predeterminado)
+                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: !esTecnologico ? "#60a5fa" : "#f8fafc" }}>
+                  🏛️ Bachillerato General Estatal (BGE)
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-                  Precarga automáticamente el Mapa Curricular Oficial (MCCEMS 2025-2027), UACs universales, capacitaciones laborales y catálogo de docentes.
+                  Malla Oficial MCCEMS Puebla (25h/30h). Precarga UACs fundamentales, 15 capacitaciones laborales y optativas FFE.
                 </div>
               </button>
 
@@ -1363,16 +1408,17 @@ export default function WizardConfiguracion({
                   textAlign: "left",
                   padding: "1rem",
                   borderRadius: "10px",
-                  border: "2px solid " + (modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#f59e0b" : "#334155"),
-                  background: modoConfiguracion === "MANUAL_TECNOLOGICO" ? "rgba(217,119,6,0.2)" : "#0f172a",
-                  cursor: "pointer"
+                  border: "2px solid " + (esTecnologico ? "#f59e0b" : "#334155"),
+                  background: esTecnologico ? "rgba(217,119,6,0.2)" : "#0f172a",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
                 }}
               >
-                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: modoConfiguracion === "MANUAL_TECNOLOGICO" ? "#fbbf24" : "#f8fafc" }}>
-                  ⚙️ Modo Manual Libre (Bachilleratos Tecnológicos / CBTIS)
+                <div style={{ fontWeight: 800, fontSize: "0.875rem", color: esTecnologico ? "#fbbf24" : "#f8fafc" }}>
+                  🏫 Bachillerato Tecnológico (DBEPA Puebla)
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-                  Configuración 100% personalizada. Permite ingresar nombres libres de asignaturas, carreras técnicas, horas semanales libres y docentes manuales.
+                  Malla Tecnológica DBEPA (28h/39h/35h). Precarga 10 UACs, Carreras Técnicas oficiales, Módulos Profesionales y Propedéuticas.
                 </div>
               </button>
             </div>
@@ -1638,23 +1684,44 @@ export default function WizardConfiguracion({
                               {g.semestre >= 3 && (
                                 <div style={{ marginBottom: "0.65rem" }}>
                                   <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.2rem" }}>
-                                    Formación Laboral (Capacitación del Grupo)
+                                    {g.carreraTecnicaId || esTecnologico ? "Carrera Técnica" : "Formación Laboral (Capacitación del Grupo)"}
                                   </label>
-                                  <select
-                                    value={g.capacitacionNombre || FORMACIONES_LABORALES[0]}
-                                    onChange={(e) => handleActualizarConfigGrupo(idx, "capacitacionNombre", e.target.value)}
-                                    style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.78125rem", fontWeight: 700, color: "#ffffff" }}
-                                  >
-                                    {FORMACIONES_LABORALES.map((cap) => (
-                                      <option key={cap} value={cap} style={{ background: "#0f172a", color: "#ffffff" }}>
-                                        {cap}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  {g.carreraTecnicaId || esTecnologico ? (
+                                    <select
+                                      value={g.carreraTecnicaId || "contabilidad"}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleActualizarConfigGrupo(idx, "carreraTecnicaId", val);
+                                        const cObj = CARRERAS_TECNOLOGICAS.find(c => c.id === val);
+                                        if (cObj) {
+                                          handleActualizarConfigGrupo(idx, "versionPrograma", cObj.tipoPrograma);
+                                        }
+                                      }}
+                                      style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.78125rem", fontWeight: 700, color: "#ffffff" }}
+                                    >
+                                      {CARRERAS_TECNOLOGICAS.map((c) => (
+                                        <option key={c.id} value={c.id} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                          {c.nombre} ({c.tipoPrograma === "nuevo" ? "Nuevo Prog. 2024" : "Acuerdo 653"})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <select
+                                      value={g.capacitacionNombre || FORMACIONES_LABORALES[0]}
+                                      onChange={(e) => handleActualizarConfigGrupo(idx, "capacitacionNombre", e.target.value)}
+                                      style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.78125rem", fontWeight: 700, color: "#ffffff" }}
+                                    >
+                                      {FORMACIONES_LABORALES.map((cap) => (
+                                        <option key={cap} value={cap} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                          {cap}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
                                 </div>
                               )}
 
-                              {g.semestre >= 3 && (() => {
+                              {g.semestre >= 3 && !g.carreraTecnicaId && !esTecnologico && (() => {
                                 const letraGrupo = g.nombre.split(" ")[1] || "A";
                                 const g3 = grupos.find(grp => normalizarNombreGrupo(grp.nombre) === `3° ${letraGrupo}`);
                                 const socio3 = g3?.ffeoSocioemocional;
@@ -1686,51 +1753,72 @@ export default function WizardConfiguracion({
                               })()}
 
                               {g.semestre === 5 && (
-                                <div>
-                                  <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.3rem" }}>
-                                    Optativas FFE (Selección libre de 4 asignaturas del catálogo oficial MCCEMS)
-                                  </label>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
-                                    {[0, 1, 2, 3].map((optIdx) => {
-                                      const valorActual = g.ffeOptativas?.[optIdx] || FFE_OPTATIVAS_CATALOGO[optIdx] || FFE_OPTATIVAS_CATALOGO[0];
-                                      const otrasSeleccionadas = (g.ffeOptativas || []).filter((_: any, i: number) => i !== optIdx);
-
-                                      return (
-                                        <div key={optIdx}>
-                                          <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#94a3b8", display: "block" }}>
-                                            Optativa FFE {optIdx + 1}
-                                          </span>
-                                          <select
-                                            value={valorActual}
-                                            onChange={(e) => handleActualizarOptativaGrupo(idx, optIdx, e.target.value)}
-                                            style={{ width: "100%", padding: "0.35rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.6875rem", fontWeight: 700, color: "#ffffff" }}
-                                          >
-                                            <optgroup label="Recursos Sociocognitivos" style={{ background: "#0f172a", color: "#38bdf8" }}>
-                                              {FFE_RECURSO_SOCIOCOGNITIVO.map((mat) => (
-                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)} style={{ background: "#0f172a", color: "#ffffff" }}>
-                                                  {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
-                                                </option>
-                                              ))}
-                                            </optgroup>
-                                            <optgroup label="Áreas de Conocimiento" style={{ background: "#0f172a", color: "#a78bfa" }}>
-                                              {FFE_AREA_CONOCIMIENTO.map((mat) => (
-                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)} style={{ background: "#0f172a", color: "#ffffff" }}>
-                                                  {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
-                                                </option>
-                                              ))}
-                                            </optgroup>
-                                          </select>
-                                        </div>
-                                      );
-                                    })}
+                                (g.carreraTecnicaId || esTecnologico) ? (
+                                  <div style={{ marginBottom: "0.65rem" }}>
+                                    <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.2rem" }}>
+                                      Materia Propedéutica (3 Horas Semanales)
+                                    </label>
+                                    <select
+                                      value={g.materiaPropedutica5to || "Derecho y Sociedad I"}
+                                      onChange={(e) => handleActualizarConfigGrupo(idx, "materiaPropedutica5to", e.target.value)}
+                                      style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.78125rem", fontWeight: 700, color: "#ffffff" }}
+                                    >
+                                      {CATALOGO_PROPEDUTICAS_5TO.map((prop) => (
+                                        <option key={prop.nombre} value={prop.nombre} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                          {prop.nombre} ({prop.area}) - 3h
+                                        </option>
+                                      ))}
+                                    </select>
                                   </div>
-                                </div>
+                                ) : (
+                                  <div>
+                                    <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                                      Optativas FFE (Selección libre de 4 asignaturas del catálogo oficial MCCEMS)
+                                    </label>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
+                                      {[0, 1, 2, 3].map((optIdx) => {
+                                        const valorActual = g.ffeOptativas?.[optIdx] || FFE_OPTATIVAS_CATALOGO[optIdx] || FFE_OPTATIVAS_CATALOGO[0];
+                                        const otrasSeleccionadas = (g.ffeOptativas || []).filter((_: any, i: number) => i !== optIdx);
+
+                                        return (
+                                          <div key={optIdx}>
+                                            <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#94a3b8", display: "block" }}>
+                                              Optativa FFE {optIdx + 1}
+                                            </span>
+                                            <select
+                                              value={valorActual}
+                                              onChange={(e) => handleActualizarOptativaGrupo(idx, optIdx, e.target.value)}
+                                              style={{ width: "100%", padding: "0.35rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.6875rem", fontWeight: 700, color: "#ffffff" }}
+                                            >
+                                              <optgroup label="Recursos Sociocognitivos" style={{ background: "#0f172a", color: "#38bdf8" }}>
+                                                {FFE_RECURSO_SOCIOCOGNITIVO.map((mat) => (
+                                                  <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                                    {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
+                                                  </option>
+                                                ))}
+                                              </optgroup>
+                                              <optgroup label="Áreas de Conocimiento" style={{ background: "#0f172a", color: "#a78bfa" }}>
+                                                {FFE_AREA_CONOCIMIENTO.map((mat) => (
+                                                  <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)} style={{ background: "#0f172a", color: "#ffffff" }}>
+                                                    {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
+                                                  </option>
+                                                ))}
+                                              </optgroup>
+                                            </select>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )
                               )}
 
                               {g.semestre === 1 && (
                                 <div style={{ background: "rgba(22,163,74,0.15)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: "6px", padding: "0.5rem", marginTop: "0.4rem" }}>
                                   <p style={{ fontSize: "0.72rem", color: "#4ade80", margin: 0, fontWeight: 700 }}>
-                                    ✓ 1.er Semestre: 8 Asignaturas Fundamentales Oficiales (5 horas diarias = 25 hrs/semana).
+                                    {(g.carreraTecnicaId || esTecnologico)
+                                      ? "✓ 1.er Semestre Tecnológico: 10 Asignaturas Fundamentales Oficiales (incluye Bioética Social y Humanismo Mexicano - 28 hrs/semana)."
+                                      : "✓ 1.er Semestre: 8 Asignaturas Fundamentales Oficiales (5 horas diarias = 25 hrs/semana)."}
                                   </p>
                                 </div>
                               )}
@@ -1966,7 +2054,14 @@ export default function WizardConfiguracion({
             const gruposSemestre = grupos.filter((g) => g.semestre === sem);
             if (gruposSemestre.length === 0) return null;
 
-            const labelSem: Record<number, string> = {
+            const labelSem: Record<number, string> = esTecnologico ? {
+              1: "1er Semestre (1er Año - 10 UACs Fundamentales - 28 hrs)",
+              2: "2do Semestre (1er Año - 10 UACs Fundamentales - 28 hrs)",
+              3: "3er Semestre (2º Año - 6 Fundamentales + Módulo II - 39 hrs)",
+              4: "4to Semestre (2º Año - 6 Fundamentales + Módulo III - 39 hrs)",
+              5: "5to Semestre (3er Año - 5 Fundamentales + Propedéutica + Módulo IV - 35 hrs)",
+              6: "6to Semestre (3er Año - 5 Fundamentales + Propedéutica + Módulo V - 35 hrs)"
+            } : {
               1: "1er Semestre (1er Año - 10 UACs Universales)",
               2: "2do Semestre (1er Año - 10 UACs Universales)",
               3: "3er Semestre (2º Año - 9 UACs por Grupo)",
@@ -1994,11 +2089,15 @@ export default function WizardConfiguracion({
                           <span style={{ fontSize: "0.9375rem", fontWeight: 900, color: "#60a5fa" }}>
                             Grupo {g.nombre}
                           </span>
-                          {g.capacitacionNombre && (
+                          {g.carreraTecnicaId ? (
+                            <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#f59e0b", background: "rgba(245, 158, 11, 0.15)", padding: "0.2rem 0.6rem", borderRadius: "6px", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+                              {CARRERAS_TECNOLOGICAS.find(c => c.id === g.carreraTecnicaId)?.nombre || g.carreraTecnicaId}
+                            </span>
+                          ) : g.capacitacionNombre ? (
                             <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#38bdf8", background: "#0f172a", padding: "0.2rem 0.6rem", borderRadius: "6px", border: "1px solid #334155" }}>
                               {g.capacitacionNombre}
                             </span>
-                          )}
+                          ) : null}
                         </div>
 
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78125rem" }}>

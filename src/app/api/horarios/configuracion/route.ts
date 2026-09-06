@@ -45,9 +45,12 @@ export async function GET(req: NextRequest) {
           id::text,
           nombre,
           semestre,
-          capacitacion_nombre  AS "capacitacionNombre",
-          ffeo_socioemocional  AS "ffeoSocioemocional",
-          ffe_optativas        AS "ffeOptativas"
+          capacitacion_nombre      AS "capacitacionNombre",
+          ffeo_socioemocional      AS "ffeoSocioemocional",
+          ffe_optativas            AS "ffeOptativas",
+          carrera_tecnica_id       AS "carreraTecnicaId",
+          version_programa         AS "versionPrograma",
+          materia_propedutica_5to  AS "materiaPropedutica5to"
         FROM horario_grupos
         WHERE teacher_id = ${teacherId}::uuid
         ORDER BY semestre ASC, nombre ASC
@@ -76,6 +79,7 @@ export async function GET(req: NextRequest) {
       nombre: teacher.school_name || "Mi Plantel",
       zonaEscolar: zonaGuardada,
       zona: zonaGuardada,
+      subsystem: teacher.subsystem || "bge",
       gruposPrimerAno: Math.max(configDB?.g1 || 0, g1Count || 0, 3),
       gruposSegundoAno: Math.max(configDB?.g2 || 0, g2Count || 0, 3),
       gruposTercerAno: Math.max(configDB?.g3 || 0, g3Count || 0, 3),
@@ -243,19 +247,25 @@ export async function POST(req: NextRequest) {
             : null;
           await sql()`
             INSERT INTO horario_grupos
-              (teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas)
+              (teacher_id, nombre, semestre, capacitacion_nombre, ffeo_socioemocional, ffe_optativas, carrera_tecnica_id, version_programa, materia_propedutica_5to)
             VALUES
               (${teacherId}::uuid,
                ${g.nombre},
                ${g.semestre},
                ${g.capacitacionNombre ?? null},
                ${g.ffeoSocioemocional ?? null},
-               ${ffeOpts}::jsonb)
+               ${ffeOpts}::jsonb,
+               ${g.carreraTecnicaId ?? null},
+               ${g.versionPrograma ?? null},
+               ${g.materiaPropedutica5to ?? null})
             ON CONFLICT (teacher_id, nombre) DO UPDATE SET
-              semestre             = EXCLUDED.semestre,
-              capacitacion_nombre  = EXCLUDED.capacitacion_nombre,
-              ffeo_socioemocional  = EXCLUDED.ffeo_socioemocional,
-              ffe_optativas        = EXCLUDED.ffe_optativas
+              semestre                = EXCLUDED.semestre,
+              capacitacion_nombre     = EXCLUDED.capacitacion_nombre,
+              ffeo_socioemocional     = EXCLUDED.ffeo_socioemocional,
+              ffe_optativas           = EXCLUDED.ffe_optativas,
+              carrera_tecnica_id      = EXCLUDED.carrera_tecnica_id,
+              version_programa        = EXCLUDED.version_programa,
+              materia_propedutica_5to = EXCLUDED.materia_propedutica_5to
           `;
         } catch (e) {
           console.error("[api/horarios/configuracion POST] Error guardando grupo:", g.nombre, e);

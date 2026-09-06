@@ -1,6 +1,12 @@
 /**
  * Utilidades para la estructura de grupos por año/grado y asignaturas oficiales del MCCEMS 2025-2026
  */
+import {
+  CARRERAS_TECNOLOGICAS,
+  getModulosPorSemestre,
+  CarreraTecnica,
+  ModuloCarrera
+} from "./carreras-tecnologicas";
 
 export interface EscuelaEstructuraGrupos {
   gruposPrimerAno: number;   // 1er Año (1º o 2º Semestre)
@@ -605,3 +611,183 @@ export function obtenerAsignaturasParaGrupo(
     { nombre: ffe4, tipo: "EXTENDIDO", horas: 3 },
   ];
 }
+
+/**
+ * Asignaturas oficiales de 1.er Semestre Bachillerato Tecnológico DBEPA Puebla (28 hrs)
+ * Incluyen Bioética Social y Humanismo Mexicano oficiales de Puebla
+ */
+export function obtenerAsignaturas1erSemestreTecnologico(): {
+  nombre: string;
+  tipo: "FUNDAMENTAL" | "SOCIOEMOCIONAL";
+  horas: number;
+}[] {
+  return [
+    { nombre: "Lengua y Comunicación I", tipo: "FUNDAMENTAL", horas: 3 },
+    { nombre: "Pensamiento Matemático I", tipo: "FUNDAMENTAL", horas: 4 },
+    { nombre: "Ciencias Naturales, Experimentales y Tecnología I", tipo: "FUNDAMENTAL", horas: 4 },
+    { nombre: "Ciencias Sociales I", tipo: "FUNDAMENTAL", horas: 2 },
+    { nombre: "Pensamiento Filosófico y Humanidades I", tipo: "FUNDAMENTAL", horas: 4 },
+    { nombre: "Cultura Digital I", tipo: "FUNDAMENTAL", horas: 3 },
+    { nombre: "Inglés I", tipo: "FUNDAMENTAL", horas: 3 },
+    { nombre: "Formación Socioemocional", tipo: "SOCIOEMOCIONAL", horas: 1 },
+    { nombre: "Bioética Social", tipo: "FUNDAMENTAL", horas: 2 },
+    { nombre: "Humanismo Mexicano", tipo: "FUNDAMENTAL", horas: 2 },
+  ];
+}
+
+/**
+ * Obtiene la malla curricular COMPLETA para un grupo de Bachillerato Tecnológico
+ * Combina las asignaturas Fundamentales del semestre + Módulos de Carrera Técnica + Propedéutica
+ * 
+ * - Semestre 1: 10 UACs Fundamentales (28h)
+ * - Semestre 3: 6 Fundamentales (22h) + Módulo II Carrera (17h) = 39h
+ * - Semestre 5: 5 Fundamentales (20h) + Propedéutica (3h) + Módulo IV Carrera (12h) = 35h
+ * - Semestres pares (2, 4, 6) con continuidad de malla.
+ */
+export function obtenerAsignaturasParaGrupoTecnologico(
+  semestre: number,
+  carreraId: string = "contabilidad",
+  versionPrograma: "nuevo" | "anterior" = "nuevo",
+  materiaPropedutica?: string
+): { nombre: string; tipo: "FUNDAMENTAL" | "MODULAR" | "PROPEDUTICA" | "SOCIOEMOCIONAL"; horas: number }[] {
+
+  if (semestre === 1) {
+    return obtenerAsignaturas1erSemestreTecnologico();
+  }
+
+  if (semestre === 2) {
+    const modI = getModulosPorSemestre(carreraId, 2, versionPrograma);
+    const modulares = modI
+      ? modI.submodulos.map(sub => ({
+          nombre: sub.nombre,
+          tipo: "MODULAR" as const,
+          horas: sub.horasSemanales,
+        }))
+      : [];
+
+    return [
+      { nombre: "Conservación de la Materia y sus Interacciones con la Energía", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Pensamiento Matemático II", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Humanidades II", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Lenguaje y Comunicación II", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Inglés II", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Cultura Digital II", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Ciencias Sociales II", tipo: "FUNDAMENTAL", horas: 2 },
+      { nombre: "Actividades Físicas y Deportivas II", tipo: "SOCIOEMOCIONAL", horas: 2 },
+      ...modulares
+    ];
+  }
+
+  if (semestre === 3) {
+    // 6 Fundamentales (22h) + Módulo II Carrera (17h) = 39h
+    const fundamentales: { nombre: string; tipo: "FUNDAMENTAL" | "SOCIOEMOCIONAL"; horas: number }[] = [
+      { nombre: "Lengua y Comunicación III", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Pensamiento Matemático III", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Ciencias Naturales, Experimentales y Tecnología III", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Pensamiento Filosófico y Humanidades III", tipo: "FUNDAMENTAL", horas: 5 },
+      { nombre: "Inglés III", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Formación Socioemocional III", tipo: "SOCIOEMOCIONAL", horas: 3 },
+    ];
+
+    const modulo = getModulosPorSemestre(carreraId, 3, versionPrograma);
+    const modulares = modulo
+      ? modulo.submodulos.map(sub => ({
+          nombre: sub.nombre,
+          tipo: "MODULAR" as const,
+          horas: sub.horasSemanales,
+        }))
+      : [
+          { nombre: "Submódulo 1 de Carrera Técnica", tipo: "MODULAR" as const, horas: 11 },
+          { nombre: "Submódulo 2 de Carrera Técnica", tipo: "MODULAR" as const, horas: 6 },
+        ];
+
+    return [...fundamentales, ...modulares];
+  }
+
+  if (semestre === 4) {
+    // 6 Fundamentales (22h) + Módulo III Carrera (17h) = 39h
+    const fundamentales: { nombre: string; tipo: "FUNDAMENTAL" | "SOCIOEMOCIONAL"; horas: number }[] = [
+      { nombre: "Lengua y Comunicación IV", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Pensamiento Matemático IV", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Ciencias Naturales, Experimentales y Tecnología IV", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Pensamiento Filosófico y Humanidades IV", tipo: "FUNDAMENTAL", horas: 5 },
+      { nombre: "Inglés IV", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "Formación Socioemocional IV", tipo: "SOCIOEMOCIONAL", horas: 3 },
+    ];
+
+    const modulo = getModulosPorSemestre(carreraId, 4, versionPrograma);
+    const modulares = modulo
+      ? modulo.submodulos.map(sub => ({
+          nombre: sub.nombre,
+          tipo: "MODULAR" as const,
+          horas: sub.horasSemanales,
+        }))
+      : [
+          { nombre: "Submódulo 1 de Carrera Técnica", tipo: "MODULAR" as const, horas: 10 },
+          { nombre: "Submódulo 2 de Carrera Técnica", tipo: "MODULAR" as const, horas: 7 },
+        ];
+
+    return [...fundamentales, ...modulares];
+  }
+
+  if (semestre === 5) {
+    // 5 Fundamentales (20h) + Propedéutica (3h) + Módulo IV Carrera (12h) = 35h
+    const fundamentales: { nombre: string; tipo: "FUNDAMENTAL" | "SOCIOEMOCIONAL"; horas: number }[] = [
+      { nombre: "Inglés V", tipo: "FUNDAMENTAL", horas: 5 },
+      { nombre: "Temas Selectos de Matemáticas II", tipo: "FUNDAMENTAL", horas: 5 },
+      { nombre: "Conciencia Histórica II. México Durante el Expansionismo Capitalista", tipo: "FUNDAMENTAL", horas: 3 },
+      { nombre: "La Energía en los Procesos de la Vida Diaria", tipo: "FUNDAMENTAL", horas: 4 },
+      { nombre: "Formación Socioemocional V", tipo: "SOCIOEMOCIONAL", horas: 3 },
+    ];
+
+    const propedeutica = {
+      nombre: materiaPropedutica || "Derecho y Sociedad I",
+      tipo: "PROPEDUTICA" as const,
+      horas: 3,
+    };
+
+    const modulo = getModulosPorSemestre(carreraId, 5, versionPrograma);
+    const modulares = modulo
+      ? modulo.submodulos.map(sub => ({
+          nombre: sub.nombre,
+          tipo: "MODULAR" as const,
+          horas: sub.horasSemanales,
+        }))
+      : [
+          { nombre: "Submódulo 1 de Carrera Técnica", tipo: "MODULAR" as const, horas: 7 },
+          { nombre: "Submódulo 2 de Carrera Técnica", tipo: "MODULAR" as const, horas: 5 },
+        ];
+
+    return [...fundamentales, propedeutica, ...modulares];
+  }
+
+  // Semestre 6: 5 Fundamentales (20h) + Propedéutica Continua (3h) + Módulo V (12h) = 35h
+  const fundamentales6: { nombre: string; tipo: "FUNDAMENTAL" | "SOCIOEMOCIONAL"; horas: number }[] = [
+    { nombre: "Inglés VI", tipo: "FUNDAMENTAL", horas: 5 },
+    { nombre: "Temas Selectos de Matemáticas III", tipo: "FUNDAMENTAL", horas: 5 },
+    { nombre: "Conciencia Histórica III. México en el Siglo XXI", tipo: "FUNDAMENTAL", horas: 3 },
+    { nombre: "La Energía en los Procesos de la Vida Diaria II", tipo: "FUNDAMENTAL", horas: 4 },
+    { nombre: "Formación Socioemocional VI", tipo: "SOCIOEMOCIONAL", horas: 3 },
+  ];
+
+  const propedeutica6 = {
+    nombre: materiaPropedutica ? `${materiaPropedutica} II` : "Derecho y Sociedad II",
+    tipo: "PROPEDUTICA" as const,
+    horas: 3,
+  };
+
+  const modulo6 = getModulosPorSemestre(carreraId, 6, versionPrograma);
+  const modulares6 = modulo6
+    ? modulo6.submodulos.map(sub => ({
+        nombre: sub.nombre,
+        tipo: "MODULAR" as const,
+        horas: sub.horasSemanales,
+      }))
+    : [
+        { nombre: "Submódulo 1 de Carrera Técnica", tipo: "MODULAR" as const, horas: 6 },
+        { nombre: "Submódulo 2 de Carrera Técnica", tipo: "MODULAR" as const, horas: 6 },
+      ];
+
+  return [...fundamentales6, propedeutica6, ...modulares6];
+}
+
